@@ -15,7 +15,11 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   response => response,
   async error => {
-    if (error.response?.status === 401) {
+    // Never intercept auth endpoint failures — let login/register pages handle their own errors
+    const url: string = error.config?.url ?? '';
+    const isAuthEndpoint = url.includes('/auth/');
+
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) {
         window.location.href = '/login';
@@ -32,9 +36,6 @@ api.interceptors.response.use(
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';
       }
-    }
-    if (error.response?.status === 403) {
-      // Don't redirect on 403 — show access denied in UI
     }
     return Promise.reject(error);
   }
