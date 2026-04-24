@@ -79,7 +79,8 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('gym_id', gymId)
-        .eq('status', 'active')
+        .eq('is_active', true)
+        .is('deleted_at', null)
         .eq('role', 'member'),
 
       // New members this month
@@ -153,7 +154,7 @@ router.get('/members', async (req: Request, res: Response, next: NextFunction) =
 
     let query = supabase
       .from('users')
-      .select('id, username, full_name, email, avatar_url, created_at, last_active_at, status', { count: 'exact' })
+      .select('id, username, full_name, email, avatar_url, created_at, last_active_at, is_active, deleted_at', { count: 'exact' })
       .eq('gym_id', gymId)
       .eq('role', 'member')
       .range(offset, offset + pageSize - 1);
@@ -161,8 +162,10 @@ router.get('/members', async (req: Request, res: Response, next: NextFunction) =
     if (search) {
       query = query.or(`username.ilike.%${search}%,full_name.ilike.%${search}%`);
     }
-    if (status) {
-      query = query.eq('status', status);
+    if (status === 'active') {
+      query = query.eq('is_active', true).is('deleted_at', null);
+    } else if (status === 'suspended') {
+      query = query.eq('is_active', false).is('deleted_at', null);
     }
 
     // Parallel: fetch members + workout counts
@@ -186,6 +189,8 @@ router.get('/members', async (req: Request, res: Response, next: NextFunction) =
 
     const members = (membersResult.data ?? []).map((m) => ({
       ...m,
+      // Derive a status string for the frontend from the boolean flags
+      status: m.deleted_at ? 'deleted' : m.is_active ? 'active' : 'suspended',
       workout_count: workoutCountMap.get(m.id) ?? 0,
     }));
 
@@ -229,17 +234,15 @@ router.patch('/members/:id/suspend', async (req: Request, res: Response, next: N
       }
     }
 
-    const newStatus = suspended ? 'suspended' : 'active';
-
     const { error } = await supabase
       .from('users')
-      .update({ status: newStatus })
+      .update({ is_active: !suspended })
       .eq('id', memberId)
       .eq('gym_id', gymId);
 
     if (error) throw new AppError('UPDATE_FAILED', 500, 'Failed to update member status');
 
-    return res.json({ data: { updated: true, status: newStatus } });
+    return res.json({ data: { updated: true, status: suspended ? 'suspended' : 'active' } });
   } catch (err) {
     next(err);
   }
@@ -254,7 +257,7 @@ router.delete('/members/:id', async (req: Request, res: Response, next: NextFunc
 
     const { error } = await supabase
       .from('users')
-      .update({ deleted_at: new Date().toISOString(), status: 'deleted' })
+      .update({ deleted_at: new Date().toISOString(), is_active: false })
       .eq('id', memberId)
       .eq('gym_id', gymId);
 

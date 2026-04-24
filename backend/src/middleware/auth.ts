@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { supabase } from '../lib/supabase';
 import { AppError } from './errorHandler';
 
 declare global {
@@ -23,7 +24,7 @@ const PUBLIC_PATHS = [
   '/api/v1/gyms/validate-invite',
 ];
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isPublic = PUBLIC_PATHS.some(path => req.originalUrl.startsWith(path)) ||
     (req.method === 'POST' && /^\/api\/v1\/gyms\/?$/.test(req.originalUrl));
 
@@ -34,14 +35,22 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   try {
     const decoded: any = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
-    const gymId = decoded.app_metadata?.gym_id || null;
-    const role = decoded.app_metadata?.role ?? 'member';
+    const userId: string = decoded.sub;
 
-    if (!gymId && role !== 'super_admin') {
-      return next(new AppError('UNAUTHORIZED', 401, 'Invalid token claims'));
+    // Always resolve gym_id and role from the database — never rely solely on
+    // JWT app_metadata claims, which require the Supabase auth hook to be
+    // perfectly configured. The DB is the source of truth.
+    const { data: userRow, error } = await supabase
+      .from('users')
+      .select('gym_id, role')
+      .eq('id', userId)
+      .single();
+
+    if (error || !userRow) {
+      return next(new AppError('UNAUTHORIZED', 401, 'User not found'));
     }
 
-    req.user = { id: decoded.sub, gym_id: gymId, role };
+    req.user = { id: userId, gym_id: userRow.gym_id, role: userRow.role };
     next();
   } catch {
     return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired token'));
