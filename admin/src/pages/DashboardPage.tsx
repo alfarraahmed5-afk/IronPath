@@ -45,7 +45,7 @@ export default function DashboardPage() {
         setStats(res.data.data as DashboardStats);
       })
       .catch((err) => {
-        setError(err?.response?.data?.message ?? 'Failed to load stats');
+        setError(err?.response?.data?.error?.message ?? 'Failed to load stats');
       })
       .finally(() => setLoading(false));
   }, []);

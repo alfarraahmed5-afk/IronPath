@@ -15,6 +15,12 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   }
   next();
 });
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.user!.gym_id) {
+    return next(new AppError('FORBIDDEN', 403, 'No gym associated with this account'));
+  }
+  next();
+});
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
@@ -470,13 +476,15 @@ router.get('/challenges', async (req: Request, res: Response, next: NextFunction
 
     const { data, error } = await supabase
       .from('leaderboard_challenges')
-      .select('*')
+      .select('id, name, description, metric, exercise_id, starts_at, ends_at, status, created_at')
       .eq('gym_id', gymId)
       .order('starts_at', { ascending: false });
 
     if (error) throw new AppError('FETCH_FAILED', 500, 'Failed to fetch challenges');
 
-    return res.json({ data: { challenges: data ?? [] } });
+    // Map 'name' → 'title' so the frontend interface stays unchanged
+    const challenges = (data ?? []).map(c => ({ ...c, title: c.name }));
+    return res.json({ data: { challenges } });
   } catch (err) {
     next(err);
   }
@@ -497,7 +505,8 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
       .from('leaderboard_challenges')
       .insert({
         gym_id: gymId,
-        title: body.title,
+        created_by: req.user!.id,
+        name: body.title,
         description: body.description ?? null,
         metric: body.metric,
         exercise_id: body.exercise_id ?? null,
@@ -510,7 +519,7 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
 
     if (error) throw new AppError('INSERT_FAILED', 500, 'Failed to create challenge');
 
-    return res.json({ data: { challenge: data } });
+    return res.json({ data: { challenge: { ...data, title: (data as any).name } } });
   } catch (err) {
     next(err);
   }
@@ -540,10 +549,15 @@ router.patch('/challenges/:id', async (req: Request, res: Response, next: NextFu
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid request body');
 
     const body = parsed.data;
+    const update: Record<string, unknown> = {};
+    if (body.title !== undefined) update.name = body.title;
+    if (body.description !== undefined) update.description = body.description;
+    if (body.starts_at !== undefined) update.starts_at = body.starts_at;
+    if (body.ends_at !== undefined) update.ends_at = body.ends_at;
 
     const { error } = await supabase
       .from('leaderboard_challenges')
-      .update(body)
+      .update(update)
       .eq('id', challengeId)
       .eq('gym_id', gymId);
 
