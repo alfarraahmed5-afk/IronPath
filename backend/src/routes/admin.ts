@@ -296,7 +296,7 @@ router.get('/invites', async (req: Request, res: Response, next: NextFunction) =
       .eq('id', gymId)
       .single();
 
-    if (error || !gym) throw new AppError('FETCH_FAILED', 500, 'Failed to fetch invite code');
+    if (error || !gym) throw new AppError('FETCH_FAILED', 500, `Failed to fetch invite code: ${error?.message ?? 'gym not found'} [gymId=${gymId}]`);
 
     const invites = [{
       id: gym.id,
@@ -416,7 +416,7 @@ router.post('/announcements', async (req: Request, res: Response, next: NextFunc
       .select('id, title, content, is_pinned, created_at')
       .single();
 
-    if (error) throw new AppError('INSERT_FAILED', 500, 'Failed to create announcement');
+    if (error) throw new AppError('INSERT_FAILED', 500, `Failed to create announcement: ${error.message}`);
 
     return res.json({ data: { announcement: { ...data, body: data.content } } });
   } catch (err) {
@@ -524,7 +524,7 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
       .select()
       .single();
 
-    if (error) throw new AppError('INSERT_FAILED', 500, 'Failed to create challenge');
+    if (error) throw new AppError('INSERT_FAILED', 500, `Failed to create challenge: ${error.message}`);
 
     return res.json({ data: { challenge: { ...data, title: (data as any).name } } });
   } catch (err) {
