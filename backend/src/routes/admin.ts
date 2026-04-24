@@ -15,9 +15,16 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   }
   next();
 });
+
+// ─── GET /admin/me — diagnostic: exempt from gym_id requirement ───────────────
+router.get('/me', (req: Request, res: Response) => {
+  res.json({ data: { user: req.user } });
+});
+
+// All routes below require a gym to be linked to the account
 router.use((req: Request, res: Response, next: NextFunction) => {
   if (!req.user!.gym_id) {
-    return next(new AppError('FORBIDDEN', 403, 'No gym associated with this account'));
+    return next(new AppError('NO_GYM', 403, 'No gym associated with this account'));
   }
   next();
 });

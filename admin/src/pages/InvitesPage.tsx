@@ -24,13 +24,18 @@ export default function InvitesPage() {
     fetchInvites();
   }, []);
 
+  function extractError(err: unknown, fallback: string): string {
+    const e = err as any;
+    return e?.response?.data?.error?.message ?? e?.message ?? fallback;
+  }
+
   async function fetchInvites() {
     try {
       setLoading(true);
       const res = await api.get('/admin/invites');
       setInvites(res.data.data.invites);
     } catch (err) {
-      setError('Failed to load invite codes.');
+      setError(extractError(err, 'Failed to load invite codes.'));
     } finally {
       setLoading(false);
     }
@@ -50,7 +55,7 @@ export default function InvitesPage() {
       setMaxUses('');
       setExpiresAt('');
     } catch (err) {
-      setError('Failed to create invite code.');
+      setError(extractError(err, 'Failed to create invite code.'));
     } finally {
       setSubmitting(false);
     }

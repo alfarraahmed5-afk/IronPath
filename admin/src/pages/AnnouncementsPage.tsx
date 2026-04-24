@@ -77,8 +77,10 @@ export default function AnnouncementsPage() {
         setItems(prev => [res.data.data.announcement, ...prev]);
       }
       cancelForm();
-    } catch {
-      alert('Failed to save announcement.');
+    } catch (err) {
+      const e = err as any;
+      const msg = e?.response?.data?.error?.message ?? e?.message ?? 'Failed to save announcement.';
+      alert(`Failed to save announcement: ${msg}`);
     } finally {
       setSaving(false);
     }
