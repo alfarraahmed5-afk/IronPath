@@ -283,8 +283,8 @@ router.delete('/members/:id', async (req: Request, res: Response, next: NextFunc
 });
 
 // ─── GET /admin/invites ───────────────────────────────────────────────────────
-// The schema uses a single invite_code on the gyms table (not a separate table).
-// We return it as a list of one so the frontend UI works without changes.
+// The schema stores a single active invite on the gyms row.
+// We return it as a list of one so the frontend table UI works unchanged.
 
 router.get('/invites', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -292,20 +292,24 @@ router.get('/invites', async (req: Request, res: Response, next: NextFunction) =
 
     const { data: gym, error } = await supabase
       .from('gyms')
-      .select('id, invite_code, created_at')
+      .select('id, invite_code, invite_uses, invite_max_uses, invite_expires_at, created_at')
       .eq('id', gymId)
       .single();
 
     if (error || !gym) throw new AppError('FETCH_FAILED', 500, `Failed to fetch invite code: ${error?.message ?? 'gym not found'} [gymId=${gymId}]`);
 
+    const now = new Date();
+    const expired = gym.invite_expires_at ? new Date(gym.invite_expires_at) < now : false;
+    const maxed = gym.invite_max_uses !== null ? gym.invite_uses >= gym.invite_max_uses : false;
+
     const invites = [{
       id: gym.id,
       code: gym.invite_code,
       created_at: gym.created_at,
-      expires_at: null,
-      uses: 0,
-      max_uses: null,
-      is_active: true,
+      expires_at: gym.invite_expires_at,
+      uses: gym.invite_uses,
+      max_uses: gym.invite_max_uses,
+      is_active: !expired && !maxed,
     }];
 
     return res.json({ data: { invites } });
@@ -314,21 +318,30 @@ router.get('/invites', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-// ─── POST /admin/invites — regenerate the gym's invite code ──────────────────
+// ─── POST /admin/invites — generate a new invite code with optional constraints
 
 router.post('/invites', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
     const code = generateInviteCode();
 
+    // Parse optional constraints from request body
+    const maxUses = req.body.max_uses ? parseInt(req.body.max_uses, 10) : null;
+    const expiresAt = req.body.expires_at ? new Date(req.body.expires_at).toISOString() : null;
+
     const { data: gym, error } = await supabase
       .from('gyms')
-      .update({ invite_code: code })
+      .update({
+        invite_code: code,
+        invite_uses: 0,
+        invite_max_uses: maxUses,
+        invite_expires_at: expiresAt,
+      })
       .eq('id', gymId)
-      .select('id, invite_code, created_at')
+      .select('id, invite_code, invite_uses, invite_max_uses, invite_expires_at, created_at')
       .single();
 
-    if (error || !gym) throw new AppError('UPDATE_FAILED', 500, `Failed to regenerate invite code: ${error?.message ?? 'gym not found'} [gymId=${gymId}]`);
+    if (error || !gym) throw new AppError('UPDATE_FAILED', 500, `Failed to generate invite code: ${error?.message ?? 'gym not found'} [gymId=${gymId}]`);
 
     return res.json({
       data: {
@@ -336,9 +349,9 @@ router.post('/invites', async (req: Request, res: Response, next: NextFunction) 
           id: gym.id,
           code: gym.invite_code,
           created_at: gym.created_at,
-          expires_at: null,
-          uses: 0,
-          max_uses: null,
+          expires_at: gym.invite_expires_at,
+          uses: gym.invite_uses,
+          max_uses: gym.invite_max_uses,
           is_active: true,
         },
       },
@@ -348,7 +361,7 @@ router.post('/invites', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// ─── DELETE /admin/invites/:id — revoke = regenerate a fresh code ────────────
+// ─── DELETE /admin/invites/:id — revoke by replacing with a fresh unconstrained code
 
 router.delete('/invites/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -357,7 +370,12 @@ router.delete('/invites/:id', async (req: Request, res: Response, next: NextFunc
 
     const { error } = await supabase
       .from('gyms')
-      .update({ invite_code: newCode })
+      .update({
+        invite_code: newCode,
+        invite_uses: 0,
+        invite_max_uses: null,
+        invite_expires_at: null,
+      })
       .eq('id', gymId);
 
     if (error) throw new AppError('UPDATE_FAILED', 500, `Failed to revoke invite code: ${error.message}`);

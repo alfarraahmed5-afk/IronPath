@@ -32,10 +32,20 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
     }
     const { invite_code, email, password, username, full_name, sex, date_of_birth } = parsed.data;
     const { data: gym } = await supabase
-      .from('gyms').select('id, name, is_active, subscription_tier')
-      .eq('invite_code', invite_code.toUpperCase()).single();
+      .from('gyms')
+      .select('id, name, is_active, subscription_tier, invite_uses, invite_max_uses, invite_expires_at')
+      .eq('invite_code', invite_code.toUpperCase())
+      .single();
     if (!gym || !gym.is_active) {
       return next(new AppError('INVITE_INVALID', 404, 'Invite code not found or inactive'));
+    }
+    // Check invite expiry
+    if (gym.invite_expires_at && new Date(gym.invite_expires_at) < new Date()) {
+      return next(new AppError('INVITE_EXPIRED', 410, 'This invite code has expired'));
+    }
+    // Check invite max uses
+    if (gym.invite_max_uses !== null && gym.invite_uses >= gym.invite_max_uses) {
+      return next(new AppError('INVITE_EXHAUSTED', 410, 'This invite code has reached its maximum uses'));
     }
     const tierLimits: Record<string, number> = { starter: 50, growth: 200, unlimited: Infinity };
     const limit = gym.subscription_tier ? (tierLimits[gym.subscription_tier] ?? 50) : 50;
@@ -70,6 +80,8 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
     await Promise.all([
       supabase.from('user_settings').insert({ user_id: authUserId }),
       supabase.from('streaks').insert({ user_id: authUserId, gym_id: gym.id }),
+      // Increment invite use counter (best-effort — don't fail registration if this errors)
+      supabase.from('gyms').update({ invite_uses: (gym.invite_uses ?? 0) + 1 }).eq('id', gym.id),
     ]);
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) throw signInError;

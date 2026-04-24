@@ -23,8 +23,21 @@ router.get('/validate-invite/:code', inviteLimiter, async (req: Request, res: Re
   try {
     const code = req.params.code.toUpperCase();
     const { data: gym } = await supabase
-      .from('gyms').select('id, name, logo_url, is_active').eq('invite_code', code).single();
+      .from('gyms')
+      .select('id, name, logo_url, is_active, invite_uses, invite_max_uses, invite_expires_at')
+      .eq('invite_code', code)
+      .single();
     if (!gym || !gym.is_active) return next(new AppError('INVITE_INVALID', 404, 'Invite code not found or inactive'));
+
+    // Check expiry
+    if (gym.invite_expires_at && new Date(gym.invite_expires_at) < new Date()) {
+      return next(new AppError('INVITE_EXPIRED', 410, 'This invite code has expired'));
+    }
+    // Check max uses
+    if (gym.invite_max_uses !== null && gym.invite_uses >= gym.invite_max_uses) {
+      return next(new AppError('INVITE_EXHAUSTED', 410, 'This invite code has reached its maximum uses'));
+    }
+
     res.json({ data: { gym_id: gym.id, gym_name: gym.name, logo_url: gym.logo_url } });
   } catch (err) { next(err); }
 });
