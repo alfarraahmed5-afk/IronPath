@@ -55,3 +55,9 @@ coverage/
 
 # Misc
 specs/
+
+# Claude Code local settings
+.claude/
+
+# Supabase CLI local state
+supabase/.temp/
