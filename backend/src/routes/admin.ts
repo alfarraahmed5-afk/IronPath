@@ -328,7 +328,7 @@ router.post('/invites', async (req: Request, res: Response, next: NextFunction) 
       .select('id, invite_code, created_at')
       .single();
 
-    if (error || !gym) throw new AppError('UPDATE_FAILED', 500, 'Failed to regenerate invite code');
+    if (error || !gym) throw new AppError('UPDATE_FAILED', 500, `Failed to regenerate invite code: ${error?.message ?? 'gym not found'} [gymId=${gymId}]`);
 
     return res.json({
       data: {
@@ -360,7 +360,7 @@ router.delete('/invites/:id', async (req: Request, res: Response, next: NextFunc
       .update({ invite_code: newCode })
       .eq('id', gymId);
 
-    if (error) throw new AppError('UPDATE_FAILED', 500, 'Failed to revoke invite code');
+    if (error) throw new AppError('UPDATE_FAILED', 500, `Failed to revoke invite code: ${error.message}`);
 
     return res.json({ data: { revoked: true } });
   } catch (err) {

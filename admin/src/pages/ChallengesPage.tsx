@@ -117,8 +117,10 @@ export default function ChallengesPage() {
         setChallenges(prev => [res.data.data.challenge, ...prev]);
       }
       cancelForm();
-    } catch {
-      alert('Failed to save challenge.');
+    } catch (err) {
+      const e = err as any;
+      const msg = e?.response?.data?.error?.message ?? e?.message ?? 'Failed to save challenge.';
+      alert(`Failed to save challenge: ${msg}`);
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAuth } from '../lib/supabase';
 import { AppError } from './errorHandler';
 
 declare global {
@@ -35,7 +35,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   try {
     // Use Supabase's own token validation — no SUPABASE_JWT_SECRET required,
     // no manual jwt.verify() that breaks if the secret is misconfigured.
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+    // IMPORTANT: use the dedicated `supabaseAuth` client so that any internal
+    // session-state mutation from getUser() cannot leak into the main DB
+    // client's Authorization header (which is what was causing RLS to fire on
+    // service-role DB queries).
+    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
     if (authError || !authUser) {
       return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired token'));
     }
