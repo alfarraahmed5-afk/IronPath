@@ -1,0 +1,22 @@
+CREATE TABLE body_measurements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  gym_id UUID REFERENCES gyms(id) NOT NULL,
+  measured_at TIMESTAMPTZ NOT NULL,
+  bodyweight_kg DECIMAL(5,2) CHECK (bodyweight_kg > 0 AND bodyweight_kg < 700),
+  body_fat_percentage DECIMAL(4,1) CHECK (body_fat_percentage >= 0 AND body_fat_percentage <= 100),
+  neck_cm DECIMAL(5,1) CHECK (neck_cm > 0),
+  chest_cm DECIMAL(5,1) CHECK (chest_cm > 0),
+  waist_cm DECIMAL(5,1) CHECK (waist_cm > 0),
+  hips_cm DECIMAL(5,1) CHECK (hips_cm > 0),
+  left_arm_cm DECIMAL(5,1) CHECK (left_arm_cm > 0),
+  right_arm_cm DECIMAL(5,1) CHECK (right_arm_cm > 0),
+  left_forearm_cm DECIMAL(5,1) CHECK (left_forearm_cm > 0),
+  right_forearm_cm DECIMAL(5,1) CHECK (right_forearm_cm > 0),
+  left_thigh_cm DECIMAL(5,1) CHECK (left_thigh_cm > 0),
+  right_thigh_cm DECIMAL(5,1) CHECK (right_thigh_cm > 0),
+  left_calf_cm DECIMAL(5,1) CHECK (left_calf_cm > 0),
+  right_calf_cm DECIMAL(5,1) CHECK (right_calf_cm > 0),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);

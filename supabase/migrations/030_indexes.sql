@@ -1,0 +1,27 @@
+CREATE INDEX idx_users_gym_id ON users(gym_id);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_exercises_gym_id ON exercises(gym_id);
+CREATE INDEX idx_exercises_name_fts ON exercises USING gin(to_tsvector('english', name));
+CREATE INDEX idx_routines_user_id ON routines(user_id);
+CREATE INDEX idx_routines_gym_id ON routines(gym_id);
+CREATE INDEX idx_routine_exercises_routine_id ON routine_exercises(routine_id);
+CREATE INDEX idx_routine_sets_routine_exercise_id ON routine_sets(routine_exercise_id);
+CREATE INDEX idx_workouts_user_id ON workouts(user_id);
+CREATE INDEX idx_workouts_gym_id ON workouts(gym_id);
+CREATE INDEX idx_workouts_started_at ON workouts(started_at DESC);
+CREATE INDEX idx_workouts_gym_feed ON workouts(gym_id, visibility, started_at DESC);
+CREATE INDEX idx_workouts_user_completed ON workouts(user_id, is_completed, started_at DESC);
+CREATE INDEX idx_workout_exercises_workout_id ON workout_exercises(workout_id);
+CREATE INDEX idx_workout_sets_workout_exercise_id ON workout_sets(workout_exercise_id);
+CREATE INDEX idx_personal_records_user_exercise ON personal_records(user_id, exercise_id);
+CREATE INDEX idx_personal_records_leaderboard
+  ON personal_records(gym_id, exercise_id, record_type, value DESC);
+CREATE INDEX idx_body_measurements_user_id ON body_measurements(user_id, measured_at DESC);
+CREATE INDEX idx_workout_media_workout_id ON workout_media(workout_id);
+CREATE INDEX idx_follows_follower ON follows(follower_id);
+CREATE INDEX idx_follows_following ON follows(following_id);
+CREATE INDEX idx_follows_active ON follows(follower_id, following_id) WHERE status = 'active';
+CREATE INDEX idx_workout_likes_workout_id ON workout_likes(workout_id);
+CREATE INDEX idx_workout_comments_workout_id ON workout_comments(workout_id);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id, is_read, created_at DESC);
+CREATE INDEX idx_monthly_reports_user ON monthly_reports(user_id, report_period_start DESC);

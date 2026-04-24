@@ -1,0 +1,11 @@
+{
+  "name": "ironpath-monorepo",
+  "private": true,
+  "workspaces": ["mobile", "backend", "admin", "shared"],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:admin": "npm run dev --workspace=admin",
+    "build:backend": "npm run build --workspace=backend",
+    "build:admin": "npm run build --workspace=admin"
+  }
+}
