@@ -270,72 +270,84 @@ router.delete('/members/:id', async (req: Request, res: Response, next: NextFunc
 });
 
 // ─── GET /admin/invites ───────────────────────────────────────────────────────
+// The schema uses a single invite_code on the gyms table (not a separate table).
+// We return it as a list of one so the frontend UI works without changes.
 
 router.get('/invites', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
 
-    const { data, error } = await supabase
-      .from('gym_invite_codes')
-      .select('id, code, created_at, expires_at, uses, max_uses')
-      .eq('gym_id', gymId)
-      .eq('is_active', true);
+    const { data: gym, error } = await supabase
+      .from('gyms')
+      .select('id, invite_code, created_at')
+      .eq('id', gymId)
+      .single();
 
-    if (error) throw new AppError('FETCH_FAILED', 500, 'Failed to fetch invites');
+    if (error || !gym) throw new AppError('FETCH_FAILED', 500, 'Failed to fetch invite code');
 
-    return res.json({ data: { invites: data ?? [] } });
+    const invites = [{
+      id: gym.id,
+      code: gym.invite_code,
+      created_at: gym.created_at,
+      expires_at: null,
+      uses: 0,
+      max_uses: null,
+      is_active: true,
+    }];
+
+    return res.json({ data: { invites } });
   } catch (err) {
     next(err);
   }
 });
 
-// ─── POST /admin/invites ──────────────────────────────────────────────────────
+// ─── POST /admin/invites — regenerate the gym's invite code ──────────────────
 
 router.post('/invites', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
-
-    const parsed = inviteCreateSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid request body');
-
-    const body = parsed.data;
     const code = generateInviteCode();
 
-    const { data, error } = await supabase
-      .from('gym_invite_codes')
-      .insert({
-        gym_id: gymId,
-        code,
-        max_uses: body.max_uses ?? null,
-        expires_at: body.expires_at ?? null,
-        is_active: true,
-        uses: 0,
-      })
-      .select()
+    const { data: gym, error } = await supabase
+      .from('gyms')
+      .update({ invite_code: code })
+      .eq('id', gymId)
+      .select('id, invite_code, created_at')
       .single();
 
-    if (error) throw new AppError('INSERT_FAILED', 500, 'Failed to create invite');
+    if (error || !gym) throw new AppError('UPDATE_FAILED', 500, 'Failed to regenerate invite code');
 
-    return res.json({ data: { invite: data } });
+    return res.json({
+      data: {
+        invite: {
+          id: gym.id,
+          code: gym.invite_code,
+          created_at: gym.created_at,
+          expires_at: null,
+          uses: 0,
+          max_uses: null,
+          is_active: true,
+        },
+      },
+    });
   } catch (err) {
     next(err);
   }
 });
 
-// ─── DELETE /admin/invites/:id ────────────────────────────────────────────────
+// ─── DELETE /admin/invites/:id — revoke = regenerate a fresh code ────────────
 
 router.delete('/invites/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
-    const inviteId = req.params.id;
+    const newCode = generateInviteCode();
 
     const { error } = await supabase
-      .from('gym_invite_codes')
-      .update({ is_active: false })
-      .eq('id', inviteId)
-      .eq('gym_id', gymId);
+      .from('gyms')
+      .update({ invite_code: newCode })
+      .eq('id', gymId);
 
-    if (error) throw new AppError('UPDATE_FAILED', 500, 'Failed to revoke invite');
+    if (error) throw new AppError('UPDATE_FAILED', 500, 'Failed to revoke invite code');
 
     return res.json({ data: { revoked: true } });
   } catch (err) {
@@ -344,24 +356,24 @@ router.delete('/invites/:id', async (req: Request, res: Response, next: NextFunc
 });
 
 // ─── GET /admin/announcements ─────────────────────────────────────────────────
+// Table is gym_announcements; column is 'content' not 'body', 'created_by' not 'author_id'.
+// We alias content→body in the response so the frontend interface stays unchanged.
 
 router.get('/announcements', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
 
-    try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('gym_id', gymId)
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('gym_announcements')
+      .select('id, title, content, is_pinned, created_at')
+      .eq('gym_id', gymId)
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false });
 
-      if (error) return res.json({ data: { announcements: [] } });
+    if (error) return res.json({ data: { announcements: [] } });
 
-      return res.json({ data: { announcements: data ?? [] } });
-    } catch {
-      return res.json({ data: { announcements: [] } });
-    }
+    const announcements = (data ?? []).map(a => ({ ...a, body: a.content }));
+    return res.json({ data: { announcements } });
   } catch (err) {
     next(err);
   }
@@ -380,20 +392,20 @@ router.post('/announcements', async (req: Request, res: Response, next: NextFunc
     const body = parsed.data;
 
     const { data, error } = await supabase
-      .from('announcements')
+      .from('gym_announcements')
       .insert({
         gym_id: gymId,
-        author_id: authorId,
+        created_by: authorId,
         title: body.title,
-        body: body.body,
+        content: body.body,
         is_pinned: body.is_pinned ?? false,
       })
-      .select()
+      .select('id, title, content, is_pinned, created_at')
       .single();
 
     if (error) throw new AppError('INSERT_FAILED', 500, 'Failed to create announcement');
 
-    return res.json({ data: { announcement: data } });
+    return res.json({ data: { announcement: { ...data, body: data.content } } });
   } catch (err) {
     next(err);
   }
@@ -409,11 +421,15 @@ router.patch('/announcements/:id', async (req: Request, res: Response, next: Nex
     const parsed = announcementUpdateSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid request body');
 
-    const body = parsed.data;
+    const { body: bodyText, title, is_pinned } = parsed.data as any;
+    const update: Record<string, any> = {};
+    if (title !== undefined) update.title = title;
+    if (bodyText !== undefined) update.content = bodyText;
+    if (is_pinned !== undefined) update.is_pinned = is_pinned;
 
     const { error } = await supabase
-      .from('announcements')
-      .update(body)
+      .from('gym_announcements')
+      .update(update)
       .eq('id', announcementId)
       .eq('gym_id', gymId);
 
@@ -433,7 +449,7 @@ router.delete('/announcements/:id', async (req: Request, res: Response, next: Ne
     const announcementId = req.params.id;
 
     const { error } = await supabase
-      .from('announcements')
+      .from('gym_announcements')
       .delete()
       .eq('id', announcementId)
       .eq('gym_id', gymId);

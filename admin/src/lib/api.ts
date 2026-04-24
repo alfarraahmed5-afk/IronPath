@@ -11,32 +11,37 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Handle token refresh on 401
+// Handle token refresh on 401 — never retry more than once, never intercept auth endpoints
 api.interceptors.response.use(
   response => response,
   async error => {
-    // Never intercept auth endpoint failures — let login/register pages handle their own errors
     const url: string = error.config?.url ?? '';
     const isAuthEndpoint = url.includes('/auth/');
+    const alreadyRetried = error.config?._retry === true;
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    if (error.response?.status === 401 && !isAuthEndpoint && !alreadyRetried) {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) {
+        localStorage.removeItem('access_token');
         window.location.href = '/login';
         return Promise.reject(error);
       }
       try {
         const res = await axios.post(`${API_URL}/auth/refresh`, { refresh_token: refresh });
-        localStorage.setItem('access_token', res.data.data.access_token);
-        localStorage.setItem('refresh_token', res.data.data.refresh_token);
-        error.config.headers.Authorization = `Bearer ${res.data.data.access_token}`;
+        const { access_token, refresh_token } = res.data.data;
+        localStorage.setItem('access_token', access_token);
+        localStorage.setItem('refresh_token', refresh_token);
+        error.config._retry = true;
+        error.config.headers.Authorization = `Bearer ${access_token}`;
         return api(error.config);
       } catch {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';
+        return Promise.reject(error);
       }
     }
+
     return Promise.reject(error);
   }
 );

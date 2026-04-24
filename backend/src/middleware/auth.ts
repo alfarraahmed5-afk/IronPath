@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { supabase } from '../lib/supabase';
 import { AppError } from './errorHandler';
 
@@ -34,23 +33,25 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (!token) return next(new AppError('UNAUTHORIZED', 401, 'Missing token'));
 
   try {
-    const decoded: any = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
-    const userId: string = decoded.sub;
+    // Use Supabase's own token validation — no SUPABASE_JWT_SECRET required,
+    // no manual jwt.verify() that breaks if the secret is misconfigured.
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser) {
+      return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired token'));
+    }
 
-    // Always resolve gym_id and role from the database — never rely solely on
-    // JWT app_metadata claims, which require the Supabase auth hook to be
-    // perfectly configured. The DB is the source of truth.
-    const { data: userRow, error } = await supabase
+    // Always read role and gym_id from the DB — it is the source of truth.
+    const { data: userRow, error: dbError } = await supabase
       .from('users')
       .select('gym_id, role')
-      .eq('id', userId)
+      .eq('id', authUser.id)
       .single();
 
-    if (error || !userRow) {
+    if (dbError || !userRow) {
       return next(new AppError('UNAUTHORIZED', 401, 'User not found'));
     }
 
-    req.user = { id: userId, gym_id: userRow.gym_id, role: userRow.role };
+    req.user = { id: authUser.id, gym_id: userRow.gym_id, role: userRow.role };
     next();
   } catch {
     return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired token'));
