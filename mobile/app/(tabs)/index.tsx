@@ -21,23 +21,24 @@ import { useAuthStore } from '../../src/stores/authStore';
 interface FeedWorkout {
   id: string;
   user_id: string;
-  workout_name: string;
+  // Backend feed shape uses `name`/`total_sets`, not `workout_name`/`exercise_count`.
+  name: string;
   started_at: string;
   duration_seconds: number;
   total_volume_kg: number | null;
-  exercise_count: number;
+  total_sets: number;
   visibility: 'public' | 'followers' | 'private';
   like_count: number;
   comment_count: number;
   viewer_liked: boolean;
-  media: { id: string; storage_path: string; media_type: 'photo' | 'video' }[];
-  user: { id: string; username: string; full_name: string; avatar_url: string | null };
+  media: { url: string; media_type: 'photo' | 'video'; position: number }[];
+  user: { username: string; full_name: string | null; avatar_url: string | null };
 }
 
 interface Comment {
   id: string;
   user_id: string;
-  text: string;
+  content: string;
   created_at: string;
   deleted_at: string | null;
   user: { id: string; username: string; avatar_url: string | null };
@@ -125,7 +126,7 @@ function CommentItem({ comment, currentUserId, onDelete }: CommentItemProps) {
             {formatRelative(comment.created_at)}
           </Text>
         </View>
-        <Text className="text-gray-300 text-sm mt-0.5">{comment.text}</Text>
+        <Text className="text-gray-300 text-sm mt-0.5">{comment.content}</Text>
       </View>
       {currentUserId === comment.user_id && (
         <TouchableOpacity
@@ -172,9 +173,11 @@ function CommentModal({
       setError(null);
       try {
         const params = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+        // Likes/comments are mounted under /api/v1/feed in backend (see
+        // backend/src/index.ts), not /api/v1/workouts.
         const res = await api.get<{
           data: { comments: Comment[]; next_cursor: string | null };
-        }>(`/workouts/${workoutId}/comments${params}`);
+        }>(`/feed/workouts/${workoutId}/comments${params}`);
         const { comments: fetched, next_cursor } = res.data;
         setComments((prev) => (cursor ? [...prev, ...fetched] : fetched));
         setNextCursor(next_cursor);
@@ -200,12 +203,13 @@ function CommentModal({
     if (!workoutId || !newText.trim()) return;
     setSending(true);
     try {
+      // Backend schema expects { content }, not { text }.
       const res = await api.post<{ data: { comment: Comment } }>(
-        `/workouts/${workoutId}/comments`,
-        { text: newText.trim() }
+        `/feed/workouts/${workoutId}/comments`,
+        { content: newText.trim() }
       );
       const created = res.data.comment;
-      setComments((prev) => [created, ...prev]);
+      setComments((prev) => [...prev, created]);
       setNewText('');
       onCommentCountChange(workoutId, 1);
     } catch {
@@ -218,7 +222,7 @@ function CommentModal({
   const handleDelete = async (commentId: string) => {
     if (!workoutId) return;
     try {
-      await api.delete(`/workouts/${workoutId}/comments/${commentId}`);
+      await api.delete(`/feed/workouts/${workoutId}/comments/${commentId}`);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
       onCommentCountChange(workoutId, -1);
     } catch {
@@ -346,7 +350,7 @@ function WorkoutCard({ workout, onLikeToggle, onCommentPress }: WorkoutCardProps
       <View className="flex-row items-center px-4 pt-4 pb-3">
         <Avatar
           avatarUrl={workout.user.avatar_url}
-          fullName={workout.user.full_name}
+          fullName={workout.user.full_name ?? workout.user.username}
           size={40}
         />
         <View className="ml-3 flex-1">
@@ -361,7 +365,7 @@ function WorkoutCard({ workout, onLikeToggle, onCommentPress }: WorkoutCardProps
 
       {/* Workout name */}
       <View className="px-4 pb-3">
-        <Text className="text-white font-bold text-base">{workout.workout_name}</Text>
+        <Text className="text-white font-bold text-base">{workout.name}</Text>
       </View>
 
       {/* Stats row */}
@@ -381,9 +385,9 @@ function WorkoutCard({ workout, onLikeToggle, onCommentPress }: WorkoutCardProps
           </View>
         )}
         <View className="items-center">
-          <Text className="text-gray-400 text-xs mb-0.5">Exercises</Text>
+          <Text className="text-gray-400 text-xs mb-0.5">Sets</Text>
           <Text className="text-white font-semibold text-sm">
-            {workout.exercise_count}
+            {workout.total_sets}
           </Text>
         </View>
       </View>
@@ -528,9 +532,9 @@ export default function FeedScreen() {
 
     try {
       if (wasLiked) {
-        await api.delete(`/workouts/${workoutId}/like`);
+        await api.delete(`/feed/workouts/${workoutId}/like`);
       } else {
-        await api.post(`/workouts/${workoutId}/like`, {});
+        await api.post(`/feed/workouts/${workoutId}/like`, {});
       }
     } catch {
       // Revert on failure

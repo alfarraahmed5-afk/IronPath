@@ -18,14 +18,13 @@ interface CompletedSet {
 
 interface WorkoutExercise {
   exercise_id: string;
-  exercise_name: string;
-  logging_type: string;
+  exercise: { id: string; name: string; equipment?: string; logging_type: string; image_url?: string | null } | null;
   position: number;
   sets: CompletedSet[];
 }
 
 interface PersonalRecord {
-  exercise_name: string;
+  exercise_id: string;
   record_type: string;
   value: number;
 }
@@ -40,7 +39,7 @@ interface WorkoutDetail {
   total_sets: number;
   visibility: string;
   exercises: WorkoutExercise[];
-  prs: PersonalRecord[];
+  personal_records: PersonalRecord[];
 }
 
 function formatDuration(seconds: number): string {
@@ -119,8 +118,10 @@ export default function WorkoutDetailScreen() {
 
     const fetchWorkout = async () => {
       try {
-        const response = await api.get<{ data: { workout: WorkoutDetail } }>(`/workouts/${id}`);
-        setWorkout(response.data.workout);
+        // Backend returns the workout fields flat under `data` (no `data.workout`
+        // wrapper) — see GET /api/v1/workouts/:id.
+        const response = await api.get<{ data: WorkoutDetail }>(`/workouts/${id}`);
+        setWorkout(response.data);
       } catch (error) {
         console.error('Failed to fetch workout:', error);
         router.back();
@@ -181,21 +182,24 @@ export default function WorkoutDetailScreen() {
       </View>
 
       {/* Personal Records Section */}
-      {workout.prs && workout.prs.length > 0 && (
+      {workout.personal_records && workout.personal_records.length > 0 && (
         <View className="px-4 pt-4 mb-4">
           <View className="border-2 rounded-2xl overflow-hidden" style={{ borderColor: ORANGE }}>
             <View className="bg-gray-900 px-4 py-4">
               <Text className="text-white font-bold text-base mb-3">🏆 Personal Records</Text>
-              {workout.prs.map((pr, idx) => (
-                <View key={idx} className={`py-2 ${idx < workout.prs.length - 1 ? 'border-b border-gray-800' : ''}`}>
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-gray-300 text-sm">{pr.exercise_name}</Text>
-                    <Text className="text-orange-400 font-semibold text-sm">
-                      {getRecordTypeLabel(pr.record_type)}: {pr.value}
-                    </Text>
+              {workout.personal_records.map((pr, idx) => {
+                const exName = workout.exercises.find(e => e.exercise_id === pr.exercise_id)?.exercise?.name ?? '';
+                return (
+                  <View key={idx} className={`py-2 ${idx < workout.personal_records.length - 1 ? 'border-b border-gray-800' : ''}`}>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-gray-300 text-sm">{exName}</Text>
+                      <Text className="text-orange-400 font-semibold text-sm">
+                        {getRecordTypeLabel(pr.record_type)}: {pr.value}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
         </View>
@@ -212,7 +216,7 @@ export default function WorkoutDetailScreen() {
             <View key={exercise.position} className="bg-gray-900 rounded-2xl overflow-hidden">
               {/* Exercise Header */}
               <View className="px-4 pt-4 pb-3 border-b border-gray-800">
-                <Text className="text-white font-bold text-base">{exercise.exercise_name}</Text>
+                <Text className="text-white font-bold text-base">{exercise.exercise?.name ?? 'Exercise'}</Text>
               </View>
 
               {/* Set Table */}
@@ -245,7 +249,7 @@ export default function WorkoutDetailScreen() {
                     </View>
                     <View className="flex-2">
                       <Text className="text-white text-sm text-right">
-                        {formatSetDisplay(set, exercise.logging_type)}
+                        {formatSetDisplay(set, exercise.exercise?.logging_type ?? 'weight_reps')}
                       </Text>
                     </View>
                   </View>

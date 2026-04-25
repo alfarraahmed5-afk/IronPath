@@ -66,7 +66,7 @@ export default function FinishWorkoutScreen() {
   const router = useRouter();
   const workout = useWorkoutStore(s => s.active);
   const idempotency_key = useWorkoutStore(s => s.idempotency_key);
-  const clearDraft = useWorkoutStore(s => s.clearDraft);
+  const finishWorkout = useWorkoutStore(s => s.finishWorkout);
 
   const [workoutName, setWorkoutName] = useState(workout?.workout_name ?? '');
   const [description, setDescription] = useState('');
@@ -126,7 +126,7 @@ export default function FinishWorkoutScreen() {
         body
       );
 
-      clearDraft();
+      finishWorkout();
 
       const savedWorkout = result.data?.workout;
       const prs = result.data?.prs_detected ?? [];

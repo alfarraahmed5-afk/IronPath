@@ -51,6 +51,7 @@ interface WorkoutStore {
   startRestTimer: (seconds: number) => void;
   clearRestTimer: () => void;
   discardWorkout: () => void;
+  finishWorkout: () => void;
   saveDraft: () => void;
   loadDraft: () => { draft: ActiveWorkout; idempotency_key: string } | null;
   clearDraft: () => void;
@@ -166,6 +167,17 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   },
 
   discardWorkout: () => {
+    get().clearRestTimer();
+    get().clearDraft();
+    set({ active: null, idempotency_key: null });
+  },
+
+  finishWorkout: () => {
+    // Same teardown as discard, but called after a successful save so the
+    // store doesn't keep holding the just-saved workout. Without this, any
+    // navigation back into /workout/active or a stray load of the SQLite
+    // draft can resurrect the workout in active state with the timer still
+    // running.
     get().clearRestTimer();
     get().clearDraft();
     set({ active: null, idempotency_key: null });

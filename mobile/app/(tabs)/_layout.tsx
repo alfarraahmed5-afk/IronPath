@@ -1,7 +1,21 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Text } from 'react-native';
+import { useEffect } from 'react';
+import { useAuthStore } from '../../src/stores/authStore';
 
 export default function TabsLayout() {
+  // If the user signs out (or their session is wiped by a 401) while inside
+  // the tabs, kick them back to login. Without this the Sign Out button looks
+  // unresponsive — logout() clears state but the tab stack stays mounted.
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const isLoading = useAuthStore(s => s.isLoading);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/(auth)/login');
+    }
+  }, [isAuthenticated, isLoading]);
+
   return (
     <Tabs
       screenOptions={{

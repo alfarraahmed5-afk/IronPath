@@ -83,12 +83,12 @@ export default function RegisterScreen() {
               <Text className="text-gray-300 mb-1 text-sm">Invite Code</Text>
               <TextInput
                 className="bg-gray-900 text-white px-4 py-3 rounded-xl mb-6 text-base tracking-widest"
-                placeholder="XXXXXX"
+                placeholder="Enter your invite code"
                 placeholderTextColor="#6b7280"
                 value={inviteCode}
                 onChangeText={v => setInviteCode(v.toUpperCase())}
                 autoCapitalize="characters"
-                maxLength={6}
+                maxLength={10}
               />
               <TouchableOpacity
                 className="bg-orange-500 py-4 rounded-xl items-center"

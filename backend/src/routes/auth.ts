@@ -8,7 +8,10 @@ import { requireActiveUser } from '../middleware/requireActiveUser';
 const router = Router();
 
 const registerSchema = z.object({
-  invite_code: z.string().length(6),
+  // Allow any reasonable invite-code length so we don't have to ship a
+  // mobile rebuild every time the generator is re-tuned. The DB column is
+  // VARCHAR(10), so 4–10 covers the full range of legal codes.
+  invite_code: z.string().min(4).max(10),
   email: z.string().email(),
   password: z.string().min(8),
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Username may only contain letters, numbers, and underscores'),

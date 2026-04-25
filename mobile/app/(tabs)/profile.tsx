@@ -336,7 +336,10 @@ export default function ProfileScreen() {
       {/* Danger Zone — Sign Out */}
       <View className="mx-4 mt-2">
         <TouchableOpacity
-          onPress={() => logout()}
+          onPress={async () => {
+            await logout();
+            router.replace('/(auth)/login');
+          }}
           className="bg-gray-900 py-4 rounded-xl items-center"
         >
           <Text className="text-red-400 font-semibold text-sm">Sign Out</Text>
