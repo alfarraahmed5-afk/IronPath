@@ -1,17 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   Alert,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pause, Play, TrendingUp, Minus, TrendingDown } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-
-const ORANGE = '#FF6B35';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing } from '../../src/theme/tokens';
 
 interface NextSession {
   session_label: string;
@@ -49,32 +54,27 @@ interface Progress {
   exercises: ProgressExercise[];
 }
 
-const TREND_ICON: Record<string, string> = {
-  trending_up: '↑',
-  stalled: '→',
-  deloaded: '↓',
-};
-
-const TREND_COLOR: Record<string, string> = {
-  trending_up: '#22c55e',
-  stalled: '#9ca3af',
-  deloaded: '#f97316',
-};
-
 function formatPrescription(ex: NextSession['exercises'][number]): string {
   if (ex.target_duration_seconds) {
-    const mins = Math.floor(ex.target_duration_seconds / 60);
-    const secs = ex.target_duration_seconds % 60;
-    return `${ex.sets} × ${mins > 0 ? `${mins}m ` : ''}${secs > 0 ? `${secs}s` : ''}`;
+    const m = Math.floor(ex.target_duration_seconds / 60);
+    const s = ex.target_duration_seconds % 60;
+    return `${ex.sets} × ${m > 0 ? `${m}m ` : ''}${s > 0 ? `${s}s` : ''}`;
   }
-  if (ex.reps_min !== null && ex.reps_max !== null) {
-    return `${ex.sets} × ${ex.reps_min}–${ex.reps_max} reps`;
-  }
-  if (ex.reps !== null) {
-    return `${ex.sets} × ${ex.reps} reps`;
-  }
+  if (ex.reps_min !== null && ex.reps_max !== null) return `${ex.sets} × ${ex.reps_min}–${ex.reps_max} reps`;
+  if (ex.reps !== null) return `${ex.sets} × ${ex.reps} reps`;
   return `${ex.sets} sets`;
 }
+
+const TREND_ICONS = {
+  trending_up: TrendingUp,
+  stalled: Minus,
+  deloaded: TrendingDown,
+};
+const TREND_COLORS = {
+  trending_up: colors.success,
+  stalled: colors.textTertiary,
+  deloaded: colors.warning,
+};
 
 export default function TrainerScreen() {
   const router = useRouter();
@@ -96,14 +96,9 @@ export default function TrainerScreen() {
         setSession(sessionRes.value.data);
         setNoProgram(false);
       } else {
-        const err = sessionRes.reason;
-        if (err?.response?.status === 404) setNoProgram(true);
+        if ((sessionRes.reason as any)?.response?.status === 404) setNoProgram(true);
       }
-      if (progressRes.status === 'fulfilled') {
-        setProgress(progressRes.value.data);
-      }
-    } catch {
-      // handled per-request above
+      if (progressRes.status === 'fulfilled') setProgress(progressRes.value.data);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,11 +106,6 @@ export default function TrainerScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    load();
-  }, [load]);
 
   async function togglePause() {
     if (!session) return;
@@ -133,192 +123,231 @@ export default function TrainerScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center">
-        <ActivityIndicator color={ORANGE} size="large" />
-      </View>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>
+      </SafeAreaView>
     );
   }
 
   if (noProgram) {
     return (
-      <View className="flex-1 bg-gray-950">
-        <View className="px-4 pt-14 pb-4 border-b border-gray-800">
-          <Text className="text-white font-bold text-2xl">AI Trainer</Text>
-          <Text className="text-gray-400 text-sm mt-1">Algorithmic progressive overload</Text>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <View style={styles.topBar}>
+          <Text variant="title2" color="textPrimary">Trainer</Text>
         </View>
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-5xl mb-6">🤖</Text>
-          <Text className="text-white text-xl font-bold text-center mb-3">No program yet</Text>
-          <Text className="text-gray-400 text-center mb-8">
-            Answer 5 quick questions and we'll build a personalized progressive overload program for you.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/trainer/onboarding')}
-            className="rounded-xl py-4 px-8 items-center"
-            style={{ backgroundColor: ORANGE }}
-          >
-            <Text className="text-white font-bold text-base">Get Started</Text>
-          </TouchableOpacity>
+        <View style={styles.centered}>
+          <EmptyState
+            illustration="exercises"
+            title="Build your program"
+            description="Set goals, equipment, and frequency. We'll build the plan."
+            action={{ label: 'Get Started', onPress: () => router.push('/trainer/onboarding') }}
+          />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-950">
-      <View className="px-4 pt-14 pb-4 border-b border-gray-800">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-white font-bold text-2xl">AI Trainer</Text>
-            {session && <Text className="text-gray-400 text-sm mt-0.5">{session.template_name}</Text>}
-          </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <View style={styles.topBar}>
+        <View style={{ flex: 1 }}>
+          <Text variant="title2" color="textPrimary">Trainer</Text>
+          {session && <Text variant="caption" color="textTertiary">{session.template_name}</Text>}
+        </View>
+        <TouchableOpacity
+          onPress={togglePause}
+          disabled={pausing}
+          style={styles.pauseBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {session?.is_paused
+            ? <Play size={16} color={colors.brand} strokeWidth={2} />
+            : <Pause size={16} color={colors.textSecondary} strokeWidth={2} />}
+          <Text variant="label" color={session?.is_paused ? 'brand' : 'textSecondary'}>
+            {pausing ? '…' : session?.is_paused ? 'Resume' : 'Pause'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab switcher */}
+      <View style={styles.tabSwitcher}>
+        {(['session', 'progress'] as const).map(t => (
           <TouchableOpacity
-            onPress={togglePause}
-            disabled={pausing}
-            className="px-3 py-1.5 rounded-lg border border-gray-700"
+            key={t}
+            onPress={() => setTab(t)}
+            style={[styles.tabBtn, { backgroundColor: tab === t ? colors.brand : 'transparent' }]}
           >
-            <Text className="text-gray-300 text-sm font-medium">
-              {pausing ? '…' : session?.is_paused ? 'Resume' : 'Pause'}
+            <Text variant="label" color={tab === t ? 'textOnBrand' : 'textSecondary'}>
+              {t === 'session' ? 'Next Session' : 'Progress'}
             </Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Tab switcher */}
-        <View className="flex-row mt-4 bg-gray-900 rounded-xl p-1">
-          {(['session', 'progress'] as const).map(t => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              className="flex-1 py-2 rounded-lg items-center"
-              style={{ backgroundColor: tab === t ? ORANGE : 'transparent' }}
-            >
-              <Text className="font-semibold text-sm" style={{ color: tab === t ? '#fff' : '#9ca3af' }}>
-                {t === 'session' ? 'Next Session' : 'Progress'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        ))}
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ORANGE} />}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
       >
         {tab === 'session' && session && (
-          <View>
+          <View style={{ gap: spacing.md }}>
             {session.is_paused && (
-              <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-4">
-                <Text className="text-yellow-400 font-semibold">Program Paused</Text>
-                <Text className="text-yellow-400/70 text-sm mt-1">Resume your program to start tracking progression.</Text>
-              </View>
+              <Surface level={3} style={[styles.pausedBanner, { borderColor: colors.warning }]}>
+                <Text variant="bodyEmphasis" style={{ color: colors.warning }}>Program Paused</Text>
+                <Text variant="caption" style={{ color: colors.warning, opacity: 0.7, marginTop: 2 }}>
+                  Resume to continue tracking progression.
+                </Text>
+              </Surface>
             )}
 
-            <View className="flex-row items-center mb-4 gap-3">
-              <View>
-                <Text className="text-white font-bold text-lg">{session.session_label}</Text>
-                <Text className="text-gray-400 text-sm">Session {session.session_number}</Text>
-              </View>
+            <View>
+              <Text variant="title3" color="textPrimary">{session.session_label}</Text>
+              <Text variant="caption" color="textTertiary">Session {session.session_number}</Text>
             </View>
 
-            <View className="gap-3 mb-6">
-              {session.exercises.map((ex, idx) => (
-                <View key={ex.exercise_id + idx} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <View className="flex-row items-start justify-between mb-1">
-                    <Text className="text-white font-semibold flex-1 mr-2">{ex.exercise_name}</Text>
-                    <Text className="text-gray-400 text-sm">{formatPrescription(ex)}</Text>
-                  </View>
-                  <View className="flex-row items-center gap-4 mt-2">
-                    {ex.prescribed_weight_kg !== null && (
-                      <View className="flex-row items-center gap-1">
-                        <Text className="text-gray-400 text-xs">Weight</Text>
-                        <Text style={{ color: ORANGE }} className="font-bold text-sm">
-                          {ex.prescribed_weight_kg}kg
-                        </Text>
-                      </View>
-                    )}
-                    <View className="flex-row items-center gap-1">
-                      <Text className="text-gray-400 text-xs">Rest</Text>
-                      <Text className="text-gray-300 text-sm font-medium">{ex.rest_seconds}s</Text>
-                    </View>
-                    {ex.is_lower_body && (
-                      <Text className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">Lower</Text>
-                    )}
-                  </View>
+            {session.exercises.map((ex, idx) => (
+              <Surface key={ex.exercise_id + idx} level={2} style={styles.exerciseCard}>
+                <View style={styles.exRow}>
+                  <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1, marginRight: spacing.sm }}>
+                    {ex.exercise_name}
+                  </Text>
+                  <Text variant="label" color="textTertiary">{formatPrescription(ex)}</Text>
                 </View>
-              ))}
-            </View>
+                <View style={styles.exMeta}>
+                  {ex.prescribed_weight_kg !== null && (
+                    <View style={styles.metaItem}>
+                      <Text variant="caption" color="textTertiary">Weight</Text>
+                      <Text variant="bodyEmphasis" color="brand">{ex.prescribed_weight_kg} kg</Text>
+                    </View>
+                  )}
+                  <View style={styles.metaItem}>
+                    <Text variant="caption" color="textTertiary">Rest</Text>
+                    <Text variant="bodyEmphasis" color="textSecondary">{ex.rest_seconds}s</Text>
+                  </View>
+                  {ex.is_lower_body && (
+                    <View style={[styles.lowerPill, { backgroundColor: colors.info + '20', borderColor: colors.info }]}>
+                      <Text variant="overline" style={{ color: colors.info }}>Lower</Text>
+                    </View>
+                  )}
+                </View>
+              </Surface>
+            ))}
 
-            <TouchableOpacity
+            <Button
+              label="Start Workout"
               onPress={() => router.push('/(tabs)/workouts')}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: ORANGE, opacity: session.is_paused ? 0.5 : 1 }}
+              variant="primary"
+              size="lg"
+              fullWidth
               disabled={session.is_paused}
-            >
-              <Text className="text-white font-bold text-base">Start Workout</Text>
-            </TouchableOpacity>
+            />
           </View>
         )}
 
         {tab === 'progress' && progress && (
-          <View>
-            <View className="flex-row gap-3 mb-6">
-              <View className="flex-1 bg-gray-900 rounded-xl p-4 border border-gray-800 items-center">
-                <Text className="text-white font-bold text-2xl">{progress.total_sessions}</Text>
-                <Text className="text-gray-400 text-xs mt-1">Sessions</Text>
-              </View>
-              <View className="flex-1 bg-gray-900 rounded-xl p-4 border border-gray-800 items-center">
-                <Text className="text-white font-bold text-2xl">
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.progStats}>
+              <Surface level={2} style={[styles.progStatCard, { flex: 1 }]}>
+                <Text variant="numeric" color="textPrimary">{progress.total_sessions}</Text>
+                <Text variant="overline" color="textTertiary">Sessions</Text>
+              </Surface>
+              <Surface level={2} style={[styles.progStatCard, { flex: 1 }]}>
+                <Text variant="numeric" color="textPrimary">
                   {progress.increment_multiplier === 1.0 ? '1×' : progress.increment_multiplier === 1.25 ? '1.25×' : '0.75×'}
                 </Text>
-                <Text className="text-gray-400 text-xs mt-1">Increment</Text>
-              </View>
+                <Text variant="overline" color="textTertiary">Increment</Text>
+              </Surface>
             </View>
 
-            <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
-              Exercise Progress
-            </Text>
-            <View className="gap-3">
-              {progress.exercises.map(ex => (
-                <View key={ex.exercise_id} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <Text className="text-white font-semibold flex-1 mr-2">{ex.exercise_name}</Text>
-                    <Text style={{ color: TREND_COLOR[ex.trend], fontSize: 18, fontWeight: 'bold' }}>
-                      {TREND_ICON[ex.trend]}
-                    </Text>
-                  </View>
-                  <View className="flex-row gap-4">
-                    <View>
-                      <Text style={{ color: ORANGE }} className="font-bold text-lg">{ex.current_weight_kg}kg</Text>
-                      <Text className="text-gray-500 text-xs">Current</Text>
-                    </View>
-                    <View>
-                      <Text className="text-gray-300 font-semibold text-lg">{ex.sessions_logged}</Text>
-                      <Text className="text-gray-500 text-xs">Sessions</Text>
-                    </View>
-                    <View>
-                      <Text className="text-gray-300 font-semibold text-lg">{ex.consecutive_successes}</Text>
-                      <Text className="text-gray-500 text-xs">Streak</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-              {progress.exercises.length === 0 && (
-                <Text className="text-gray-500 text-center py-8">
-                  Complete a session to see your progress here.
-                </Text>
-              )}
-            </View>
+            <Text variant="overline" color="textTertiary">Exercise Progress</Text>
 
-            <TouchableOpacity
+            {progress.exercises.length === 0 ? (
+              <Text variant="body" color="textTertiary" style={{ textAlign: 'center', paddingVertical: spacing.xl }}>
+                Complete a session to see your progress here.
+              </Text>
+            ) : progress.exercises.map(ex => {
+              const TrendIcon = TREND_ICONS[ex.trend];
+              return (
+                <Surface key={ex.exercise_id} level={2} style={styles.progressCard}>
+                  <View style={styles.exRow}>
+                    <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }}>{ex.exercise_name}</Text>
+                    <TrendIcon size={18} color={TREND_COLORS[ex.trend]} strokeWidth={2} />
+                  </View>
+                  <View style={styles.exMeta}>
+                    <View style={styles.metaItem}>
+                      <Text variant="numeric" color="brand" style={{ fontSize: 20, lineHeight: 24 }}>{ex.current_weight_kg} kg</Text>
+                      <Text variant="caption" color="textTertiary">Current</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Text variant="numeric" color="textSecondary" style={{ fontSize: 20, lineHeight: 24 }}>{ex.sessions_logged}</Text>
+                      <Text variant="caption" color="textTertiary">Sessions</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Text variant="numeric" color="textSecondary" style={{ fontSize: 20, lineHeight: 24 }}>{ex.consecutive_successes}</Text>
+                      <Text variant="caption" color="textTertiary">Streak</Text>
+                    </View>
+                  </View>
+                </Surface>
+              );
+            })}
+
+            <Button
+              label="Reset / New Program"
               onPress={() => router.push('/trainer/onboarding')}
-              className="mt-6 rounded-xl py-3 items-center border border-gray-700"
-            >
-              <Text className="text-gray-400 text-sm font-medium">Reset / New Program</Text>
-            </TouchableOpacity>
+              variant="ghost"
+              size="md"
+              fullWidth
+            />
           </View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  pauseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tabSwitcher: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.base,
+    marginVertical: spacing.md,
+    backgroundColor: colors.surface2,
+    borderRadius: 10,
+    padding: 3,
+    gap: 3,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+  },
+  scrollContent: { paddingHorizontal: spacing.base, paddingBottom: 32, gap: spacing.md },
+  pausedBanner: { padding: spacing.base, borderWidth: 1, borderRadius: 12 },
+  exerciseCard: { padding: spacing.base },
+  exRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
+  exMeta: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center', flexWrap: 'wrap' },
+  metaItem: { gap: 2 },
+  lowerPill: { borderWidth: 1, borderRadius: 12, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  progStats: { flexDirection: 'row', gap: spacing.md },
+  progStatCard: { padding: spacing.base, alignItems: 'center', gap: spacing.xs },
+  progressCard: { padding: spacing.base },
+});

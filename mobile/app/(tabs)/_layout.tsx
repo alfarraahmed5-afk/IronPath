@@ -1,12 +1,11 @@
 import { Tabs, router } from 'expo-router';
-import { Text } from 'react-native';
 import { useEffect } from 'react';
+import { Newspaper, Dumbbell, Trophy, Sparkles, User } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
+import { TabBarIcon } from '../../src/components/TabBarIcon';
+import { colors } from '../../src/theme/tokens';
 
 export default function TabsLayout() {
-  // If the user signs out (or their session is wiped by a 401) while inside
-  // the tabs, kick them back to login. Without this the Sign Out button looks
-  // unresponsive — logout() clears state but the tab stack stays mounted.
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const isLoading = useAuthStore(s => s.isLoading);
 
@@ -20,30 +19,58 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#111', borderTopColor: '#222' },
-        tabBarActiveTintColor: '#FF6B35',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarStyle: {
+          backgroundColor: colors.surface1,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: colors.brand,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontFamily: 'Barlow_500Medium',
+          fontSize: 10,
+          marginTop: 2,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Feed', tabBarLabel: 'Feed' }}
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={Newspaper} focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="workouts"
-        options={{ title: 'Workouts', tabBarLabel: 'Workouts' }}
+        options={{
+          title: 'Workouts',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={Dumbbell} focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="leaderboard"
-        options={{ title: 'Leaderboard', tabBarLabel: 'Leaders' }}
+        options={{
+          title: 'Leaderboard',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={Trophy} focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="trainer"
-        options={{ title: 'AI Trainer', tabBarLabel: 'Trainer' }}
+        options={{
+          title: 'Trainer',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={Sparkles} focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarLabel: 'Profile' }}
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={User} focused={focused} />,
+        }}
       />
     </Tabs>
   );

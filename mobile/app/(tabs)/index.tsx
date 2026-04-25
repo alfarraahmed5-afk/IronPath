@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
-  Text,
   FlatList,
   TouchableOpacity,
   Modal,
@@ -9,19 +8,29 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Heart, MessageCircle, Bell, Clock, Weight, Hash } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { Avatar } from '../../src/components/Avatar';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Icon } from '../../src/components/Icon';
+import { EmptyState } from '../../src/components/EmptyState';
+import { Button } from '../../src/components/Button';
+import { colors, spacing, radii } from '../../src/theme/tokens';
+import { haptic } from '../../src/lib/haptics';
+import { router as globalRouter } from 'expo-router';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FeedWorkout {
   id: string;
   user_id: string;
-  // Backend feed shape uses `name`/`total_sets`, not `workout_name`/`exercise_count`.
   name: string;
   started_at: string;
   duration_seconds: number;
@@ -65,76 +74,30 @@ function formatDuration(s: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-// ─── Avatar ──────────────────────────────────────────────────────────────────
-
-interface AvatarProps {
-  avatarUrl: string | null;
-  fullName: string;
-  size?: number;
-}
-
-function Avatar({ avatarUrl, fullName, size = 40 }: AvatarProps) {
-  if (avatarUrl) {
-    return (
-      <Image
-        source={{ uri: avatarUrl }}
-        style={{ width: size, height: size, borderRadius: size / 2 }}
-      />
-    );
-  }
-  return (
-    <View
-      className="rounded-full items-center justify-center bg-orange-500"
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-    >
-      <Text className="text-white font-bold text-sm">{initials(fullName)}</Text>
-    </View>
-  );
-}
-
 // ─── CommentItem ─────────────────────────────────────────────────────────────
 
-interface CommentItemProps {
+function CommentItem({
+  comment,
+  currentUserId,
+  onDelete,
+}: {
   comment: Comment;
   currentUserId: string | undefined;
-  onDelete: (commentId: string) => void;
-}
-
-function CommentItem({ comment, currentUserId, onDelete }: CommentItemProps) {
+  onDelete: (id: string) => void;
+}) {
   return (
-    <View className="flex-row items-start px-4 py-3 border-b border-gray-800">
-      <Avatar
-        avatarUrl={comment.user.avatar_url}
-        fullName={comment.user.username}
-        size={32}
-      />
-      <View className="flex-1 ml-3">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-white font-semibold text-sm">
-            {comment.user.username}
-          </Text>
-          <Text className="text-gray-500 text-xs">
-            {formatRelative(comment.created_at)}
-          </Text>
+    <View style={styles.commentRow}>
+      <Avatar username={comment.user.username} avatarUrl={comment.user.avatar_url} size={32} />
+      <View style={styles.commentBody}>
+        <View style={styles.commentMeta}>
+          <Text variant="bodyEmphasis" color="textPrimary">{comment.user.username}</Text>
+          <Text variant="caption" color="textTertiary">{formatRelative(comment.created_at)}</Text>
         </View>
-        <Text className="text-gray-300 text-sm mt-0.5">{comment.content}</Text>
+        <Text variant="body" color="textSecondary" style={{ marginTop: 2 }}>{comment.content}</Text>
       </View>
       {currentUserId === comment.user_id && (
-        <TouchableOpacity
-          onPress={() => onDelete(comment.id)}
-          className="ml-2 mt-1"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text className="text-gray-500 text-xs">Delete</Text>
+        <TouchableOpacity onPress={() => onDelete(comment.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text variant="caption" color="danger">Delete</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -143,53 +106,41 @@ function CommentItem({ comment, currentUserId, onDelete }: CommentItemProps) {
 
 // ─── CommentModal ─────────────────────────────────────────────────────────────
 
-interface CommentModalProps {
-  workoutId: string | null;
-  visible: boolean;
-  onClose: () => void;
-  onCommentCountChange: (workoutId: string, delta: number) => void;
-}
-
 function CommentModal({
   workoutId,
   visible,
   onClose,
   onCommentCountChange,
-}: CommentModalProps) {
-  const user = useAuthStore((s) => s.user);
+}: {
+  workoutId: string | null;
+  visible: boolean;
+  onClose: () => void;
+  onCommentCountChange: (workoutId: string, delta: number) => void;
+}) {
+  const user = useAuthStore(s => s.user);
   const [comments, setComments] = useState<Comment[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [newText, setNewText] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadComments = useCallback(
-    async (cursor?: string) => {
-      if (!workoutId) return;
-      if (cursor) setLoadingMore(true);
-      else setLoading(true);
-      setError(null);
-      try {
-        const params = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-        // Likes/comments are mounted under /api/v1/feed in backend (see
-        // backend/src/index.ts), not /api/v1/workouts.
-        const res = await api.get<{
-          data: { comments: Comment[]; next_cursor: string | null };
-        }>(`/feed/workouts/${workoutId}/comments${params}`);
-        const { comments: fetched, next_cursor } = res.data;
-        setComments((prev) => (cursor ? [...prev, ...fetched] : fetched));
-        setNextCursor(next_cursor);
-      } catch {
-        setError('Failed to load comments.');
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [workoutId]
-  );
+  const loadComments = useCallback(async (cursor?: string) => {
+    if (!workoutId) return;
+    cursor ? setLoadingMore(true) : setLoading(true);
+    try {
+      const params = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const res = await api.get<{ data: { comments: Comment[]; next_cursor: string | null } }>(
+        `/feed/workouts/${workoutId}/comments${params}`
+      );
+      const { comments: fetched, next_cursor } = res.data;
+      setComments(prev => (cursor ? [...prev, ...fetched] : fetched));
+      setNextCursor(next_cursor);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [workoutId]);
 
   React.useEffect(() => {
     if (visible && workoutId) {
@@ -203,17 +154,13 @@ function CommentModal({
     if (!workoutId || !newText.trim()) return;
     setSending(true);
     try {
-      // Backend schema expects { content }, not { text }.
       const res = await api.post<{ data: { comment: Comment } }>(
         `/feed/workouts/${workoutId}/comments`,
         { content: newText.trim() }
       );
-      const created = res.data.comment;
-      setComments((prev) => [...prev, created]);
+      setComments(prev => [...prev, res.data.comment]);
       setNewText('');
       onCommentCountChange(workoutId, 1);
-    } catch {
-      // silent — user can retry
     } finally {
       setSending(false);
     }
@@ -223,87 +170,53 @@ function CommentModal({
     if (!workoutId) return;
     try {
       await api.delete(`/feed/workouts/${workoutId}/comments/${commentId}`);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setComments(prev => prev.filter(c => c.id !== commentId));
       onCommentCountChange(workoutId, -1);
-    } catch {
-      // silent
-    }
+    } catch {}
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <SafeAreaView className="flex-1 bg-gray-950">
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-800">
-          <Text className="text-white text-lg font-bold">Comments</Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.modalRoot}>
+        <View style={styles.modalHeader}>
+          <Text variant="title3" color="textPrimary">Comments</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text className="text-gray-400 text-base">Close</Text>
+            <Text variant="label" color="textSecondary">Close</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Comment list */}
         {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="#FF6B35" />
-          </View>
-        ) : error ? (
-          <View className="flex-1 items-center justify-center px-4">
-            <Text className="text-gray-400 text-center">{error}</Text>
-            <TouchableOpacity
-              onPress={() => loadComments()}
-              className="mt-3 px-4 py-2 rounded-full bg-gray-800"
-            >
-              <Text className="text-white">Retry</Text>
-            </TouchableOpacity>
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.brand} />
           </View>
         ) : (
           <FlatList
             data={comments}
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <CommentItem
-                comment={item}
-                currentUserId={user?.id}
-                onDelete={handleDelete}
-              />
+              <CommentItem comment={item} currentUserId={user?.id} onDelete={handleDelete} />
             )}
             ListEmptyComponent={
-              <View className="items-center justify-center py-12">
-                <Text className="text-gray-500">No comments yet. Be the first!</Text>
-              </View>
+              <EmptyState illustration="comments" title="Be the first to comment" />
             }
             ListFooterComponent={
               nextCursor ? (
-                <TouchableOpacity
-                  onPress={() => loadComments(nextCursor)}
-                  disabled={loadingMore}
-                  className="items-center py-4"
-                >
-                  {loadingMore ? (
-                    <ActivityIndicator color="#FF6B35" />
-                  ) : (
-                    <Text className="text-orange-500">Load more</Text>
-                  )}
+                <TouchableOpacity onPress={() => loadComments(nextCursor!)} style={styles.loadMore}>
+                  {loadingMore
+                    ? <ActivityIndicator color={colors.brand} />
+                    : <Text variant="label" color="brand">Load more</Text>}
                 </TouchableOpacity>
               ) : null
             }
           />
         )}
 
-        {/* Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View className="flex-row items-center px-4 py-3 border-t border-gray-800 bg-gray-900">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.commentInput}>
             <TextInput
-              className="flex-1 bg-gray-800 text-white rounded-full px-4 py-2 text-sm mr-2"
+              style={styles.commentField}
               placeholder="Add a comment…"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={colors.textTertiary}
               value={newText}
               onChangeText={setNewText}
               returnKeyType="send"
@@ -313,14 +226,11 @@ function CommentModal({
             <TouchableOpacity
               onPress={handleSend}
               disabled={sending || !newText.trim()}
-              className="px-4 py-2 rounded-full"
-              style={{ backgroundColor: newText.trim() ? '#FF6B35' : '#374151' }}
+              style={[styles.sendBtn, { backgroundColor: newText.trim() ? colors.brand : colors.surface4 }]}
             >
-              {sending ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text className="text-white font-semibold text-sm">Send</Text>
-              )}
+              {sending
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text variant="label" color="textOnBrand">Send</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -331,109 +241,98 @@ function CommentModal({
 
 // ─── WorkoutCard ──────────────────────────────────────────────────────────────
 
-interface WorkoutCardProps {
+function WorkoutCard({
+  workout,
+  onLikeToggle,
+  onCommentPress,
+}: {
   workout: FeedWorkout;
-  onLikeToggle: (workoutId: string) => void;
-  onCommentPress: (workoutId: string) => void;
-}
-
-function WorkoutCard({ workout, onLikeToggle, onCommentPress }: WorkoutCardProps) {
+  onLikeToggle: (id: string) => void;
+  onCommentPress: (id: string) => void;
+}) {
   const router = useRouter();
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.9}
       onPress={() => router.push(`/workouts/${workout.id}` as any)}
-      className="bg-gray-900 rounded-2xl mx-4 mb-4 overflow-hidden"
     >
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-4 pb-3">
-        <Avatar
-          avatarUrl={workout.user.avatar_url}
-          fullName={workout.user.full_name ?? workout.user.username}
-          size={40}
-        />
-        <View className="ml-3 flex-1">
-          <Text className="text-white font-semibold text-sm">
-            {workout.user.username}
-          </Text>
-          <Text className="text-gray-500 text-xs">
-            {formatRelative(workout.started_at)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Workout name */}
-      <View className="px-4 pb-3">
-        <Text className="text-white font-bold text-base">{workout.name}</Text>
-      </View>
-
-      {/* Stats row */}
-      <View className="flex-row px-4 pb-4" style={{ gap: 16 }}>
-        <View className="items-center">
-          <Text className="text-gray-400 text-xs mb-0.5">Duration</Text>
-          <Text className="text-white font-semibold text-sm">
-            {formatDuration(workout.duration_seconds)}
-          </Text>
-        </View>
-        {workout.total_volume_kg !== null && (
-          <View className="items-center">
-            <Text className="text-gray-400 text-xs mb-0.5">Volume</Text>
-            <Text className="text-white font-semibold text-sm">
-              {workout.total_volume_kg.toLocaleString()} kg
-            </Text>
+      <Surface level={2} style={styles.card}>
+        {/* Header */}
+        <View style={styles.cardHeader}>
+          <Avatar
+            username={workout.user.username}
+            avatarUrl={workout.user.avatar_url}
+            size={40}
+          />
+          <View style={styles.cardHeaderText}>
+            <Text variant="bodyEmphasis" color="textPrimary">{workout.user.username}</Text>
+            <Text variant="caption" color="textTertiary">{formatRelative(workout.started_at)}</Text>
           </View>
-        )}
-        <View className="items-center">
-          <Text className="text-gray-400 text-xs mb-0.5">Sets</Text>
-          <Text className="text-white font-semibold text-sm">
-            {workout.total_sets}
-          </Text>
         </View>
-      </View>
 
-      {/* Divider */}
-      <View className="h-px bg-gray-800 mx-4" />
+        {/* Workout name */}
+        <Text variant="title3" color="textPrimary" style={styles.workoutName}>{workout.name}</Text>
 
-      {/* Action row */}
-      <View className="flex-row items-center px-4 py-3" style={{ gap: 24 }}>
-        {/* Like */}
-        <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation();
-            onLikeToggle(workout.id);
-          }}
-          className="flex-row items-center"
-          style={{ gap: 6 }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={{ fontSize: 18 }}>
-            {workout.viewer_liked ? '❤️' : '🤍'}
-          </Text>
-          <Text
-            className="text-sm font-medium"
-            style={{ color: workout.viewer_liked ? '#FF6B35' : '#9CA3AF' }}
+        {/* Stats strip */}
+        <View style={styles.statsStrip}>
+          <View style={styles.statItem}>
+            <Icon icon={Clock} size={12} color={colors.textTertiary} />
+            <Text variant="caption" color="textSecondary">{formatDuration(workout.duration_seconds)}</Text>
+          </View>
+          {workout.total_volume_kg !== null && (
+            <View style={styles.statItem}>
+              <Icon icon={Weight} size={12} color={colors.textTertiary} />
+              <Text variant="caption" color="textSecondary">{workout.total_volume_kg.toLocaleString()} kg</Text>
+            </View>
+          )}
+          <View style={styles.statItem}>
+            <Icon icon={Hash} size={12} color={colors.textTertiary} />
+            <Text variant="caption" color="textSecondary">{workout.total_sets} sets</Text>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={e => {
+              e.stopPropagation?.();
+              haptic.light();
+              onLikeToggle(workout.id);
+            }}
+            style={styles.actionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            {workout.like_count}
-          </Text>
-        </TouchableOpacity>
+            <Heart
+              size={20}
+              color={workout.viewer_liked ? colors.danger : colors.textTertiary}
+              fill={workout.viewer_liked ? colors.danger : 'none'}
+              strokeWidth={2}
+            />
+            <Text
+              variant="caption"
+              color={workout.viewer_liked ? 'danger' : 'textTertiary'}
+            >
+              {workout.like_count}
+            </Text>
+          </TouchableOpacity>
 
-        {/* Comment */}
-        <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation();
-            onCommentPress(workout.id);
-          }}
-          className="flex-row items-center"
-          style={{ gap: 6 }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={{ fontSize: 18 }}>💬</Text>
-          <Text className="text-gray-400 text-sm font-medium">
-            {workout.comment_count}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={e => {
+              e.stopPropagation?.();
+              onCommentPress(workout.id);
+            }}
+            style={styles.actionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MessageCircle size={20} color={colors.textTertiary} strokeWidth={2} />
+            <Text variant="caption" color="textTertiary">{workout.comment_count}</Text>
+          </TouchableOpacity>
+        </View>
+      </Surface>
     </TouchableOpacity>
   );
 }
@@ -448,47 +347,39 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
   const [commentModalWorkoutId, setCommentModalWorkoutId] = useState<string | null>(null);
-
   const loadingMoreRef = useRef(false);
 
-  const fetchFeed = useCallback(
-    async (opts: { filter: FeedFilter; cursor?: string; isRefresh?: boolean }) => {
-      const { filter: f, cursor, isRefresh } = opts;
-
-      if (cursor) {
-        if (loadingMoreRef.current) return;
-        loadingMoreRef.current = true;
-        setLoadingMore(true);
-      } else if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setError(null);
-
-      try {
-        const params = new URLSearchParams({ filter: f });
-        if (cursor) params.set('cursor', cursor);
-        const res = await api.get<{
-          data: { workouts: FeedWorkout[]; next_cursor: string | null };
-        }>(`/feed?${params.toString()}`);
-        const { workouts: fetched, next_cursor } = res.data;
-        setWorkouts((prev) => (cursor ? [...prev, ...fetched] : fetched));
-        setNextCursor(next_cursor);
-      } catch {
-        setError('Failed to load feed. Pull down to retry.');
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-        loadingMoreRef.current = false;
-      }
-    },
-    []
-  );
+  const fetchFeed = useCallback(async (opts: { filter: FeedFilter; cursor?: string; isRefresh?: boolean }) => {
+    const { filter: f, cursor, isRefresh } = opts;
+    if (cursor) {
+      if (loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+    } else if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const params = new URLSearchParams({ filter: f });
+      if (cursor) params.set('cursor', cursor);
+      const res = await api.get<{ data: { workouts: FeedWorkout[]; next_cursor: string | null } }>(
+        `/feed?${params.toString()}`
+      );
+      const { workouts: fetched, next_cursor } = res.data;
+      setWorkouts(prev => (cursor ? [...prev, ...fetched] : fetched));
+      setNextCursor(next_cursor);
+    } catch {
+      setError('Failed to load feed. Pull down to retry.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+      loadingMoreRef.current = false;
+    }
+  }, []);
 
   React.useEffect(() => {
     setWorkouts([]);
@@ -496,40 +387,17 @@ export default function FeedScreen() {
     fetchFeed({ filter });
   }, [filter]);
 
-  const handleFilterChange = (f: FeedFilter) => {
-    if (f === filter) return;
-    setFilter(f);
-  };
-
-  const handleEndReached = () => {
-    if (nextCursor && !loadingMoreRef.current) {
-      fetchFeed({ filter, cursor: nextCursor });
-    }
-  };
-
-  const handleRefresh = () => {
-    fetchFeed({ filter, isRefresh: true });
-  };
-
   const handleLikeToggle = async (workoutId: string) => {
-    const workout = workouts.find((w) => w.id === workoutId);
+    const workout = workouts.find(w => w.id === workoutId);
     if (!workout) return;
-
     const wasLiked = workout.viewer_liked;
-
-    // Optimistic update
-    setWorkouts((prev) =>
-      prev.map((w) =>
+    setWorkouts(prev =>
+      prev.map(w =>
         w.id === workoutId
-          ? {
-              ...w,
-              viewer_liked: !wasLiked,
-              like_count: wasLiked ? w.like_count - 1 : w.like_count + 1,
-            }
+          ? { ...w, viewer_liked: !wasLiked, like_count: wasLiked ? w.like_count - 1 : w.like_count + 1 }
           : w
       )
     );
-
     try {
       if (wasLiked) {
         await api.delete(`/feed/workouts/${workoutId}/like`);
@@ -537,15 +405,10 @@ export default function FeedScreen() {
         await api.post(`/feed/workouts/${workoutId}/like`, {});
       }
     } catch {
-      // Revert on failure
-      setWorkouts((prev) =>
-        prev.map((w) =>
+      setWorkouts(prev =>
+        prev.map(w =>
           w.id === workoutId
-            ? {
-                ...w,
-                viewer_liked: wasLiked,
-                like_count: wasLiked ? w.like_count + 1 : w.like_count - 1,
-              }
+            ? { ...w, viewer_liked: wasLiked, like_count: wasLiked ? w.like_count + 1 : w.like_count - 1 }
             : w
         )
       );
@@ -553,97 +416,98 @@ export default function FeedScreen() {
   };
 
   const handleCommentCountChange = (workoutId: string, delta: number) => {
-    setWorkouts((prev) =>
-      prev.map((w) =>
-        w.id === workoutId
-          ? { ...w, comment_count: Math.max(0, w.comment_count + delta) }
-          : w
-      )
+    setWorkouts(prev =>
+      prev.map(w => w.id === workoutId ? { ...w, comment_count: Math.max(0, w.comment_count + delta) } : w)
     );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-950">
-      {/* Filter row */}
-      <View className="flex-row px-4 pt-3 pb-2" style={{ gap: 8 }}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Header */}
+      <View style={styles.topBar}>
+        <Text variant="title2" color="textPrimary">Feed</Text>
         <TouchableOpacity
-          onPress={() => handleFilterChange('all')}
-          className="px-5 py-2 rounded-full"
-          style={{ backgroundColor: filter === 'all' ? '#FF6B35' : '#1F2937' }}
+          onPress={() => globalRouter.push('/notifications' as any)}
+          style={styles.bellBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text
-            className="font-semibold text-sm"
-            style={{ color: filter === 'all' ? '#fff' : '#9CA3AF' }}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleFilterChange('following')}
-          className="px-5 py-2 rounded-full"
-          style={{ backgroundColor: filter === 'following' ? '#FF6B35' : '#1F2937' }}
-        >
-          <Text
-            className="font-semibold text-sm"
-            style={{ color: filter === 'following' ? '#fff' : '#9CA3AF' }}
-          >
-            Following
-          </Text>
+          <Bell size={20} color={colors.textSecondary} strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
+      {/* Filter pills */}
+      <View style={styles.filterRow}>
+        {(['all', 'following'] as FeedFilter[]).map(f => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => { if (f !== filter) setFilter(f); }}
+            style={[styles.filterPill, { backgroundColor: filter === f ? colors.brand : colors.surface2 }]}
+          >
+            <Text
+              variant="label"
+              color={filter === f ? 'textOnBrand' : 'textSecondary'}
+              style={{ textTransform: 'capitalize' }}
+            >
+              {f === 'all' ? 'All' : 'Following'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {loading && !refreshing ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#FF6B35" size="large" />
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.brand} size="large" />
         </View>
       ) : error && workouts.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-gray-400 text-center mb-4">{error}</Text>
-          <TouchableOpacity
-            onPress={() => fetchFeed({ filter })}
-            className="px-6 py-3 rounded-full"
-            style={{ backgroundColor: '#FF6B35' }}
-          >
-            <Text className="text-white font-semibold">Retry</Text>
-          </TouchableOpacity>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Couldn't load feed"
+            description={error}
+            action={{ label: 'Retry', onPress: () => fetchFeed({ filter }) }}
+          />
         </View>
       ) : (
         <FlatList
           data={workouts}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <WorkoutCard
               workout={item}
               onLikeToggle={handleLikeToggle}
-              onCommentPress={(id) => setCommentModalWorkoutId(id)}
+              onCommentPress={id => setCommentModalWorkoutId(id)}
             />
           )}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}
-          onEndReached={handleEndReached}
+          contentContainerStyle={{ paddingVertical: spacing.sm }}
+          onEndReached={() => {
+            if (nextCursor && !loadingMoreRef.current) {
+              fetchFeed({ filter, cursor: nextCursor });
+            }
+          }}
           onEndReachedThreshold={0.4}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchFeed({ filter, isRefresh: true })}
+              tintColor={colors.brand}
+            />
+          }
           ListEmptyComponent={
             !loading ? (
-              <View className="flex-1 items-center justify-center py-20">
-                <Text className="text-4xl mb-4">🏋️</Text>
-                <Text className="text-white font-semibold text-lg mb-2">
-                  No workouts yet
-                </Text>
-                <Text className="text-gray-500 text-center px-8">
-                  {filter === 'following'
-                    ? 'Follow some athletes to see their workouts here.'
-                    : 'Be the first to log a workout!'}
-                </Text>
+              <View style={styles.emptyWrap}>
+                <EmptyState
+                  illustration="workouts"
+                  title={filter === 'following' ? 'Follow members to see their lifts' : 'Quiet in here'}
+                  description={
+                    filter === 'following'
+                      ? undefined
+                      : 'When members complete workouts, they\'ll show up here.'
+                  }
+                />
               </View>
             ) : null
           }
           ListFooterComponent={
-            loadingMore ? (
-              <View className="py-4 items-center">
-                <ActivityIndicator color="#FF6B35" />
-              </View>
-            ) : null
+            loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.lg }} /> : null
           }
         />
       )}
@@ -657,3 +521,100 @@ export default function FeedScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.full,
+  },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyWrap: { paddingTop: spacing['3xl'] },
+
+  // Card
+  card: { marginHorizontal: spacing.base, marginBottom: spacing.md, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: spacing.base, paddingBottom: spacing.sm },
+  cardHeaderText: { marginLeft: spacing.md, flex: 1 },
+  workoutName: { paddingHorizontal: spacing.base, paddingBottom: spacing.sm },
+  statsStrip: { flexDirection: 'row', paddingHorizontal: spacing.base, paddingBottom: spacing.base, gap: spacing.base },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginHorizontal: spacing.base },
+  actions: { flexDirection: 'row', paddingHorizontal: spacing.base, paddingVertical: spacing.md, gap: spacing.xl },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // Modal
+  modalRoot: { flex: 1, backgroundColor: colors.surface2 },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  commentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing.md,
+  },
+  commentBody: { flex: 1 },
+  commentMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  loadMore: { alignItems: 'center', paddingVertical: spacing.base },
+  commentInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface2,
+    gap: spacing.sm,
+  },
+  commentField: {
+    flex: 1,
+    backgroundColor: colors.surface3,
+    color: colors.textPrimary,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    fontFamily: 'Barlow_400Regular',
+    fontSize: 14,
+  },
+  sendBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.full,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, KeyboardAvoidingView, Platform, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import { CheckCircle2, Mail } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
+import { Text } from '../../src/components/Text';
+import { Input } from '../../src/components/Input';
+import { Button } from '../../src/components/Button';
+import { Icon } from '../../src/components/Icon';
+import { colors, spacing } from '../../src/theme/tokens';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -13,51 +19,77 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       await api.post('/auth/forgot-password', { email: email.trim().toLowerCase() });
-      setSent(true);
     } catch {
-      setSent(true); // non-enumerable — always show success
+      // Non-enumerable — always show success
     } finally {
       setLoading(false);
+      setSent(true);
     }
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-black" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View className="flex-1 px-6 justify-center">
-        <TouchableOpacity onPress={() => router.back()} className="mb-6 self-start">
-          <Text className="text-orange-400">← Back</Text>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.container}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text variant="label" color="brand">← Back</Text>
         </TouchableOpacity>
 
-        <Text className="text-3xl font-bold text-white mb-2">Reset Password</Text>
+        <Text variant="title1" color="textPrimary" style={styles.heading}>Reset Password</Text>
 
         {sent ? (
-          <View>
-            <Text className="text-gray-300 text-base mb-6">
-              If an account exists for that email, a reset link has been sent. Check your inbox.
+          <View style={styles.successBox}>
+            <Icon icon={CheckCircle2} size={56} color={colors.brand} />
+            <Text variant="title3" color="textPrimary" style={styles.successTitle}>Check your inbox</Text>
+            <Text variant="body" color="textSecondary" style={styles.successBody}>
+              If an account exists for that email, a reset link has been sent.
             </Text>
-            <TouchableOpacity onPress={() => router.back()} className="bg-orange-500 py-4 rounded-xl items-center">
-              <Text className="text-white font-semibold">Back to Login</Text>
-            </TouchableOpacity>
+            <Button label="Back to Login" onPress={() => router.back()} variant="primary" size="lg" fullWidth style={{ marginTop: spacing.xl }} />
           </View>
         ) : (
-          <>
-            <Text className="text-gray-400 mb-8">Enter your email and we'll send a reset link.</Text>
-            <Text className="text-gray-300 mb-1 text-sm">Email</Text>
-            <TextInput
-              className="bg-gray-900 text-white px-4 py-3 rounded-xl mb-6 text-base"
-              placeholder="your@email.com" placeholderTextColor="#6b7280"
-              value={email} onChangeText={setEmail}
-              keyboardType="email-address" autoCapitalize="none"
+          <View>
+            <Text variant="body" color="textSecondary" style={styles.subheading}>
+              Enter your email and we'll send a reset link.
+            </Text>
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="your@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              leftIcon={<Icon icon={Mail} size={16} color={colors.textTertiary} />}
             />
-            <TouchableOpacity
-              className="bg-orange-500 py-4 rounded-xl items-center"
-              onPress={handleSubmit} disabled={loading}
-            >
-              <Text className="text-white font-semibold">{loading ? 'Sending...' : 'Send Reset Link'}</Text>
-            </TouchableOpacity>
-          </>
+            <Button
+              label={loading ? 'Sending…' : 'Send Reset Link'}
+              onPress={handleSubmit}
+              variant="primary"
+              size="lg"
+              loading={loading}
+              fullWidth
+              style={{ marginTop: spacing.xl }}
+            />
+          </View>
         )}
       </View>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing['3xl'],
+    justifyContent: 'center',
+  },
+  back: { alignSelf: 'flex-start', marginBottom: spacing.xl },
+  heading: { marginBottom: spacing.xl },
+  subheading: { marginBottom: spacing.xl },
+  successBox: { alignItems: 'center', gap: spacing.md },
+  successTitle: { textAlign: 'center', marginTop: spacing.sm },
+  successBody: { textAlign: 'center' },
+});

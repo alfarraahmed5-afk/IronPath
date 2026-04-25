@@ -1,59 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
+  ScrollView,
   FlatList,
   Modal,
-  ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
-  Pressable,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Play, Clock, Hash, Weight } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore, ActiveWorkout } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { Icon } from '../../src/components/Icon';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
-const ORANGE = '#FF6B35';
-
-// ─── Format helpers ────────────────────────────────────────────────────────────
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function formatRelativeDate(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  if (dateStart.getTime() === todayStart.getTime()) return 'Today';
-  if (dateStart.getTime() === yesterdayStart.getTime()) return 'Yesterday';
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[date.getMonth()]} ${date.getDate()}`;
-}
-
-function formatVolume(kg: number): string {
-  return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(1)} kg`;
-}
-
-function formatTimeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return 'Just now';
-}
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WorkoutSummary {
   id: string;
@@ -69,73 +36,101 @@ interface Routine {
   name: string;
 }
 
-// ─── Workout card ──────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatDuration(s: number): string {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatRelativeDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const ystStart = new Date(todayStart.getTime() - 86400000);
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (dateStart.getTime() === todayStart.getTime()) return 'Today';
+  if (dateStart.getTime() === ystStart.getTime()) return 'Yesterday';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTimeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (d > 0) return `${d}d ago`;
+  if (h > 0) return `${h}h ago`;
+  if (m > 0) return `${m}m ago`;
+  return 'Just now';
+}
+
+// ─── WorkoutCard ──────────────────────────────────────────────────────────────
 
 function WorkoutCard({ workout, onPress }: { workout: WorkoutSummary; onPress: () => void }) {
   return (
-    <Pressable
-      onPress={onPress}
-      className="bg-gray-900 rounded-2xl mx-4 mb-3 px-4 py-4"
-    >
-      <View className="flex-row items-start justify-between mb-1">
-        <Text className="text-white font-bold text-base flex-1 mr-2" numberOfLines={1}>
-          {workout.name}
-        </Text>
-        <Text className="text-gray-400 text-sm">{formatRelativeDate(workout.started_at)}</Text>
-      </View>
-      <View className="flex-row items-center mt-2 gap-x-3">
-        <Text className="text-gray-400 text-sm">{workout.total_sets} sets</Text>
-        <Text className="text-gray-700">·</Text>
-        <Text className="text-gray-400 text-sm">{formatDuration(workout.duration_seconds)}</Text>
-        <Text className="text-gray-700">·</Text>
-        <Text className="text-gray-400 text-sm">{formatVolume(workout.total_volume_kg)}</Text>
-      </View>
-    </Pressable>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+      <Surface level={2} style={styles.card}>
+        <View style={styles.cardTop}>
+          <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginRight: spacing.md }}>
+            {workout.name}
+          </Text>
+          <Text variant="caption" color="textTertiary">{formatRelativeDate(workout.started_at)}</Text>
+        </View>
+        <View style={styles.cardStats}>
+          <View style={styles.statItem}>
+            <Icon icon={Hash} size={12} color={colors.textTertiary} />
+            <Text variant="caption" color="textSecondary">{workout.total_sets} sets</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon icon={Clock} size={12} color={colors.textTertiary} />
+            <Text variant="caption" color="textSecondary">{formatDuration(workout.duration_seconds)}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon icon={Weight} size={12} color={colors.textTertiary} />
+            <Text variant="caption" color="textSecondary">{workout.total_volume_kg.toLocaleString()} kg</Text>
+          </View>
+        </View>
+      </Surface>
+    </TouchableOpacity>
   );
 }
 
-// ─── Resume modal ──────────────────────────────────────────────────────────────
+// ─── ResumeModal ──────────────────────────────────────────────────────────────
 
-interface ResumeModalProps {
+function ResumeModal({
+  visible,
+  draft,
+  onResume,
+  onDiscard,
+}: {
   visible: boolean;
   draft: ActiveWorkout;
-  idempotencyKey: string;
   onResume: () => void;
   onDiscard: () => void;
-}
-
-function ResumeModal({ visible, draft, idempotencyKey, onResume, onDiscard }: ResumeModalProps) {
+}) {
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/80 items-center justify-center px-6">
-        <View className="bg-gray-900 rounded-2xl w-full p-6">
-          <Text className="text-white font-bold text-xl mb-1">Resume Workout?</Text>
-          <Text className="text-gray-400 text-sm mb-1" numberOfLines={1}>
+      <View style={styles.modalOverlay}>
+        <Surface level={3} style={styles.modalBox}>
+          <Text variant="title2" color="textPrimary" style={{ marginBottom: spacing.xs }}>Resume Workout?</Text>
+          <Text variant="bodyEmphasis" color="textSecondary" numberOfLines={1} style={{ marginBottom: spacing.xs }}>
             {draft.workout_name}
           </Text>
-          <Text className="text-gray-500 text-sm mb-6">
+          <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.xl }}>
             Started {formatTimeAgo(draft.started_at)}
           </Text>
-          <TouchableOpacity
-            onPress={onResume}
-            className="rounded-xl py-3.5 items-center mb-3"
-            style={{ backgroundColor: ORANGE }}
-          >
-            <Text className="text-white font-bold text-base">Resume</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onDiscard}
-            className="rounded-xl py-3.5 items-center border border-red-500"
-          >
-            <Text className="text-red-500 font-semibold text-base">Discard</Text>
-          </TouchableOpacity>
-        </View>
+          <Button label="Resume" onPress={onResume} variant="primary" size="lg" fullWidth />
+          <View style={{ height: spacing.md }} />
+          <Button label="Discard" onPress={onDiscard} variant="destructive" size="lg" fullWidth />
+        </Surface>
       </View>
     </Modal>
   );
 }
 
-// ─── Main screen ───────────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function WorkoutsScreen() {
   const router = useRouter();
@@ -147,11 +142,9 @@ export default function WorkoutsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [routines, setRoutines] = useState<Routine[]>([]);
-
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [draftData, setDraftData] = useState<{ draft: ActiveWorkout; idempotency_key: string } | null>(null);
 
-  // Check for draft + initial fetch on mount
   useEffect(() => {
     const store = useWorkoutStore.getState();
     const draft = store.loadDraft();
@@ -159,27 +152,22 @@ export default function WorkoutsScreen() {
       setDraftData(draft);
       setShowResumeModal(true);
     }
-
     fetchWorkouts(null, true);
     fetchRoutines();
   }, []);
 
   const fetchWorkouts = useCallback(async (cursorParam: string | null, reset = false) => {
-    if (reset) setLoading(true);
-    else setLoadingMore(true);
-
+    reset ? setLoading(true) : setLoadingMore(true);
     try {
       const url = `/workouts/history?limit=20${cursorParam ? `&cursor=${encodeURIComponent(cursorParam)}` : ''}`;
       const result = await api.get<{ data: { workouts: WorkoutSummary[]; next_cursor: string | null } }>(url);
       const fetched = result.data?.workouts ?? [];
       const nextCursor = result.data?.next_cursor ?? null;
-
       setWorkouts(prev => reset ? fetched : [...prev, ...fetched]);
       setCursor(nextCursor);
       setHasMore(nextCursor !== null);
-    } catch {
-      // silently fail — list stays empty or unchanged
-    } finally {
+    } catch {}
+    finally {
       setLoading(false);
       setLoadingMore(false);
     }
@@ -192,146 +180,163 @@ export default function WorkoutsScreen() {
     } catch {}
   };
 
-  const handleLoadMore = () => {
-    if (!hasMore || loadingMore || loading) return;
-    fetchWorkouts(cursor);
-  };
-
-  const handleStartWorkout = () => {
+  function handleStartWorkout() {
     startWorkout('New Workout');
     router.push('/workout/active');
-  };
+  }
 
-  const handleStartRoutine = (routine: Routine) => {
+  function handleStartRoutine(routine: Routine) {
     startWorkout(routine.name, routine.id);
     router.push('/workout/active');
-  };
+  }
 
-  const handleResume = () => {
+  function handleResume() {
     if (!draftData) return;
-    const store = useWorkoutStore.getState();
-    store.resumeWorkout(draftData.draft, draftData.idempotency_key);
+    useWorkoutStore.getState().resumeWorkout(draftData.draft, draftData.idempotency_key);
     setShowResumeModal(false);
     router.push('/workout/active');
-  };
+  }
 
-  const handleDiscard = () => {
-    const store = useWorkoutStore.getState();
-    store.clearDraft();
+  function handleDiscard() {
+    useWorkoutStore.getState().clearDraft();
     setDraftData(null);
     setShowResumeModal(false);
-  };
+  }
 
-  const renderHeader = () => (
-    <View>
-      {/* Page header */}
-      <View className="flex-row items-center justify-between px-4 pt-14 pb-4">
-        <Text className="text-white font-bold text-3xl">Workouts</Text>
-        <TouchableOpacity className="p-2">
-          <Text className="text-2xl">📅</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Start workout button */}
-      <View className="px-4 mb-4">
-        <TouchableOpacity
-          onPress={handleStartWorkout}
-          className="rounded-2xl py-4 items-center"
-          style={{ backgroundColor: ORANGE }}
-        >
-          <Text className="text-white font-bold text-lg">Start Workout</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick start routines */}
-      {routines.length > 0 && (
-        <View className="mb-5">
-          <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider px-4 mb-2">
-            Quick Start
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
-          >
-            {routines.map(routine => (
-              <TouchableOpacity
-                key={routine.id}
-                onPress={() => handleStartRoutine(routine)}
-                className="bg-gray-900 rounded-xl px-4 py-2.5 border border-gray-800"
-              >
-                <Text className="text-white font-medium text-sm" numberOfLines={1}>
-                  {routine.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Recent workouts header */}
-      <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider px-4 mb-3">
-        Recent Workouts
-      </Text>
-    </View>
-  );
-
-  const renderFooter = () => {
-    if (!loadingMore) return null;
+  function ListHeader() {
     return (
-      <View className="py-6 items-center">
-        <ActivityIndicator color={ORANGE} />
+      <View>
+        {/* Section title */}
+        <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Recent Workouts</Text>
       </View>
     );
-  };
-
-  const renderEmpty = () => {
-    if (loading) {
-      return (
-        <View className="py-12 items-center">
-          <ActivityIndicator color={ORANGE} />
-        </View>
-      );
-    }
-    return (
-      <View className="py-12 items-center px-8">
-        <Text className="text-gray-400 text-base text-center">
-          No workouts yet. Start your first workout above!
-        </Text>
-      </View>
-    );
-  };
+  }
 
   return (
-    <View className="flex-1 bg-gray-950">
-      <FlatList
-        data={workouts}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <WorkoutCard
-            workout={item}
-            onPress={() => router.push(`/workouts/${item.id}` as any)}
-          />
-        )}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.3}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-      />
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Header */}
+      <View style={styles.topBar}>
+        <Text variant="title2" color="textPrimary">Workouts</Text>
+      </View>
 
-      {/* Resume modal */}
+      {/* Fixed top area */}
+      <View style={styles.topActions}>
+        <Button
+          label="Start Workout"
+          onPress={handleStartWorkout}
+          variant="primary"
+          size="lg"
+          fullWidth
+        />
+
+        {routines.length > 0 && (
+          <View style={{ marginTop: spacing.md }}>
+            <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.sm }}>Quick Start</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+              {routines.map(routine => (
+                <TouchableOpacity
+                  key={routine.id}
+                  onPress={() => handleStartRoutine(routine)}
+                  style={styles.routinePill}
+                >
+                  <Text variant="label" color="textPrimary" numberOfLines={1}>{routine.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Workout list */}
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.brand} size="large" />
+        </View>
+      ) : (
+        <FlatList
+          data={workouts}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <WorkoutCard workout={item} onPress={() => router.push(`/workouts/${item.id}` as any)} />
+          )}
+          ListHeaderComponent={<ListHeader />}
+          ListEmptyComponent={
+            <EmptyState
+              illustration="workouts"
+              title="Your first workout starts here"
+              description="Tap Start to log a session."
+              action={{ label: 'Start Workout', onPress: handleStartWorkout }}
+            />
+          }
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null
+          }
+          onEndReached={() => { if (hasMore && !loadingMore && !loading) fetchWorkouts(cursor); }}
+          onEndReachedThreshold={0.3}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        />
+      )}
+
       {showResumeModal && draftData && (
         <ResumeModal
           visible={showResumeModal}
           draft={draftData.draft}
-          idempotencyKey={draftData.idempotency_key}
           onResume={handleResume}
           onDiscard={handleDiscard}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  topActions: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.base,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  routinePill: {
+    backgroundColor: colors.surface2,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+  },
+  sectionLabel: {
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.base,
+    paddingBottom: spacing.sm,
+  },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  card: {
+    marginHorizontal: spacing.base,
+    marginBottom: spacing.sm,
+    padding: spacing.base,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
+  cardStats: { flexDirection: 'row', gap: spacing.md },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  modalBox: {
+    width: '100%',
+    padding: spacing.xl,
+  },
+});

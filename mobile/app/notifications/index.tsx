@@ -2,36 +2,28 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Text,
   TouchableOpacity,
   View,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Heart, MessageCircle, UserPlus, Trophy, Flame, Bell, BarChart2 } from 'lucide-react-native';
+import { LucideIcon } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { Text } from '../../src/components/Text';
+import { Header } from '../../src/components/Header';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface Notification {
   id: string;
-  type:
-    | 'like'
-    | 'comment'
-    | 'follow'
-    | 'follow_request'
-    | 'follow_request_approved'
-    | 'pr'
-    | 'streak_broken'
-    | 'challenge_started'
-    | 'challenge_ended'
-    | 'monthly_report'
-    | 'yearly_report';
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_request_approved' | 'pr' | 'streak_broken' | 'challenge_started' | 'challenge_ended' | 'monthly_report' | 'yearly_report';
   title: string;
   body: string | null;
   data: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -42,64 +34,45 @@ function formatRelative(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-const NOTIF_ICON: Record<string, string> = {
-  like: '❤️',
-  comment: '💬',
-  follow: '👤',
-  follow_request: '👤',
-  follow_request_approved: '✅',
-  pr: '🏆',
-  streak_broken: '🔥',
-  challenge_started: '⚡',
-  challenge_ended: '⚡',
-  monthly_report: '📊',
-  yearly_report: '📊',
+const NOTIF_CONFIG: Record<string, { icon: LucideIcon; color: string }> = {
+  like:                    { icon: Heart,          color: colors.danger },
+  comment:                 { icon: MessageCircle,  color: colors.info },
+  follow:                  { icon: UserPlus,       color: colors.success },
+  follow_request:          { icon: UserPlus,       color: colors.info },
+  follow_request_approved: { icon: UserPlus,       color: colors.success },
+  pr:                      { icon: Trophy,         color: '#F59E0B' },
+  streak_broken:           { icon: Flame,          color: colors.brand },
+  challenge_started:       { icon: Trophy,         color: colors.info },
+  challenge_ended:         { icon: Trophy,         color: colors.textTertiary },
+  monthly_report:          { icon: BarChart2,      color: colors.info },
+  yearly_report:           { icon: BarChart2,      color: colors.brand },
 };
 
-// ─── NotificationRow ─────────────────────────────────────────────────────────
-
-interface NotificationRowProps {
-  item: Notification;
-  onPress: (id: string) => void;
-}
-
-function NotificationRow({ item, onPress }: NotificationRowProps) {
-  const icon = NOTIF_ICON[item.type] ?? '🔔';
+function NotificationRow({ item, onPress }: { item: Notification; onPress: (id: string) => void }) {
+  const config = NOTIF_CONFIG[item.type] ?? { icon: Bell, color: colors.textTertiary };
+  const IconComp = config.icon;
 
   return (
     <TouchableOpacity
-      onPress={() => {
-        if (!item.is_read) onPress(item.id);
-      }}
-      activeOpacity={0.7}
-      className={`flex-row items-start px-4 py-3 border-b border-gray-800 ${
-        item.is_read ? 'bg-gray-950' : 'bg-gray-900'
-      }`}
+      onPress={() => { if (!item.is_read) onPress(item.id); }}
+      activeOpacity={0.8}
+      style={[styles.row, { backgroundColor: item.is_read ? colors.bg : colors.surface2 }]}
     >
-      {/* Unread indicator bar */}
-      {!item.is_read && (
-        <View className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500" />
-      )}
+      {!item.is_read && <View style={styles.unreadBar} />}
 
-      {/* Icon */}
-      <Text className="text-2xl mr-3 mt-0.5">{icon}</Text>
+      <View style={[styles.iconCircle, { backgroundColor: config.color + '20' }]}>
+        <IconComp size={18} color={config.color} strokeWidth={2} />
+      </View>
 
-      {/* Content */}
-      <View className="flex-1">
-        <View className="flex-row justify-between items-start">
-          <Text
-            className="text-white font-semibold text-sm flex-1 mr-2"
-            numberOfLines={2}
-          >
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={2} style={{ flex: 1, marginRight: spacing.sm }}>
             {item.title}
           </Text>
-          <Text className="text-gray-500 text-xs mt-0.5 shrink-0">
-            {formatRelative(item.created_at)}
-          </Text>
+          <Text variant="caption" color="textTertiary">{formatRelative(item.created_at)}</Text>
         </View>
-
         {item.body ? (
-          <Text className="text-gray-400 text-sm mt-0.5" numberOfLines={2}>
+          <Text variant="body" color="textSecondary" numberOfLines={2} style={{ marginTop: 2 }}>
             {item.body}
           </Text>
         ) : null}
@@ -108,46 +81,27 @@ function NotificationRow({ item, onPress }: NotificationRowProps) {
   );
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
-  // ── Fetch (initial + paginated) ───────────────────────────────────────────
-
-  const fetchNotifications = useCallback(
-    async (cursor?: string) => {
-      try {
-        const url = cursor
-          ? `/notifications?cursor=${encodeURIComponent(cursor)}`
-          : '/notifications';
-        const res = await api.get<{
-          data: { notifications: Notification[]; next_cursor: string | null };
-        }>(url);
-        const { notifications: items, next_cursor } = res.data;
-
-        setNotifications((prev) =>
-          cursor ? [...prev, ...items] : items
-        );
-        setNextCursor(next_cursor);
-      } catch {
-        setError('Failed to load notifications.');
-      }
-    },
-    []
-  );
+  const fetchNotifications = useCallback(async (cursor?: string) => {
+    try {
+      const url = cursor ? `/notifications?cursor=${encodeURIComponent(cursor)}` : '/notifications';
+      const res = await api.get<{ data: { notifications: Notification[]; next_cursor: string | null } }>(url);
+      const { notifications: items, next_cursor } = res.data;
+      setNotifications(prev => cursor ? [...prev, ...items] : items);
+      setNextCursor(next_cursor);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     setLoading(true);
     fetchNotifications().finally(() => setLoading(false));
   }, [fetchNotifications]);
-
-  // ── Load more ─────────────────────────────────────────────────────────────
 
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -156,107 +110,84 @@ export default function NotificationsScreen() {
     setLoadingMore(false);
   }, [nextCursor, loadingMore, fetchNotifications]);
 
-  // ── Mark single read ──────────────────────────────────────────────────────
-
   const handleMarkRead = useCallback(async (id: string) => {
-    // Optimistic update
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     try {
-      await api.patch<{ data: { read: true } }>(`/notifications/${id}/read`);
+      await api.patch(`/notifications/${id}/read`);
     } catch {
-      // Revert on failure
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: false } : n))
-      );
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
     }
   }, []);
-
-  // ── Mark all read ─────────────────────────────────────────────────────────
 
   const handleMarkAllRead = useCallback(async () => {
     if (markingAll) return;
     setMarkingAll(true);
     try {
-      await api.post<{ data: { updated: number } }>('/notifications/read-all');
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    } catch {
-      // silently fail — user can retry
+      await api.post('/notifications/read-all');
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } finally {
       setMarkingAll(false);
     }
   }, [markingAll]);
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-
-  const renderItem = useCallback(
-    ({ item }: { item: Notification }) => (
-      <NotificationRow item={item} onPress={handleMarkRead} />
-    ),
-    [handleMarkRead]
-  );
-
-  const keyExtractor = useCallback((item: Notification) => item.id, []);
-
-  const ListFooter = loadingMore ? (
-    <ActivityIndicator color="#FF6B35" className="py-4" />
-  ) : null;
-
-  const ListEmpty = loading ? null : (
-    <View className="flex-1 items-center justify-center py-24">
-      <Text className="text-gray-500 text-base">No notifications yet</Text>
-    </View>
-  );
-
-  // ── Main render ───────────────────────────────────────────────────────────
-
   return (
-    <View className="flex-1 bg-gray-950">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 pt-14 pb-4 border-b border-gray-800">
-        <Text className="text-white text-xl font-bold">Notifications</Text>
-        <TouchableOpacity
-          onPress={handleMarkAllRead}
-          disabled={markingAll}
-          activeOpacity={0.7}
-        >
-          <Text
-            className="text-base font-medium"
-            style={{ color: markingAll ? '#6b7280' : '#FF6B35' }}
-          >
-            {markingAll ? 'Marking…' : 'Mark all read'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header
+        title="Notifications"
+        right={
+          <TouchableOpacity onPress={handleMarkAllRead} disabled={markingAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text variant="label" color={markingAll ? 'textDisabled' : 'brand'}>
+              {markingAll ? '…' : 'Mark all read'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
-      {/* Error banner */}
-      {error ? (
-        <View className="bg-red-900/40 px-4 py-3 mx-4 mt-3 rounded-lg">
-          <Text className="text-red-400 text-sm">{error}</Text>
-        </View>
-      ) : null}
-
-      {/* Loading state */}
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#FF6B35" size="large" />
-          <Text className="text-gray-400 mt-3">Loading…</Text>
-        </View>
+        <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>
       ) : (
         <FlatList
           data={notifications}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
+          renderItem={({ item }) => <NotificationRow item={item} onPress={handleMarkRead} />}
+          keyExtractor={item => item.id}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
-          ListFooterComponent={ListFooter}
-          ListEmptyComponent={ListEmpty}
-          contentContainerStyle={
-            notifications.length === 0 ? { flex: 1 } : undefined
-          }
+          ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null}
+          ListEmptyComponent={<EmptyState illustration="notifications" title="All caught up" description="You'll see likes, comments, and PR alerts here." />}
+          contentContainerStyle={notifications.length === 0 ? { flex: 1 } : undefined}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+  },
+  unreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: colors.brand,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  content: { flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+});
