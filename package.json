@@ -7,5 +7,9 @@
     "dev:admin": "npm run dev --workspace=admin",
     "build:backend": "npm run build --workspace=backend",
     "build:admin": "npm run build --workspace=admin"
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }
