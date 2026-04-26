@@ -153,7 +153,9 @@ export default function FinishWorkoutScreen() {
       }
 
       if (prs.length > 0) {
-        router.replace({ pathname: '/workout/celebrate', params: { prs: prs.join(',') } } as any);
+        // Use ' | ' as separator — PR strings can contain commas/dots so a
+        // simple comma split breaks. The celebrate screen knows to split on '|'.
+        router.replace({ pathname: '/workout/celebrate', params: { prs: prs.join(' | ') } } as any);
       } else {
         router.replace('/(tabs)/workouts');
       }

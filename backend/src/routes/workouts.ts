@@ -21,66 +21,117 @@ function getISOWeekMonday(dateStr: string): string {
   return monday.toISOString().split('T')[0];
 }
 
-// Helper: PR detection
+// Helper: PR detection — bulk version
+// 1. Build all candidates locally (no DB roundtrip).
+// 2. Fetch ALL existing PRs for these (exercise_id, record_type) tuples in ONE query.
+// 3. Filter to actual new records.
+// 4. Bulk insert in ONE query.
+// Returns descriptive strings like "Bench Press · 100 kg" so the celebrate
+// screen can render them directly without an extra fetch.
 async function detectPRs(
   workoutId: string, userId: string, gymId: string,
-  exercises: Array<{ exercise_id: string; sets: Array<{ id?: string; set_type: string; weight_kg?: number|null; reps?: number|null; duration_seconds?: number|null; distance_meters?: number|null; is_completed: boolean }> }>,
+  exercises: Array<{ exercise_id: string; exercise_name: string; sets: Array<{ id?: string; set_type: string; weight_kg?: number|null; reps?: number|null; duration_seconds?: number|null; distance_meters?: number|null; is_completed: boolean }> }>,
   loggingTypes: Record<string, string>,
   bodyweightKg: number | null
 ): Promise<string[]> {
-  const prIds: string[] = [];
+  type Candidate = {
+    exercise_id: string;
+    exercise_name: string;
+    record_type: string;
+    value: number;
+    set_id: string | null;
+    label: string; // for response
+  };
+
+  const candidates: Candidate[] = [];
+
   for (const ex of exercises) {
     const eligibleSets = ex.sets.filter(s => s.is_completed && ['normal','dropset','failure'].includes(s.set_type));
     if (!eligibleSets.length) continue;
     const lt = loggingTypes[ex.exercise_id] || 'weight_reps';
-    const candidates: Array<{ record_type: string; value: number; set_id: string | null }> = [];
 
     if (lt === 'weight_reps' || lt === 'bodyweight_reps') {
       const withWeight = eligibleSets.filter(s => (s.weight_kg ?? 0) >= 0 && (s.reps ?? 0) >= 0);
       if (!withWeight.length) continue;
       const bw = bodyweightKg || 0;
       const effectiveWeight = (s: any) => lt === 'bodyweight_reps' ? (bw + (s.weight_kg || 0)) : (s.weight_kg || 0);
-      const maxHeavy = withWeight.reduce((best, s) => effectiveWeight(s) > effectiveWeight(best) ? s : best, withWeight[0]);
-      candidates.push({ record_type: 'heaviest_weight', value: effectiveWeight(maxHeavy), set_id: (maxHeavy as any).id || null });
+      const fmtKg = (n: number) => `${Math.round(n * 10) / 10} kg`;
+
+      const maxHeavy = withWeight.reduce((b, s) => effectiveWeight(s) > effectiveWeight(b) ? s : b, withWeight[0]);
+      candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'heaviest_weight', value: effectiveWeight(maxHeavy), set_id: (maxHeavy as any).id || null, label: `${ex.exercise_name} · ${fmtKg(effectiveWeight(maxHeavy))}` });
+
       const with1rm = withWeight.filter(s => (s.reps || 0) > 0);
       if (with1rm.length) {
-        const max1rm = with1rm.reduce((best, s) => {
-          const v = effectiveWeight(s) * (1 + (s.reps || 0) / 30.0);
-          const bv = effectiveWeight(best) * (1 + (best.reps || 0) / 30.0);
-          return v > bv ? s : best;
-        }, with1rm[0]);
-        candidates.push({ record_type: 'projected_1rm', value: effectiveWeight(max1rm) * (1 + (max1rm.reps || 0) / 30.0), set_id: (max1rm as any).id || null });
+        const max1rm = with1rm.reduce((b, s) => effectiveWeight(s) * (1 + (s.reps || 0) / 30) > effectiveWeight(b) * (1 + (b.reps || 0) / 30) ? s : b, with1rm[0]);
+        const v = effectiveWeight(max1rm) * (1 + (max1rm.reps || 0) / 30);
+        candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'projected_1rm', value: v, set_id: (max1rm as any).id || null, label: `${ex.exercise_name} · ${fmtKg(v)} 1RM` });
       }
-      const maxVol = withWeight.reduce((best, s) => (effectiveWeight(s) * (s.reps || 0)) > (effectiveWeight(best) * (best.reps || 0)) ? s : best, withWeight[0]);
-      candidates.push({ record_type: 'best_volume_set', value: effectiveWeight(maxVol) * (maxVol.reps || 0), set_id: (maxVol as any).id || null });
+
+      const maxVol = withWeight.reduce((b, s) => (effectiveWeight(s) * (s.reps || 0)) > (effectiveWeight(b) * (b.reps || 0)) ? s : b, withWeight[0]);
+      candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'best_volume_set', value: effectiveWeight(maxVol) * (maxVol.reps || 0), set_id: (maxVol as any).id || null, label: `${ex.exercise_name} · ${fmtKg(effectiveWeight(maxVol))}×${maxVol.reps}` });
+
       const totalVol = withWeight.reduce((sum, s) => sum + effectiveWeight(s) * (s.reps || 0), 0);
-      candidates.push({ record_type: 'best_volume_session', value: totalVol, set_id: null });
-      const maxReps = withWeight.reduce((best, s) => (s.reps || 0) > (best.reps || 0) ? s : best, withWeight[0]);
-      candidates.push({ record_type: 'most_reps', value: maxReps.reps || 0, set_id: (maxReps as any).id || null });
-      const for3 = withWeight.filter(s => (s.reps || 0) >= 3);
-      if (for3.length) { const m = for3.reduce((b, s) => effectiveWeight(s) > effectiveWeight(b) ? s : b, for3[0]); candidates.push({ record_type: '3rm', value: effectiveWeight(m), set_id: (m as any).id || null }); }
-      const for5 = withWeight.filter(s => (s.reps || 0) >= 5);
-      if (for5.length) { const m = for5.reduce((b, s) => effectiveWeight(s) > effectiveWeight(b) ? s : b, for5[0]); candidates.push({ record_type: '5rm', value: effectiveWeight(m), set_id: (m as any).id || null }); }
-      const for10 = withWeight.filter(s => (s.reps || 0) >= 10);
-      if (for10.length) { const m = for10.reduce((b, s) => effectiveWeight(s) > effectiveWeight(b) ? s : b, for10[0]); candidates.push({ record_type: '10rm', value: effectiveWeight(m), set_id: (m as any).id || null }); }
+      if (totalVol > 0) candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'best_volume_session', value: totalVol, set_id: null, label: `${ex.exercise_name} · ${fmtKg(totalVol)} total` });
+
+      const maxReps = withWeight.reduce((b, s) => (s.reps || 0) > (b.reps || 0) ? s : b, withWeight[0]);
+      if ((maxReps.reps || 0) > 0) candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'most_reps', value: maxReps.reps || 0, set_id: (maxReps as any).id || null, label: `${ex.exercise_name} · ${maxReps.reps} reps` });
+
+      for (const repsTarget of [3, 5, 10]) {
+        const filtered = withWeight.filter(s => (s.reps || 0) >= repsTarget);
+        if (!filtered.length) continue;
+        const m = filtered.reduce((b, s) => effectiveWeight(s) > effectiveWeight(b) ? s : b, filtered[0]);
+        candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: `${repsTarget}rm`, value: effectiveWeight(m), set_id: (m as any).id || null, label: `${ex.exercise_name} · ${repsTarget}RM ${fmtKg(effectiveWeight(m))}` });
+      }
     } else if (lt === 'duration') {
       const withDur = eligibleSets.filter(s => (s.duration_seconds || 0) > 0);
-      if (withDur.length) { const m = withDur.reduce((b, s) => (s.duration_seconds || 0) > (b.duration_seconds || 0) ? s : b, withDur[0]); candidates.push({ record_type: 'longest_duration', value: m.duration_seconds || 0, set_id: (m as any).id || null }); }
+      if (!withDur.length) continue;
+      const m = withDur.reduce((b, s) => (s.duration_seconds || 0) > (b.duration_seconds || 0) ? s : b, withDur[0]);
+      const secs = m.duration_seconds || 0;
+      const mins = Math.floor(secs / 60);
+      const ss = secs % 60;
+      candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'longest_duration', value: secs, set_id: (m as any).id || null, label: `${ex.exercise_name} · ${mins}:${String(ss).padStart(2, '0')}` });
     } else if (lt === 'distance') {
       const withDist = eligibleSets.filter(s => (s.distance_meters || 0) > 0);
-      if (withDist.length) { const total = withDist.reduce((sum, s) => sum + (s.distance_meters || 0), 0); candidates.push({ record_type: 'longest_distance', value: total, set_id: null }); }
-    }
-
-    for (const c of candidates) {
-      if (!c.value) continue;
-      const { data: existing } = await supabase.from('personal_records').select('value').eq('user_id', userId).eq('exercise_id', ex.exercise_id).eq('record_type', c.record_type).order('value', { ascending: false }).limit(1).single();
-      if (!existing || c.value > existing.value) {
-        const { data: pr } = await supabase.from('personal_records').insert({ user_id: userId, gym_id: gymId, exercise_id: ex.exercise_id, workout_id: workoutId, workout_set_id: c.set_id, record_type: c.record_type, value: c.value, achieved_at: new Date().toISOString() }).select('id').single();
-        if (pr) prIds.push(pr.id);
-      }
+      if (!withDist.length) continue;
+      const total = withDist.reduce((sum, s) => sum + (s.distance_meters || 0), 0);
+      candidates.push({ exercise_id: ex.exercise_id, exercise_name: ex.exercise_name, record_type: 'longest_distance', value: total, set_id: null, label: `${ex.exercise_name} · ${total} m` });
     }
   }
-  return prIds;
+
+  if (!candidates.length) return [];
+
+  // Fetch existing PRs in ONE query: max value per (exercise_id, record_type)
+  const exerciseIds = [...new Set(candidates.map(c => c.exercise_id))];
+  const recordTypes = [...new Set(candidates.map(c => c.record_type))];
+  const { data: existingPRs } = await supabase.from('personal_records')
+    .select('exercise_id, record_type, value')
+    .eq('user_id', userId)
+    .in('exercise_id', exerciseIds)
+    .in('record_type', recordTypes);
+
+  const existingMap = new Map<string, number>();
+  for (const r of existingPRs || []) {
+    const key = `${r.exercise_id}::${r.record_type}`;
+    const cur = existingMap.get(key) ?? 0;
+    if (Number(r.value) > cur) existingMap.set(key, Number(r.value));
+  }
+
+  const newPRs = candidates.filter(c => {
+    const key = `${c.exercise_id}::${c.record_type}`;
+    const existing = existingMap.get(key) ?? 0;
+    return c.value > existing && c.value > 0;
+  });
+
+  if (!newPRs.length) return [];
+
+  // Bulk insert
+  const now = new Date().toISOString();
+  await supabase.from('personal_records').insert(newPRs.map(c => ({
+    user_id: userId, gym_id: gymId, exercise_id: c.exercise_id, workout_id: workoutId,
+    workout_set_id: c.set_id, record_type: c.record_type, value: c.value, achieved_at: now,
+  })));
+
+  return newPRs.map(c => c.label);
 }
 
 const workoutSchema = z.object({
@@ -131,11 +182,15 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
     const { data: userRow } = await supabase.from('users').select('bodyweight_kg').eq('id', req.user.id).single();
     const bodyweightKg = userRow?.bodyweight_kg ?? null;
 
-    // Get exercise logging types
+    // Get exercise logging types + names (one query for both)
     const exerciseIds = [...new Set(body.exercises.map(e => e.exercise_id))];
-    const { data: exRows } = await supabase.from('exercises').select('id,logging_type').in('id', exerciseIds);
+    const { data: exRows } = await supabase.from('exercises').select('id,name,logging_type').in('id', exerciseIds);
     const loggingTypes: Record<string, string> = {};
-    for (const e of exRows || []) loggingTypes[e.id] = e.logging_type;
+    const exerciseNames: Record<string, string> = {};
+    for (const e of exRows || []) {
+      loggingTypes[e.id] = e.logging_type;
+      exerciseNames[e.id] = e.name;
+    }
 
     // Insert workout
     const { data: workout, error: wErr } = await supabase.from('workouts').insert({
@@ -146,27 +201,33 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
     }).select().single();
     if (wErr) throw wErr;
 
-    // Insert exercises + sets, collect for volume calc
+    // BULK insert workout_exercises (single roundtrip)
+    const exRowsToInsert = body.exercises.map(ex => ({
+      workout_id: workout.id, exercise_id: ex.exercise_id, position: ex.position,
+      superset_group: ex.superset_group || null, rest_seconds: ex.rest_seconds || 90, notes: ex.notes || '',
+    }));
+    const { data: insertedExs, error: bulkExErr } = await supabase.from('workout_exercises').insert(exRowsToInsert).select('id, position');
+    if (bulkExErr) throw bulkExErr;
+
+    // Map back: position -> workout_exercise_id (positions are unique per workout)
+    const posToWeId: Record<number, string> = {};
+    for (const r of insertedExs || []) posToWeId[r.position] = r.id;
+
+    // BULK insert workout_sets (single roundtrip)
     let totalVolumeKg = 0;
     let totalSets = 0;
-    const exercisesForPR: any[] = [];
+    const setsToInsert: any[] = [];
 
     for (const ex of body.exercises) {
-      const { data: weRow, error: weErr } = await supabase.from('workout_exercises').insert({
-        workout_id: workout.id, exercise_id: ex.exercise_id, position: ex.position,
-        superset_group: ex.superset_group || null, rest_seconds: ex.rest_seconds || 90, notes: ex.notes || '',
-      }).select().single();
-      if (weErr) throw weErr;
-
-      const setsForPR: any[] = [];
-      for (const s of ex.sets) {
+      const weId = posToWeId[ex.position];
+      ex.sets.forEach((s) => {
         const is_warmup_counted = s.set_type === 'warmup' && warm_up_sets_in_stats;
-        const { data: setRow } = await supabase.from('workout_sets').insert({
-          workout_exercise_id: weRow.id, position: s.position, set_type: s.set_type,
+        setsToInsert.push({
+          workout_exercise_id: weId, position: s.position, set_type: s.set_type,
           weight_kg: s.weight_kg ?? null, reps: s.reps ?? null, duration_seconds: s.duration_seconds ?? null,
           distance_meters: s.distance_meters ?? null, rpe: s.rpe ?? null,
           is_completed: s.is_completed, is_warmup_counted, completed_at: s.completed_at ?? null,
-        }).select().single();
+        });
 
         if (s.is_completed && (s.set_type !== 'warmup' || is_warmup_counted)) {
           const lt = loggingTypes[ex.exercise_id] || 'weight_reps';
@@ -174,10 +235,22 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
           else if (lt === 'bodyweight_reps') totalVolumeKg += ((bodyweightKg || 0) + (s.weight_kg || 0)) * (s.reps || 0);
         }
         if (s.is_completed && s.set_type !== 'warmup') totalSets++;
-        setsForPR.push({ ...s, id: setRow?.id });
-      }
-      exercisesForPR.push({ exercise_id: ex.exercise_id, sets: setsForPR });
+      });
     }
+
+    const { data: insertedSets, error: bulkSetErr } = setsToInsert.length
+      ? await supabase.from('workout_sets').insert(setsToInsert).select('id, workout_exercise_id, position')
+      : { data: [] as any[], error: null };
+    if (bulkSetErr) throw bulkSetErr;
+
+    // Build exercisesForPR with set IDs (lookup by workout_exercise_id+position)
+    const setIdLookup = new Map<string, string>();
+    for (const r of insertedSets || []) setIdLookup.set(`${r.workout_exercise_id}::${r.position}`, r.id);
+    const exercisesForPR = body.exercises.map(ex => ({
+      exercise_id: ex.exercise_id,
+      exercise_name: exerciseNames[ex.exercise_id] || 'Exercise',
+      sets: ex.sets.map(s => ({ ...s, id: setIdLookup.get(`${posToWeId[ex.position]}::${s.position}`) })),
+    }));
 
     // ordinal_number
     const { count: completedCount } = await supabase.from('workouts').select('id', { count: 'exact', head: true }).eq('user_id', req.user.id).eq('is_completed', true);
@@ -253,6 +326,29 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
     });
 
     res.status(201).json({ data: { workout: updatedWorkout, prs_detected: prIds, media_failed } });
+  } catch (err) { next(err); }
+});
+
+// GET /workouts/active/personal-records — current PRs for given exercise IDs.
+// Used by the active workout screen to flag live PRs as the user logs sets.
+// BEFORE /:id (Express matches in order — '/active/...' would otherwise be
+// interpreted as the literal id "active").
+router.get('/active/personal-records', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const ids = String(req.query.exercise_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return res.json({ data: { records: {} } });
+    const { data } = await supabase.from('personal_records')
+      .select('exercise_id, record_type, value')
+      .eq('user_id', req.user.id)
+      .in('exercise_id', ids);
+    const records: Record<string, Record<string, number>> = {};
+    for (const r of data || []) {
+      records[r.exercise_id] = records[r.exercise_id] || {};
+      const cur = records[r.exercise_id][r.record_type] ?? 0;
+      records[r.exercise_id][r.record_type] = Math.max(cur, Number(r.value));
+    }
+    res.json({ data: { records } });
   } catch (err) { next(err); }
 });
 

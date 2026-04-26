@@ -20,6 +20,7 @@ import { Button } from '../../src/components/Button';
 import { Icon } from '../../src/components/Icon';
 import { Pressable } from '../../src/components/Pressable';
 import { Sheet } from '../../src/components/Sheet';
+import { useToast } from '../../src/components/Toast';
 import { haptic } from '../../src/lib/haptics';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
@@ -197,9 +198,10 @@ interface ExerciseCardProps {
   onUpdateSets: (sets: WorkoutSet[]) => void;
   onChangeSetType: (setPosition: number, type: WorkoutSet['set_type']) => void;
   onRemove: () => void;
+  onPRCheck?: (exerciseId: string, exerciseName: string, set: WorkoutSet, loggingType: string) => void;
 }
 
-function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove }: ExerciseCardProps) {
+function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove, onPRCheck }: ExerciseCardProps) {
   const { startRestTimer } = useWorkoutStore();
 
   const handleUpdateSet = (setPosition: number, updates: Partial<WorkoutSet>) => {
@@ -234,6 +236,8 @@ function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove }: Exe
     if (s?.is_completed && s.set_type !== 'warmup') {
       haptic.light();
       startRestTimer(exercise.rest_seconds);
+      // Live PR check for working sets
+      if (onPRCheck) onPRCheck(exercise.exercise_id, exercise.exercise_name, s, exercise.logging_type);
     } else if (s?.is_completed) {
       haptic.light();
     }
@@ -573,6 +577,9 @@ export default function ActiveWorkoutScreen() {
   } = useWorkoutStore();
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showTimerSheet, setShowTimerSheet] = useState(false);
+  // Live PR map: exercise_id -> { record_type -> max_value }
+  const [prMap, setPrMap] = useState<Record<string, Record<string, number>>>({});
+  const toast = useToast();
 
   useEffect(() => {
     if (!active) router.replace('/(tabs)/workouts');
@@ -582,6 +589,50 @@ export default function ActiveWorkoutScreen() {
     const interval = setInterval(tickElapsed, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch existing PRs for the active workout's exercises (one shot on mount/change of exercise list)
+  useEffect(() => {
+    if (!active || active.exercises.length === 0) return;
+    const ids = [...new Set(active.exercises.map(e => e.exercise_id))].join(',');
+    api.get<{ data: { records: Record<string, Record<string, number>> } }>(
+      `/workouts/active/personal-records?exercise_ids=${encodeURIComponent(ids)}`
+    )
+      .then(r => setPrMap(r.data?.records ?? {}))
+      .catch(() => {});
+  }, [active?.exercises.map(e => e.exercise_id).join(',')]);
+
+  // Live PR check: called when a working set is completed
+  const handlePRCheck = useCallback((exerciseId: string, exerciseName: string, set: WorkoutSet, loggingType: string) => {
+    const existing = prMap[exerciseId] ?? {};
+    const checks: Array<{ type: string; value: number; label: string }> = [];
+
+    if (loggingType === 'weight_reps' && set.weight_kg && set.reps) {
+      const w = set.weight_kg;
+      if (w > (existing.heaviest_weight ?? 0)) checks.push({ type: 'heaviest_weight', value: w, label: `${w} kg` });
+      const vol = w * set.reps;
+      if (vol > (existing.best_volume_set ?? 0)) checks.push({ type: 'best_volume_set', value: vol, label: `${w}×${set.reps}` });
+    } else if (loggingType === 'bodyweight_reps' && set.reps) {
+      if (set.reps > (existing.most_reps ?? 0)) checks.push({ type: 'most_reps', value: set.reps, label: `${set.reps} reps` });
+    } else if (loggingType === 'duration' && set.duration_seconds) {
+      if (set.duration_seconds > (existing.longest_duration ?? 0)) {
+        const m = Math.floor(set.duration_seconds / 60), s = set.duration_seconds % 60;
+        checks.push({ type: 'longest_duration', value: set.duration_seconds, label: `${m}:${String(s).padStart(2,'0')}` });
+      }
+    } else if (loggingType === 'distance' && set.distance_meters) {
+      if (set.distance_meters > (existing.longest_distance ?? 0)) checks.push({ type: 'longest_distance', value: set.distance_meters, label: `${set.distance_meters} m` });
+    }
+
+    if (checks.length === 0) return;
+    // Take the highest-priority PR (first one)
+    const pr = checks[0];
+    haptic.success();
+    toast.show(`PR! ${exerciseName} · ${pr.label}`, 'success');
+    // Update local map so subsequent sets compare to the new high
+    setPrMap(prev => ({
+      ...prev,
+      [exerciseId]: { ...(prev[exerciseId] ?? {}), ...checks.reduce((a, c) => ({ ...a, [c.type]: c.value }), {}) },
+    }));
+  }, [prMap, toast]);
 
   const handleFinish = () => {
     if (!active) return;
@@ -680,6 +731,7 @@ export default function ActiveWorkoutScreen() {
             exercise={ex}
             onUpdateSets={(sets) => updateExerciseSets(ex.position, sets)}
             onChangeSetType={(setPos, type) => setSetType(ex.position, setPos, type)}
+            onPRCheck={handlePRCheck}
             onRemove={() => {
               Alert.alert('Remove Exercise', `Remove ${ex.exercise_name}?`, [
                 { text: 'Cancel', style: 'cancel' },
