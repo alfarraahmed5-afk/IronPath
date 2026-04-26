@@ -23,8 +23,10 @@ router.patch('/me', requireActiveUser, async (req: Request, res: Response, next:
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
     const updateSchema = z.object({
+      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Letters, numbers, and underscores only').optional(),
       full_name: z.string().max(255).optional(),
       bio: z.string().max(500).optional(),
+      avatar_url: z.string().url().nullable().optional(),
       sex: z.enum(['male', 'female']).optional(),
       date_of_birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       bodyweight_kg: z.number().positive().max(699).optional(),
@@ -35,10 +37,52 @@ router.patch('/me', requireActiveUser, async (req: Request, res: Response, next:
       const fields = parsed.error.errors.map(e => ({ field: String(e.path.join('.')), message: e.message }));
       return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
     }
+
+    // Username uniqueness check (case-insensitive within the gym)
+    if (parsed.data.username) {
+      const { data: existing } = await supabase.from('users')
+        .select('id').ilike('username', parsed.data.username)
+        .eq('gym_id', req.user.gym_id)
+        .neq('id', req.user.id)
+        .maybeSingle();
+      if (existing) {
+        return next(new AppError('USERNAME_TAKEN', 409, 'That username is already taken.'));
+      }
+    }
+
     const { data: user, error } = await supabase.from('users').update(parsed.data).eq('id', req.user.id)
       .select('id, username, full_name, avatar_url, bio, role, sex, date_of_birth, bodyweight_kg, is_profile_private, gym_id').single();
     if (error) throw error;
     res.json({ data: user });
+  } catch (err) { next(err); }
+});
+
+// POST /users/me/avatar — upload base64-encoded image to Supabase Storage
+router.post('/me/avatar', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const schema = z.object({
+      image_base64: z.string().min(10),
+      mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']).default('image/jpeg'),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return next(new AppError('VALIDATION_ERROR', 422, 'Validation failed'));
+
+    const ext = parsed.data.mime_type === 'image/png' ? 'png' : parsed.data.mime_type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${req.user.id}/avatar_${Date.now()}.${ext}`;
+    const buffer = Buffer.from(parsed.data.image_base64, 'base64');
+
+    const { error: upErr } = await supabase.storage.from('avatars')
+      .upload(path, buffer, { contentType: parsed.data.mime_type, upsert: true });
+    if (upErr) throw upErr;
+
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+    const avatar_url = urlData.publicUrl;
+
+    const { data: user, error } = await supabase.from('users').update({ avatar_url }).eq('id', req.user.id)
+      .select('id, username, full_name, avatar_url, bio, role, gym_id').single();
+    if (error) throw error;
+    res.json({ data: { user, avatar_url } });
   } catch (err) { next(err); }
 });
 

@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/lib/api';
 import { Header } from '../../src/components/Header';
@@ -17,24 +20,87 @@ import { colors, spacing, radii } from '../../src/theme/tokens';
 export default function EditProfileScreen() {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
+  const setUser = useAuthStore(s => s.setUser);
 
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
-  const [bio, setBio] = useState('');
+  const [bio, setBio] = useState(user?.bio ?? '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  async function handlePickPhoto() {
+    if (uploadingPhoto) return;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow photo library access to change your avatar.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+
+      setUploadingPhoto(true);
+
+      // Resize/compress to keep upload light
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 512, height: 512 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      // Read as base64
+      const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const res = await api.post<{ data: { user: any; avatar_url: string } }>('/users/me/avatar', {
+        image_base64: base64,
+        mime_type: 'image/jpeg',
+      });
+
+      const newUrl = res.data?.avatar_url ?? null;
+      setAvatarUrl(newUrl);
+      if (res.data?.user && setUser) {
+        setUser({
+          ...(user as any),
+          ...res.data.user,
+        });
+      }
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.error?.message ?? 'Could not upload photo. Try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   async function handleSave() {
     if (saving) return;
     setSaving(true);
     try {
-      await api.patch('/users/me', {
-        full_name: fullName.trim() || undefined,
-        username: username.trim() || undefined,
-        bio: bio.trim() || undefined,
-      });
+      const body: Record<string, any> = {};
+      if (fullName.trim() !== (user?.full_name ?? '')) body.full_name = fullName.trim();
+      if (username.trim() && username.trim() !== user?.username) body.username = username.trim();
+      if (bio !== (user?.bio ?? '')) body.bio = bio;
+
+      if (Object.keys(body).length === 0) {
+        router.back();
+        return;
+      }
+
+      const res = await api.patch<{ data: any }>('/users/me', body);
+      if (res.data && setUser) {
+        setUser({ ...(user as any), ...res.data });
+      }
       router.back();
-    } catch {
-      Alert.alert('Error', 'Could not save profile. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.error?.message ?? 'Could not save profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -42,19 +108,7 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <Header
-        title="Edit Profile"
-        back
-        right={
-          <Button
-            label="Save"
-            onPress={handleSave}
-            variant="primary"
-            size="sm"
-            loading={saving}
-          />
-        }
-      />
+      <Header title="Edit Profile" back />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -67,18 +121,28 @@ export default function EditProfileScreen() {
         >
           {/* Avatar with edit affordance */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarWrap}>
+            <Pressable
+              onPress={handlePickPhoto}
+              style={styles.avatarWrap}
+              accessibilityLabel="Change profile photo"
+            >
               <Avatar
                 username={user?.full_name || user?.username || 'U'}
-                avatarUrl={user?.avatar_url}
+                avatarUrl={avatarUrl ?? undefined}
                 size={80}
               />
-              <Pressable style={styles.cameraBtn} accessibilityLabel="Change photo">
-                <Icon icon={Camera} size={14} color={colors.textOnBrand} />
-              </Pressable>
-            </View>
-            <Text variant="label" color="brand" style={{ marginTop: spacing.sm }}>Change Photo</Text>
-            <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>Photo editing coming soon</Text>
+              <View style={styles.cameraBtn}>
+                {uploadingPhoto
+                  ? <ActivityIndicator size="small" color={colors.textOnBrand} />
+                  : <Icon icon={Camera} size={14} color={colors.textOnBrand} />
+                }
+              </View>
+            </Pressable>
+            <Pressable onPress={handlePickPhoto} disabled={uploadingPhoto} accessibilityLabel="Change photo">
+              <Text variant="label" color="brand" style={{ marginTop: spacing.sm }}>
+                {uploadingPhoto ? 'Uploading…' : 'Change Photo'}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Form */}
@@ -114,6 +178,18 @@ export default function EditProfileScreen() {
             />
           </View>
         </ScrollView>
+
+        {/* Sticky save button */}
+        <View style={styles.footer}>
+          <Button
+            label="Save"
+            onPress={handleSave}
+            variant="primary"
+            size="lg"
+            loading={saving}
+            fullWidth
+          />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -138,4 +214,11 @@ const styles = StyleSheet.create({
     borderColor: colors.bg,
   },
   form: { paddingHorizontal: spacing.base },
+  footer: {
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.md,
+    paddingBottom: spacing['2xl'],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
 });

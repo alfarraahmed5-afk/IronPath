@@ -10,6 +10,7 @@ interface AuthUser {
   username: string;
   full_name: string | null;
   avatar_url: string | null;
+  bio?: string | null;
   role: string;
   gym_id: string;
 }
@@ -21,6 +22,7 @@ interface AuthState {
   login: (user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   loadFromStorage: () => Promise<void>;
+  setUser: (user: AuthUser) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -41,6 +43,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     clearTokens();
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
+
+  setUser: (user) => set({ user }),
 
   loadFromStorage: async () => {
     try {
