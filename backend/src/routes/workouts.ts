@@ -277,6 +277,33 @@ router.get('/history', requireActiveUser, async (req: Request, res: Response, ne
   } catch (err) { next(err); }
 });
 
+// GET /workouts/calendar — BEFORE /:id
+router.get('/calendar', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const start = String(req.query.start || '');
+    const end = String(req.query.end || '');
+    if (!/^\d{4}-\d{2}-\d{2}/.test(start) || !/^\d{4}-\d{2}-\d{2}/.test(end)) {
+      return next(new AppError('VALIDATION_ERROR', 422, 'Invalid start/end'));
+    }
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('id,started_at')
+      .eq('user_id', req.user.id)
+      .eq('is_completed', true)
+      .gte('started_at', start)
+      .lte('started_at', end);
+    if (error) throw error;
+    const byDay: Record<string, string[]> = {};
+    for (const w of data || []) {
+      const day = (w.started_at as string).slice(0, 10);
+      (byDay[day] = byDay[day] || []).push(w.id);
+    }
+    const days = Object.entries(byDay).map(([date, workout_ids]) => ({ date, workout_ids }));
+    res.json({ data: { days } });
+  } catch (err) { next(err); }
+});
+
 // GET /workouts/:id
 router.get('/:id', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
   try {

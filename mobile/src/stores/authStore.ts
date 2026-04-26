@@ -13,6 +13,7 @@ interface AuthUser {
   bio?: string | null;
   role: string;
   gym_id: string;
+  is_profile_private?: boolean;
 }
 
 interface AuthState {

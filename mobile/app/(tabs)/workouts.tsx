@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Play, Clock, Hash, Weight } from 'lucide-react-native';
+import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore, ActiveWorkout } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
@@ -18,6 +18,8 @@ import { Surface } from '../../src/components/Surface';
 import { Button } from '../../src/components/Button';
 import { Icon } from '../../src/components/Icon';
 import { EmptyState } from '../../src/components/EmptyState';
+import { Pressable } from '../../src/components/Pressable';
+import { Calendar } from '../../src/components/Calendar';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
