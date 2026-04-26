@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Plus, Timer, Check, Search } from 'lucide-react-native';
+import { X, Plus, Timer, Check, Search, Pause, Play, RotateCcw, Minus } from 'lucide-react-native';
 import { useWorkoutStore, WorkoutSet, WorkoutExercise } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
 import { Text } from '../../src/components/Text';
@@ -19,6 +19,7 @@ import { Surface } from '../../src/components/Surface';
 import { Button } from '../../src/components/Button';
 import { Icon } from '../../src/components/Icon';
 import { Pressable } from '../../src/components/Pressable';
+import { Sheet } from '../../src/components/Sheet';
 import { haptic } from '../../src/lib/haptics';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
@@ -29,6 +30,20 @@ const SET_TYPE_COLORS: Record<string, string> = {
   failure: colors.setFailure,
 };
 
+const SET_TYPE_LABELS: Record<string, string> = {
+  normal:  'N',
+  warmup:  'W',
+  dropset: 'D',
+  failure: 'F',
+};
+
+const SET_TYPE_OPTIONS: { key: WorkoutSet['set_type']; label: string; desc: string }[] = [
+  { key: 'normal',  label: 'Normal',  desc: 'Working set' },
+  { key: 'warmup',  label: 'Warm-up', desc: "Doesn't count toward stats" },
+  { key: 'dropset', label: 'Drop set', desc: 'Reduce weight, continue' },
+  { key: 'failure', label: 'To failure', desc: 'Rep until you can\'t' },
+];
+
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -37,43 +52,83 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// Validation: a set is "complete-able" only if it has the right values for its logging type.
+function setHasRequiredValues(set: WorkoutSet, loggingType: string): boolean {
+  if (loggingType === 'weight_reps') {
+    return set.weight_kg !== null && set.weight_kg > 0 && set.reps !== null && set.reps > 0;
+  }
+  if (loggingType === 'bodyweight_reps') {
+    return set.reps !== null && set.reps > 0;
+  }
+  if (loggingType === 'duration') {
+    return set.duration_seconds !== null && set.duration_seconds > 0;
+  }
+  if (loggingType === 'distance') {
+    return set.distance_meters !== null && set.distance_meters > 0;
+  }
+  return false;
+}
+
 interface SetRowProps {
   set: WorkoutSet;
   index: number;
   loggingType: string;
   onToggleComplete: () => void;
   onUpdateSet: (updated: Partial<WorkoutSet>) => void;
+  onChangeType: (type: WorkoutSet['set_type']) => void;
 }
 
-function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet }: SetRowProps) {
+function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onChangeType }: SetRowProps) {
   const isCompleted = set.is_completed;
   const typeColor = SET_TYPE_COLORS[set.set_type] ?? colors.setNormal;
+  const canComplete = setHasRequiredValues(set, loggingType);
+  const [showTypePicker, setShowTypePicker] = useState(false);
 
   return (
     <View style={[styles.setRow, isCompleted && styles.setRowComplete]}>
-      {/* Set number / complete toggle */}
+      {/* Set number + type long-press */}
       <Pressable
-        onPress={onToggleComplete}
-        style={[styles.setNumBtn, { backgroundColor: isCompleted ? colors.success : typeColor + '30', borderColor: isCompleted ? colors.success : typeColor }]}
-        accessibilityLabel={`Set ${index + 1}, ${isCompleted ? 'completed' : 'incomplete'}`}
+        onPress={() => {
+          if (!isCompleted && !canComplete) {
+            haptic.warning();
+            return;
+          }
+          onToggleComplete();
+        }}
+        onLongPress={() => setShowTypePicker(true)}
+        style={[styles.setNumBtn, {
+          backgroundColor: isCompleted ? colors.success : typeColor + '30',
+          borderColor: isCompleted ? colors.success : typeColor,
+          opacity: !isCompleted && !canComplete ? 0.45 : 1,
+        }]}
+        accessibilityLabel={`Set ${index + 1}, ${set.set_type}, ${isCompleted ? 'completed' : 'incomplete'}, long-press to change type`}
       >
         {isCompleted
           ? <Icon icon={Check} size={14} color={colors.textPrimary} strokeWidth={2.5} />
-          : <Text variant="label" style={{ color: typeColor }}>{index + 1}</Text>
+          : set.set_type === 'normal'
+            ? <Text variant="label" style={{ color: typeColor }}>{index + 1}</Text>
+            : <Text variant="label" style={{ color: typeColor, fontSize: 14 }}>{SET_TYPE_LABELS[set.set_type]}</Text>
         }
       </Pressable>
 
       {/* Inputs */}
       {(loggingType === 'weight_reps' || loggingType === 'bodyweight_reps') && (
         <>
-          <TextInput
-            style={[styles.setInput, isCompleted && styles.setInputComplete]}
-            placeholder="kg"
-            placeholderTextColor={colors.textDisabled}
-            keyboardType="decimal-pad"
-            value={set.weight_kg !== null ? String(set.weight_kg) : ''}
-            onChangeText={v => onUpdateSet({ weight_kg: v ? parseFloat(v) : null })}
-          />
+          {loggingType === 'weight_reps' ? (
+            <TextInput
+              style={[styles.setInput, isCompleted && styles.setInputComplete]}
+              placeholder="kg"
+              placeholderTextColor={colors.textDisabled}
+              keyboardType="decimal-pad"
+              value={set.weight_kg !== null ? String(set.weight_kg) : ''}
+              onChangeText={v => onUpdateSet({ weight_kg: v ? parseFloat(v) : null })}
+              editable={!isCompleted}
+            />
+          ) : (
+            <View style={[styles.setInput, { justifyContent: 'center' }]}>
+              <Text variant="caption" color="textTertiary" style={{ textAlign: 'center' }}>BW</Text>
+            </View>
+          )}
           <TextInput
             style={[styles.setInput, isCompleted && styles.setInputComplete]}
             placeholder="reps"
@@ -81,6 +136,7 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet }: SetR
             keyboardType="number-pad"
             value={set.reps !== null ? String(set.reps) : ''}
             onChangeText={v => onUpdateSet({ reps: v ? parseInt(v) : null })}
+            editable={!isCompleted}
           />
         </>
       )}
@@ -92,6 +148,7 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet }: SetR
           keyboardType="number-pad"
           value={set.duration_seconds !== null ? String(set.duration_seconds) : ''}
           onChangeText={v => onUpdateSet({ duration_seconds: v ? parseInt(v) : null })}
+          editable={!isCompleted}
         />
       )}
       {loggingType === 'distance' && (
@@ -102,8 +159,35 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet }: SetR
           keyboardType="decimal-pad"
           value={set.distance_meters !== null ? String(set.distance_meters) : ''}
           onChangeText={v => onUpdateSet({ distance_meters: v ? parseFloat(v) : null })}
+          editable={!isCompleted}
         />
       )}
+
+      {/* Set type picker sheet */}
+      <Sheet visible={showTypePicker} onClose={() => setShowTypePicker(false)} snapPoint={0.5}>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Set Type</Text>
+        {SET_TYPE_OPTIONS.map((opt) => {
+          const selected = set.set_type === opt.key;
+          const c = SET_TYPE_COLORS[opt.key];
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => { onChangeType(opt.key); setShowTypePicker(false); }}
+              style={[styles.typePickerRow, selected && { backgroundColor: c + '15', borderColor: c }]}
+              accessibilityLabel={opt.label}
+            >
+              <View style={[styles.typeBadge, { backgroundColor: c + '30', borderColor: c }]}>
+                <Text variant="label" style={{ color: c }}>{SET_TYPE_LABELS[opt.key]}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text variant="bodyEmphasis" color={selected ? 'textPrimary' : 'textSecondary'}>{opt.label}</Text>
+                <Text variant="caption" color="textTertiary">{opt.desc}</Text>
+              </View>
+              {selected && <Icon icon={Check} size={16} color={c} />}
+            </Pressable>
+          );
+        })}
+      </Sheet>
     </View>
   );
 }
@@ -111,10 +195,11 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet }: SetR
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
   onUpdateSets: (sets: WorkoutSet[]) => void;
+  onChangeSetType: (setPosition: number, type: WorkoutSet['set_type']) => void;
   onRemove: () => void;
 }
 
-function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
+function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove }: ExerciseCardProps) {
   const { startRestTimer } = useWorkoutStore();
 
   const handleUpdateSet = (setPosition: number, updates: Partial<WorkoutSet>) => {
@@ -123,6 +208,22 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
   };
 
   const handleToggleComplete = (setPosition: number) => {
+    const target = exercise.sets.find(s => s.position === setPosition);
+    if (!target) return;
+
+    // Block toggling complete on a set with no values
+    if (!target.is_completed && !setHasRequiredValues(target, exercise.logging_type)) {
+      haptic.warning();
+      Alert.alert(
+        'Empty set',
+        exercise.logging_type === 'weight_reps' ? 'Enter weight and reps before completing the set.' :
+        exercise.logging_type === 'bodyweight_reps' ? 'Enter reps before completing the set.' :
+        exercise.logging_type === 'duration' ? 'Enter duration before completing the set.' :
+        'Enter distance before completing the set.'
+      );
+      return;
+    }
+
     const newSets = exercise.sets.map(s => {
       if (s.position !== setPosition) return s;
       const completing = !s.is_completed;
@@ -130,9 +231,11 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
     });
     onUpdateSets(newSets);
     const s = newSets.find(s => s.position === setPosition);
-    if (s?.is_completed) {
+    if (s?.is_completed && s.set_type !== 'warmup') {
       haptic.light();
       startRestTimer(exercise.rest_seconds);
+    } else if (s?.is_completed) {
+      haptic.light();
     }
   };
 
@@ -162,7 +265,7 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
         <View style={{ flex: 1 }}>
           <Text variant="title3" color="textPrimary" numberOfLines={1}>{exercise.exercise_name}</Text>
           <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>
-            {completedCount}/{totalCount} sets completed
+            {completedCount}/{totalCount} sets · {exercise.rest_seconds}s rest
           </Text>
         </View>
         <Pressable onPress={onRemove} style={styles.removeBtn} accessibilityLabel="Remove exercise">
@@ -173,9 +276,15 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
       {/* Column headers */}
       <View style={styles.setHeaderRow}>
         <View style={styles.setNumBtn} />
-        {(exercise.logging_type === 'weight_reps' || exercise.logging_type === 'bodyweight_reps') && (
+        {exercise.logging_type === 'weight_reps' && (
           <>
             <Text variant="overline" color="textTertiary" style={styles.setColHeader}>KG</Text>
+            <Text variant="overline" color="textTertiary" style={styles.setColHeader}>REPS</Text>
+          </>
+        )}
+        {exercise.logging_type === 'bodyweight_reps' && (
+          <>
+            <Text variant="overline" color="textTertiary" style={styles.setColHeader}>BODY</Text>
             <Text variant="overline" color="textTertiary" style={styles.setColHeader}>REPS</Text>
           </>
         )}
@@ -196,6 +305,7 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
           loggingType={exercise.logging_type}
           onToggleComplete={() => handleToggleComplete(s.position)}
           onUpdateSet={(updates) => handleUpdateSet(s.position, updates)}
+          onChangeType={(type) => onChangeSetType(s.position, type)}
         />
       ))}
 
@@ -211,15 +321,17 @@ function ExerciseCard({ exercise, onUpdateSets, onRemove }: ExerciseCardProps) {
 function ExercisePickerModal({
   visible,
   onClose,
-  onAdd,
+  onAddMany,
 }: {
   visible: boolean;
   onClose: () => void;
-  onAdd: (ex: any) => void;
+  onAddMany: (exs: any[]) => void;
 }) {
   const [exercises, setExercises] = useState<any[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [equipment, setEquipment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -227,30 +339,48 @@ function ExercisePickerModal({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLoading(true);
-      api.get<any>(`/exercises?limit=50${searchText ? '&search=' + encodeURIComponent(searchText) : ''}`)
+      const params = new URLSearchParams({ limit: '50' });
+      if (searchText) params.set('search', searchText);
+      if (equipment) params.set('equipment', equipment);
+      api.get<any>(`/exercises?${params.toString()}`)
         .then(r => setExercises(r.data.exercises || []))
         .catch(() => {})
         .finally(() => setLoading(false));
     }, 300);
-  }, [visible, searchText]);
+  }, [visible, searchText, equipment]);
 
   function handleClose() {
     setSearchText('');
+    setSelectedIds([]);
+    setEquipment('');
     onClose();
   }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
+  function handleAddSelected() {
+    const picks = exercises.filter(e => selectedIds.includes(e.id));
+    if (picks.length === 0) return;
+    onAddMany(picks);
+    handleClose();
+  }
+
+  const EQUIPMENT_PILLS = ['', 'barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={styles.pickerRoot} edges={['top']}>
-        {/* Header */}
         <View style={styles.pickerHeader}>
-          <Text variant="title3" color="textPrimary" style={{ flex: 1 }}>Add Exercise</Text>
-          <Pressable onPress={handleClose} accessibilityLabel="Close">
-            <Text variant="label" color="brand">Done</Text>
+          <Text variant="title3" color="textPrimary" style={{ flex: 1 }}>
+            Add Exercises{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+          </Text>
+          <Pressable onPress={handleClose} accessibilityLabel="Close" style={{ paddingHorizontal: spacing.sm }}>
+            <Text variant="label" color="textSecondary">Cancel</Text>
           </Pressable>
         </View>
 
-        {/* Search */}
         <View style={styles.pickerSearch}>
           <Surface level={2} style={styles.searchBar}>
             <Icon icon={Search} size={16} color={colors.textTertiary} />
@@ -271,6 +401,24 @@ function ExercisePickerModal({
           </Surface>
         </View>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.equipScroll}>
+          {EQUIPMENT_PILLS.map((eq) => {
+            const active = equipment === eq;
+            return (
+              <Pressable
+                key={eq || 'all'}
+                onPress={() => setEquipment(eq)}
+                style={[styles.equipPill, active && { backgroundColor: colors.brand }]}
+                accessibilityLabel={eq || 'All equipment'}
+              >
+                <Text variant="label" color={active ? 'textOnBrand' : 'textTertiary'}>
+                  {eq ? eq.charAt(0).toUpperCase() + eq.slice(1) : 'All'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         {loading ? (
           <View style={styles.pickerLoading}>
             <ActivityIndicator color={colors.brand} />
@@ -279,22 +427,27 @@ function ExercisePickerModal({
           <FlatList
             data={exercises}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => onAdd(item)}
-                style={styles.pickerRow}
-                accessibilityLabel={item.name}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.name}</Text>
-                  <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xxs }}>
-                    {(item.equipment || 'Other').replace(/_/g, ' ')}
-                    {item.primary_muscles?.length ? ' · ' + item.primary_muscles[0] : ''}
-                  </Text>
-                </View>
-                <Icon icon={Plus} size={18} color={colors.brand} />
-              </Pressable>
-            )}
+            renderItem={({ item }) => {
+              const selected = selectedIds.includes(item.id);
+              return (
+                <Pressable
+                  onPress={() => toggleSelect(item.id)}
+                  style={[styles.pickerRow, selected && { backgroundColor: colors.brandGlow }]}
+                  accessibilityLabel={item.name}
+                >
+                  <View style={[styles.pickerCheck, selected && { backgroundColor: colors.brand, borderColor: colors.brand }]}>
+                    {selected ? <Icon icon={Check} size={12} color={colors.textPrimary} strokeWidth={3} /> : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.name}</Text>
+                    <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xxs }}>
+                      {(item.equipment || 'Other').replace(/_/g, ' ')}
+                      {item.primary_muscles?.length ? ' · ' + item.primary_muscles[0] : ''}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            }}
             ListEmptyComponent={
               <View style={styles.pickerEmpty}>
                 <Text variant="body" color="textTertiary">No exercises found</Text>
@@ -304,15 +457,122 @@ function ExercisePickerModal({
             keyboardShouldPersistTaps="handled"
           />
         )}
+
+        {/* Sticky add button */}
+        {selectedIds.length > 0 && (
+          <View style={styles.pickerFooter}>
+            <Button
+              label={`Add ${selectedIds.length} exercise${selectedIds.length > 1 ? 's' : ''}`}
+              onPress={handleAddSelected}
+              variant="primary"
+              size="lg"
+              fullWidth
+            />
+          </View>
+        )}
       </SafeAreaView>
     </Modal>
   );
 }
 
+function TimerControlSheet({
+  visible,
+  onClose,
+  elapsedSeconds,
+  isPaused,
+  onPause,
+  onResume,
+  onReset,
+  onSetElapsed,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  elapsedSeconds: number;
+  isPaused: boolean;
+  onPause: () => void;
+  onResume: () => void;
+  onReset: () => void;
+  onSetElapsed: (s: number) => void;
+}) {
+  const adjust = (delta: number) => onSetElapsed(elapsedSeconds + delta);
+
+  return (
+    <Sheet visible={visible} onClose={onClose} snapPoint={0.45}>
+      <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Workout Timer</Text>
+
+      <View style={styles.timerDisplay}>
+        <Text variant="display3" color="brand" style={{ fontVariant: ['tabular-nums'] }}>{formatTime(elapsedSeconds)}</Text>
+        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
+          {isPaused ? 'Paused' : 'Running'}
+        </Text>
+      </View>
+
+      {/* Adjust controls */}
+      <View style={styles.adjustRow}>
+        <Pressable onPress={() => adjust(-60)} style={styles.adjustBtn} accessibilityLabel="Subtract 1 minute">
+          <Icon icon={Minus} size={14} color={colors.textPrimary} />
+          <Text variant="label" color="textPrimary" style={{ marginLeft: spacing.xxs }}>1m</Text>
+        </Pressable>
+        <Pressable onPress={() => adjust(-10)} style={styles.adjustBtn} accessibilityLabel="Subtract 10 seconds">
+          <Icon icon={Minus} size={14} color={colors.textPrimary} />
+          <Text variant="label" color="textPrimary" style={{ marginLeft: spacing.xxs }}>10s</Text>
+        </Pressable>
+        <Pressable onPress={() => adjust(10)} style={styles.adjustBtn} accessibilityLabel="Add 10 seconds">
+          <Icon icon={Plus} size={14} color={colors.textPrimary} />
+          <Text variant="label" color="textPrimary" style={{ marginLeft: spacing.xxs }}>10s</Text>
+        </Pressable>
+        <Pressable onPress={() => adjust(60)} style={styles.adjustBtn} accessibilityLabel="Add 1 minute">
+          <Icon icon={Plus} size={14} color={colors.textPrimary} />
+          <Text variant="label" color="textPrimary" style={{ marginLeft: spacing.xxs }}>1m</Text>
+        </Pressable>
+      </View>
+
+      {/* Action buttons */}
+      <View style={styles.timerActions}>
+        {isPaused ? (
+          <Button label="Resume" onPress={() => { onResume(); onClose(); }} variant="primary" size="md" fullWidth />
+        ) : (
+          <Button label="Pause" onPress={onPause} variant="secondary" size="md" fullWidth />
+        )}
+        <View style={{ height: spacing.sm }} />
+        <Pressable
+          onPress={() => {
+            Alert.alert('Reset Timer', 'Set elapsed time back to zero?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reset', style: 'destructive', onPress: () => { onReset(); onClose(); } },
+            ]);
+          }}
+          style={styles.resetBtn}
+          accessibilityLabel="Reset timer"
+        >
+          <Icon icon={RotateCcw} size={14} color={colors.danger} />
+          <Text variant="label" color="danger" style={{ marginLeft: spacing.xs }}>Reset to 0:00</Text>
+        </Pressable>
+      </View>
+    </Sheet>
+  );
+}
+
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
-  const { active, restTimer, updateExerciseSets, removeExercise, discardWorkout, tickElapsed, clearRestTimer, addExercise } = useWorkoutStore();
+  const {
+    active,
+    isPaused,
+    restTimer,
+    updateExerciseSets,
+    setSetType,
+    removeExercise,
+    discardWorkout,
+    tickElapsed,
+    clearRestTimer,
+    adjustRestTimer,
+    addExercise,
+    pauseTimer,
+    resumeTimer,
+    setElapsed,
+  } = useWorkoutStore();
   const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [showTimerSheet, setShowTimerSheet] = useState(false);
 
   useEffect(() => {
     if (!active) router.replace('/(tabs)/workouts');
@@ -330,6 +590,7 @@ export default function ActiveWorkoutScreen() {
       Alert.alert('No completed sets', 'Complete at least one set before finishing.');
       return;
     }
+    pauseTimer(); // Pause elapsed timer when entering finish screen
     router.push('/workout/finish');
   };
 
@@ -346,21 +607,23 @@ export default function ActiveWorkoutScreen() {
     ]);
   };
 
-  const handleAddExercise = useCallback((ex: any) => {
-    const position = useWorkoutStore.getState().active?.exercises.length ?? 0;
-    addExercise({
-      exercise_id: ex.id,
-      exercise_name: ex.name,
-      logging_type: ex.logging_type || 'weight_reps',
-      position,
-      superset_group: null,
-      rest_seconds: 90,
-      notes: '',
-      sets: [{
-        position: 0, set_type: 'normal',
-        weight_kg: null, reps: null, duration_seconds: null,
-        distance_meters: null, rpe: null, is_completed: false, completed_at: null,
-      }],
+  const handleAddMany = useCallback((exs: any[]) => {
+    const startPosition = useWorkoutStore.getState().active?.exercises.length ?? 0;
+    exs.forEach((ex, idx) => {
+      addExercise({
+        exercise_id: ex.id,
+        exercise_name: ex.name,
+        logging_type: ex.logging_type || 'weight_reps',
+        position: startPosition + idx,
+        superset_group: null,
+        rest_seconds: 90,
+        notes: '',
+        sets: [{
+          position: 0, set_type: 'normal',
+          weight_kg: null, reps: null, duration_seconds: null,
+          distance_meters: null, rpe: null, is_completed: false, completed_at: null,
+        }],
+      });
     });
     setShowExercisePicker(false);
   }, [addExercise]);
@@ -374,7 +637,17 @@ export default function ActiveWorkoutScreen() {
         <View style={styles.header}>
           <View style={{ flex: 1, marginRight: spacing.md }}>
             <Text variant="title3" color="textPrimary" numberOfLines={1}>{active.workout_name}</Text>
-            <Text variant="numeric" color="brand" style={styles.timer}>{formatTime(active.elapsed_seconds)}</Text>
+            <Pressable onPress={() => setShowTimerSheet(true)} accessibilityLabel="Workout timer controls">
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xxs }}>
+                <Text variant="numeric" color="brand" style={styles.timer}>{formatTime(active.elapsed_seconds)}</Text>
+                {isPaused && (
+                  <View style={styles.pausedBadge}>
+                    <Icon icon={Pause} size={10} color={colors.warning} />
+                    <Text variant="overline" style={{ color: colors.warning, marginLeft: 4 }}>PAUSED</Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
           </View>
           <Button label="Discard" onPress={handleDiscard} variant="ghost" size="sm" style={{ marginRight: spacing.sm } as any} />
           <Button label="Finish" onPress={handleFinish} variant="primary" size="sm" />
@@ -383,12 +656,20 @@ export default function ActiveWorkoutScreen() {
 
       {/* Rest timer */}
       {restTimer !== null && (
-        <Pressable onPress={clearRestTimer} style={styles.restTimer} accessibilityLabel="Rest timer, tap to skip">
+        <View style={styles.restTimer}>
           <Icon icon={Timer} size={16} color={colors.brand} />
           <Text variant="bodyEmphasis" color="textPrimary" style={{ marginLeft: spacing.sm, flex: 1 }}>Rest</Text>
+          <Pressable onPress={() => adjustRestTimer(-15)} style={styles.restAdjust} accessibilityLabel="Subtract 15s">
+            <Icon icon={Minus} size={14} color={colors.textSecondary} />
+          </Pressable>
           <Text variant="numeric" color="brand" style={styles.restTime}>{formatTime(restTimer)}</Text>
-          <Text variant="caption" color="textTertiary" style={{ marginLeft: spacing.md }}>Skip</Text>
-        </Pressable>
+          <Pressable onPress={() => adjustRestTimer(15)} style={styles.restAdjust} accessibilityLabel="Add 15s">
+            <Icon icon={Plus} size={14} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable onPress={clearRestTimer} style={{ marginLeft: spacing.sm }} accessibilityLabel="Skip rest">
+            <Text variant="caption" color="textTertiary">Skip</Text>
+          </Pressable>
+        </View>
       )}
 
       {/* Exercise list */}
@@ -398,6 +679,7 @@ export default function ActiveWorkoutScreen() {
             key={ex.exercise_id + ex.position}
             exercise={ex}
             onUpdateSets={(sets) => updateExerciseSets(ex.position, sets)}
+            onChangeSetType={(setPos, type) => setSetType(ex.position, setPos, type)}
             onRemove={() => {
               Alert.alert('Remove Exercise', `Remove ${ex.exercise_name}?`, [
                 { text: 'Cancel', style: 'cancel' },
@@ -407,7 +689,6 @@ export default function ActiveWorkoutScreen() {
           />
         ))}
 
-        {/* Add exercise */}
         <Pressable
           onPress={() => setShowExercisePicker(true)}
           style={styles.addExerciseBtn}
@@ -423,7 +704,18 @@ export default function ActiveWorkoutScreen() {
       <ExercisePickerModal
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
-        onAdd={handleAddExercise}
+        onAddMany={handleAddMany}
+      />
+
+      <TimerControlSheet
+        visible={showTimerSheet}
+        onClose={() => setShowTimerSheet(false)}
+        elapsedSeconds={active.elapsed_seconds}
+        isPaused={isPaused}
+        onPause={() => { pauseTimer(); }}
+        onResume={() => { resumeTimer(); }}
+        onReset={() => { setElapsed(0); }}
+        onSetElapsed={setElapsed}
       />
     </View>
   );
@@ -441,7 +733,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  timer: { fontSize: 20, lineHeight: 24, marginTop: spacing.xxs },
+  timer: { fontSize: 20, lineHeight: 24 },
+  pausedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: colors.warning + '20',
+    borderRadius: radii.sm,
+  },
   restTimer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -453,7 +754,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.brand + '40',
   },
-  restTime: { fontSize: 22, lineHeight: 26 },
+  restAdjust: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: spacing.xs,
+  },
+  restTime: { fontSize: 22, lineHeight: 26, minWidth: 64, textAlign: 'center' },
   scrollContent: { paddingTop: spacing.base },
   exerciseCard: { marginHorizontal: spacing.base, marginBottom: spacing.base, padding: spacing.base },
   exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
@@ -481,7 +791,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  setRowComplete: { opacity: 0.7 },
+  setRowComplete: {},
   setNumBtn: {
     width: SETNUM_SIZE,
     height: SETNUM_SIZE,
@@ -525,6 +835,38 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderStyle: 'dashed',
   },
+  // Type picker
+  typePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: spacing.xs,
+  },
+  typeBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Timer sheet
+  timerDisplay: { alignItems: 'center', paddingVertical: spacing.xl },
+  adjustRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.lg },
+  adjustBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface3,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+  },
+  timerActions: { paddingTop: spacing.sm },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md },
   // Picker modal
   pickerRoot: { flex: 1, backgroundColor: colors.bg },
   pickerHeader: {
@@ -550,6 +892,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Barlow_400Regular',
     fontSize: 15,
   },
+  equipScroll: { paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm },
+  equipPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+  },
   pickerLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerRow: {
     flexDirection: 'row',
@@ -558,5 +907,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.md,
   },
+  pickerCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: radii.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pickerEmpty: { paddingVertical: spacing['3xl'], alignItems: 'center' },
+  pickerFooter: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
 });

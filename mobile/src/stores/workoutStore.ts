@@ -36,6 +36,7 @@ export interface ActiveWorkout {
 interface WorkoutStore {
   active: ActiveWorkout | null;
   idempotency_key: string | null;
+  isPaused: boolean;
   restTimer: number | null; // seconds remaining
   restTimerInterval: ReturnType<typeof setInterval> | null;
 
@@ -47,8 +48,13 @@ interface WorkoutStore {
   removeExercise: (position: number) => void;
   updateWorkoutName: (name: string) => void;
   tickElapsed: () => void;
+  setElapsed: (seconds: number) => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
   completeSet: (exercisePosition: number, setPosition: number) => void;
+  setSetType: (exercisePosition: number, setPosition: number, type: WorkoutSet['set_type']) => void;
   startRestTimer: (seconds: number) => void;
+  adjustRestTimer: (deltaSeconds: number) => void;
   clearRestTimer: () => void;
   discardWorkout: () => void;
   finishWorkout: () => void;
@@ -67,6 +73,7 @@ function generateUUID(): string {
 export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   active: null,
   idempotency_key: null,
+  isPaused: false,
   restTimer: null,
   restTimerInterval: null,
 
@@ -124,9 +131,31 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   },
 
   tickElapsed: () => {
+    const { active, isPaused } = get();
+    if (!active || isPaused) return;
+    set({ active: { ...active, elapsed_seconds: active.elapsed_seconds + 1 } });
+  },
+
+  setElapsed: (seconds) => {
     const { active } = get();
     if (!active) return;
-    set({ active: { ...active, elapsed_seconds: active.elapsed_seconds + 1 } });
+    set({ active: { ...active, elapsed_seconds: Math.max(0, Math.floor(seconds)) } });
+    get().saveDraft();
+  },
+
+  pauseTimer: () => set({ isPaused: true }),
+  resumeTimer: () => set({ isPaused: false }),
+
+  setSetType: (exercisePosition, setPosition, type) => {
+    const { active } = get();
+    if (!active) return;
+    const exercises = active.exercises.map(ex => {
+      if (ex.position !== exercisePosition) return ex;
+      const sets = ex.sets.map(s => s.position === setPosition ? { ...s, set_type: type } : s);
+      return { ...ex, sets };
+    });
+    set({ active: { ...active, exercises } });
+    get().saveDraft();
   },
 
   completeSet: (exercisePosition, setPosition) => {
@@ -160,6 +189,12 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     set({ restTimerInterval: interval });
   },
 
+  adjustRestTimer: (deltaSeconds) => {
+    const { restTimer } = get();
+    if (restTimer === null) return;
+    set({ restTimer: Math.max(0, restTimer + deltaSeconds) });
+  },
+
   clearRestTimer: () => {
     const { restTimerInterval } = get();
     if (restTimerInterval) clearInterval(restTimerInterval);
@@ -169,7 +204,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   discardWorkout: () => {
     get().clearRestTimer();
     get().clearDraft();
-    set({ active: null, idempotency_key: null });
+    set({ active: null, idempotency_key: null, isPaused: false });
   },
 
   finishWorkout: () => {
@@ -180,7 +215,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     // running.
     get().clearRestTimer();
     get().clearDraft();
-    set({ active: null, idempotency_key: null });
+    set({ active: null, idempotency_key: null, isPaused: false });
   },
 
   saveDraft: () => {

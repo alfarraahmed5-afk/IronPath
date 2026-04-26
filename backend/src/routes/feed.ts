@@ -176,9 +176,16 @@ router.post('/workouts/:workoutId/comments', async (req: Request, res: Response,
     const { data: workout } = await supabase.from('workouts').select('id, user_id, gym_id').eq('id', workoutId).eq('gym_id', gymId).maybeSingle();
     if (!workout) return next(new AppError('NOT_FOUND', 404, 'Workout not found'));
 
-    const { data: comment } = await supabase.from('workout_comments').insert({
+    const { data: insertedComment } = await supabase.from('workout_comments').insert({
       workout_id: workoutId, user_id: userId, gym_id: gymId, content: parsed.data.content,
     }).select().single();
+
+    // Hydrate with the commenter's user info so the client can render
+    // immediately without an extra round-trip (this previously caused a WSOD
+    // because `comment.user` was undefined in the response).
+    const { data: commenterUser } = await supabase.from('users')
+      .select('id, username, avatar_url').eq('id', userId).maybeSingle();
+    const comment = insertedComment ? { ...insertedComment, user: commenterUser ?? null } : insertedComment;
 
     // @mentions
     const MENTION_REGEX = /(?<!\w)@([a-zA-Z0-9_]{3,30})(?!\w)/g;

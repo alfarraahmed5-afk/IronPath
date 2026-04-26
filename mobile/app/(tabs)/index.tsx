@@ -10,6 +10,7 @@ import {
   Platform,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -151,16 +152,34 @@ function CommentModal({
   }, [visible, workoutId]);
 
   const handleSend = async () => {
-    if (!workoutId || !newText.trim()) return;
+    if (!workoutId || !newText.trim() || !user) return;
+    const text = newText.trim();
     setSending(true);
     try {
-      const res = await api.post<{ data: { comment: Comment } }>(
+      const res = await api.post<{ data: { comment: Partial<Comment> } }>(
         `/feed/workouts/${workoutId}/comments`,
-        { content: newText.trim() }
+        { content: text }
       );
-      setComments(prev => [...prev, res.data.comment]);
+      // The backend may or may not return the joined `user` object; synthesize
+      // from the current auth store to guarantee a renderable shape.
+      const raw = res.data.comment;
+      const safeComment: Comment = {
+        id: raw.id ?? `tmp_${Date.now()}`,
+        user_id: raw.user_id ?? user.id,
+        content: raw.content ?? text,
+        created_at: raw.created_at ?? new Date().toISOString(),
+        deleted_at: null,
+        user: raw.user ?? {
+          id: user.id,
+          username: user.username,
+          avatar_url: user.avatar_url,
+        },
+      };
+      setComments(prev => [...prev, safeComment]);
       setNewText('');
       onCommentCountChange(workoutId, 1);
+    } catch {
+      Alert.alert('Comment failed', 'Please try again.');
     } finally {
       setSending(false);
     }

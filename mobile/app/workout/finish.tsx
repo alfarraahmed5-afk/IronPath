@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -75,11 +75,24 @@ export default function FinishWorkoutScreen() {
   const workout = useWorkoutStore(s => s.active);
   const idempotency_key = useWorkoutStore(s => s.idempotency_key);
   const finishWorkout = useWorkoutStore(s => s.finishWorkout);
+  const resumeTimer = useWorkoutStore(s => s.resumeTimer);
 
   const [workoutName, setWorkoutName] = useState(workout?.workout_name ?? '');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<Visibility>('public');
   const [saving, setSaving] = useState(false);
+
+  // Resume the workout timer when navigating back without saving.
+  // (active.tsx pauses on entering this screen.)
+  useEffect(() => {
+    return () => {
+      // If the workout still exists when this screen unmounts, the user backed
+      // out without finishing — resume timer.
+      if (useWorkoutStore.getState().active) {
+        resumeTimer();
+      }
+    };
+  }, [resumeTimer]);
 
   if (!workout) {
     return (

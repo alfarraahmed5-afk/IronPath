@@ -396,6 +396,7 @@ export default function LeaderboardScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.tabScrollWrap}
         contentContainerStyle={styles.tabScroll}
       >
         {TABS.map(tab => (
@@ -422,15 +423,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  tabScrollWrap: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   tabScroll: {
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.md,
     gap: spacing.sm,
+    alignItems: 'center',
   },
   tabPill: {
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.sm,
     borderRadius: radii.full,
+    alignSelf: 'center',
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listPad: { paddingHorizontal: spacing.base, paddingBottom: spacing['2xl'] },
