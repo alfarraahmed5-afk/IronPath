@@ -1,18 +1,22 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Dimensions,
-  Modal,
-  Pressable,
   ScrollView,
-  Text,
+  StyleSheet,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Dumbbell, Weight, Clock, Hash, Flame, ChevronRight } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-import { useAuthStore } from '../../src/stores/authStore';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Icon } from '../../src/components/Icon';
+import { StatCard } from '../../src/components/StatCard';
+import { Pressable } from '../../src/components/Pressable';
+import { Sheet } from '../../src/components/Sheet';
+import { Button } from '../../src/components/Button';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 type Period = '30d' | '3m' | '1y' | 'all';
 
@@ -40,10 +44,6 @@ interface StatsResponse {
   volume_comparison: { label: string; kg: number } | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
 const PERIOD_OPTIONS: { label: string; value: Period }[] = [
   { label: '30 Days', value: '30d' },
   { label: '3 Months', value: '3m' },
@@ -53,8 +53,15 @@ const PERIOD_OPTIONS: { label: string; value: Period }[] = [
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const LEVEL_COLORS: Record<string, string> = {
+  Beginner:     colors.info,
+  Intermediate: colors.success,
+  Advanced:     colors.brand,
+  Elite:        colors.setDropset,
+};
+
 function formatVolume(kg: number): string {
-  return kg.toLocaleString('en-US') + ' kg';
+  return kg >= 1000 ? `${(kg / 1000).toFixed(1)}k` : kg.toLocaleString('en-US');
 }
 
 function formatDuration(seconds: number): string {
@@ -66,123 +73,20 @@ function formatDuration(seconds: number): string {
 
 function abbreviateMuscle(muscle: string): string {
   const map: Record<string, string> = {
-    chest: 'Chest',
-    back: 'Back',
-    shoulders: 'Delts',
-    biceps: 'Bis',
-    triceps: 'Tris',
-    legs: 'Legs',
-    quads: 'Quads',
-    hamstrings: 'Hams',
-    glutes: 'Glutes',
-    calves: 'Calves',
-    abs: 'Abs',
-    core: 'Core',
-    forearms: 'Fore',
-    traps: 'Traps',
-    lats: 'Lats',
+    chest: 'Chest', back: 'Back', shoulders: 'Delts', biceps: 'Bis',
+    triceps: 'Tris', legs: 'Legs', quads: 'Quads', hamstrings: 'Hams',
+    glutes: 'Glutes', calves: 'Calves', abs: 'Abs', core: 'Core',
+    forearms: 'Fore', traps: 'Traps', lats: 'Lats',
   };
-  const key = muscle.toLowerCase();
-  return map[key] ?? muscle.slice(0, 5);
+  return map[muscle.toLowerCase()] ?? muscle.slice(0, 5);
 }
-
-const LEVEL_COLORS: Record<string, string> = {
-  Beginner: '#3B82F6',
-  Intermediate: '#22C55E',
-  Advanced: '#FF6B35',
-  Elite: '#A855F7',
-};
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function OverviewCard({
-  emoji,
-  value,
-  label,
-}: {
-  emoji: string;
-  value: string;
-  label: string;
-}) {
-  return (
-    <View className="bg-gray-900 rounded-xl p-4 flex-1 mx-1">
-      <Text style={{ fontSize: 22 }}>{emoji}</Text>
-      <Text
-        className="text-white font-bold mt-2"
-        style={{ fontSize: 22 }}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {value}
-      </Text>
-      <Text className="text-gray-400 mt-1" style={{ fontSize: 12 }}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function WorkoutDayModal({
-  visible,
-  workoutIds,
-  onClose,
-}: {
-  visible: boolean;
-  workoutIds: string[];
-  onClose: () => void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        className="flex-1 bg-black/70 justify-end"
-        onPress={onClose}
-      >
-        <Pressable className="bg-gray-900 rounded-t-2xl p-6">
-          <Text className="text-white font-bold text-lg mb-4">
-            Workouts that day
-          </Text>
-          {workoutIds.map((id, idx) => (
-            <Pressable
-              key={id}
-              className="flex-row items-center py-3 border-b border-gray-800"
-              onPress={() => {
-                onClose();
-                router.push(`/workouts/${id}`);
-              }}
-            >
-              <Text className="text-gray-400 mr-3" style={{ fontSize: 15 }}>
-                {idx + 1}.
-              </Text>
-              <Text className="text-white flex-1" style={{ fontSize: 15 }}>
-                Workout {idx + 1}
-              </Text>
-              <Text className="text-gray-500" style={{ fontSize: 18 }}>
-                ›
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            className="mt-4 rounded-xl py-3 items-center"
-            style={{ backgroundColor: '#FF6B35' }}
-            onPress={onClose}
-          >
-            <Text className="text-white font-bold">Close</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
-  const user = useAuthStore((s) => s.user);
   const [period, setPeriod] = useState<Period>('30d');
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [modalWorkoutIds, setModalWorkoutIds] = useState<string[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [sheetWorkoutIds, setSheetWorkoutIds] = useState<string[]>([]);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const fetchStats = useCallback(async (p: Period) => {
     setLoading(true);
@@ -196,43 +100,22 @@ export default function AnalyticsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchStats(period);
-  }, [period, fetchStats]);
+  useEffect(() => { fetchStats(period); }, [period, fetchStats]);
 
-  // Prepare last-7-days columns aligned to Sun–Sat
   const last7Days = (() => {
     const today = new Date();
-    const cols: {
-      dayLabel: string;
-      dateNum: number;
-      entry: StatsResponse['last_7_days'][number] | null;
-    }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
-      d.setDate(today.getDate() - i);
+      d.setDate(today.getDate() - (6 - i));
       const dateStr = d.toISOString().slice(0, 10);
       const entry = stats?.last_7_days.find((e) => e.date === dateStr) ?? null;
-      cols.push({
-        dayLabel: DAY_LABELS[d.getDay()],
-        dateNum: d.getDate(),
-        entry,
-      });
-    }
-    return cols;
+      return { dayLabel: DAY_LABELS[d.getDay()], dateNum: d.getDate(), entry };
+    });
   })();
 
-  // Muscle sets — top 8 by count
   const topMuscles = stats
-    ? [...stats.muscle_sets]
-        .sort((a, b) => b.sets - a.sets)
-        .slice(0, 8)
+    ? [...stats.muscle_sets].sort((a, b) => b.sets - a.sets).slice(0, 8)
     : [];
-
-  const chartData = topMuscles.map((m) => ({
-    x: abbreviateMuscle(m.muscle),
-    y: m.sets,
-  }));
 
   const strengthWithLevel = stats?.strength_levels.filter((s) => s.level !== null) ?? [];
 
@@ -240,303 +123,272 @@ export default function AnalyticsScreen() {
     if (entry.workout_ids.length === 1) {
       router.push(`/workouts/${entry.workout_ids[0]}`);
     } else {
-      setModalWorkoutIds(entry.workout_ids);
-      setModalVisible(true);
+      setSheetWorkoutIds(entry.workout_ids);
+      setSheetVisible(true);
     }
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-950"
-      contentContainerStyle={{ paddingBottom: 48 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View className="px-4 pt-14 pb-4">
-        <Text className="text-white font-bold" style={{ fontSize: 28 }}>
-          Progress
-        </Text>
-      </View>
-
-      {/* Period filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="px-4 mb-5"
-        contentContainerStyle={{ gap: 8 }}
-      >
-        {PERIOD_OPTIONS.map((opt) => {
-          const active = opt.value === period;
-          return (
-            <Pressable
-              key={opt.value}
-              onPress={() => setPeriod(opt.value)}
-              className="rounded-full px-4 py-2"
-              style={{ backgroundColor: active ? '#FF6B35' : '#1F2937' }}
-            >
-              <Text
-                className="font-semibold"
-                style={{ color: active ? '#FFFFFF' : '#9CA3AF', fontSize: 14 }}
-              >
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {loading && (
-        <View className="px-4 mb-4">
-          <Text className="text-gray-500 text-center">Loading…</Text>
-        </View>
-      )}
-
-      {stats && (
-        <>
-          {/* Overview cards 2×2 */}
-          <View className="px-4 mb-4">
-            <View className="flex-row mb-3">
-              <OverviewCard
-                emoji="🏋️"
-                value={String(stats.overview.total_workouts)}
-                label="Total Workouts"
-              />
-              <OverviewCard
-                emoji="📦"
-                value={formatVolume(stats.overview.total_volume_kg)}
-                label="Total Volume"
-              />
-            </View>
-            <View className="flex-row">
-              <OverviewCard
-                emoji="⏱️"
-                value={formatDuration(stats.overview.total_duration_seconds)}
-                label="Total Duration"
-              />
-              <OverviewCard
-                emoji="🔢"
-                value={String(stats.overview.total_sets)}
-                label="Total Sets"
-              />
-            </View>
-          </View>
-
-          {/* Streak card */}
-          <View
-            className="mx-4 mb-4 rounded-xl p-4 bg-gray-900"
-            style={{ borderWidth: 1, borderColor: '#FF6B35' }}
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text variant="title1" color="textPrimary">Progress</Text>
+          <Pressable
+            onPress={() => router.push('/analytics/measurements')}
+            style={styles.measureBtn}
+            accessibilityLabel="Body measurements"
           >
-            {stats.current_streak_weeks > 0 ? (
-              <Text className="text-white font-bold text-base">
-                🔥 {stats.current_streak_weeks} week streak
-              </Text>
-            ) : (
-              <Text className="text-gray-300 font-semibold text-base">
-                Start your streak this week!
-              </Text>
-            )}
-          </View>
+            <Icon icon={Weight} size={16} color={colors.textSecondary} />
+          </Pressable>
+        </View>
 
-          {/* Volume comparison */}
-          {stats.volume_comparison && (
-            <View className="mx-4 mb-4 rounded-xl p-4 bg-gray-900">
-              <Text className="text-white font-semibold text-base">
-                You lifted as much as{' '}
-                <Text style={{ color: '#FF6B35' }}>{stats.volume_comparison.label}</Text>!
-              </Text>
-            </View>
-          )}
+        {/* Period filter */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.periodScroll}
+          contentContainerStyle={styles.periodContent}
+        >
+          {PERIOD_OPTIONS.map((opt) => {
+            const active = opt.value === period;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setPeriod(opt.value)}
+                style={[styles.periodChip, active && styles.periodChipActive]}
+                accessibilityLabel={opt.label}
+              >
+                <Text variant="label" color={active ? 'textPrimary' : 'textTertiary'}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-          {/* Last 7 Days */}
-          <View className="px-4 mb-6">
-            <Text className="text-white font-bold text-base mb-3">Last 7 Days</Text>
-            <View className="flex-row justify-between">
-              {last7Days.map(({ dayLabel, dateNum, entry }, idx) => {
-                const hasWorkouts = entry && entry.workout_ids.length > 0;
-                return (
-                  <Pressable
-                    key={idx}
-                    className="items-center flex-1"
-                    onPress={() => {
-                      if (hasWorkouts && entry) handleDayPress(entry);
-                    }}
-                    disabled={!hasWorkouts}
-                  >
-                    <Text className="text-gray-500 mb-1" style={{ fontSize: 11 }}>
-                      {dayLabel}
-                    </Text>
-                    <View
-                      className="rounded-full items-center justify-center"
-                      style={{
-                        width: 38,
-                        height: 38,
-                        backgroundColor: hasWorkouts ? '#FF6B35' : '#1F2937',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: hasWorkouts ? '#FFFFFF' : '#6B7280',
-                          fontSize: 13,
-                          fontWeight: '600',
-                        }}
-                      >
-                        {dateNum}
-                      </Text>
-                    </View>
-                    {hasWorkouts && entry && (
-                      <>
-                        {entry.workout_ids.length > 1 && (
-                          <View
-                            className="rounded-full px-1 mt-1"
-                            style={{ backgroundColor: '#7C3AED' }}
-                          >
-                            <Text style={{ color: '#fff', fontSize: 9 }}>
-                              ×{entry.workout_ids.length}
-                            </Text>
-                          </View>
-                        )}
-                        {entry.muscles.slice(0, 2).map((m, mi) => (
-                          <Text
-                            key={mi}
-                            className="text-gray-400 text-center"
-                            style={{ fontSize: 8 }}
-                            numberOfLines={1}
-                          >
-                            {abbreviateMuscle(m)}
-                          </Text>
-                        ))}
-                      </>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Muscle Sets Bar Chart */}
-          <View className="px-4 mb-6">
-            <Text className="text-white font-bold text-base mb-3">Muscle Sets</Text>
-            {topMuscles.length === 0 ? (
-              <View className="bg-gray-900 rounded-xl p-6 items-center">
-                <Text className="text-gray-500">No data for this period</Text>
+        {stats && (
+          <>
+            {/* Overview 2×2 */}
+            <View style={styles.section}>
+              <View style={styles.overviewGrid}>
+                <StatCard label="Workouts" value={stats.overview.total_workouts} icon={Dumbbell} compact />
+                <StatCard label="Volume" value={formatVolume(stats.overview.total_volume_kg)} unit="kg" icon={Weight} compact />
               </View>
-            ) : (
-              <View className="bg-gray-900 rounded-xl p-4">
-                {(() => {
-                  const maxSets = Math.max(...topMuscles.map(m => m.sets), 1);
-                  return topMuscles.map((m, i) => (
-                    <View key={m.muscle} className="flex-row items-center mb-2">
-                      <Text className="text-gray-400 text-xs w-16" numberOfLines={1}>
-                        {abbreviateMuscle(m.muscle)}
-                      </Text>
-                      <View className="flex-1 h-5 bg-gray-800 rounded-full overflow-hidden mx-2">
-                        <View
-                          className="h-full rounded-full"
-                          style={{ width: `${(m.sets / maxSets) * 100}%`, backgroundColor: '#FF6B35' }}
-                        />
-                      </View>
-                      <Text className="text-gray-300 text-xs w-8 text-right">{m.sets}</Text>
-                    </View>
-                  ));
-                })()}
-              </View>
-            )}
-          </View>
-
-          {/* Top Exercises */}
-          {stats.top_exercises.length > 0 && (
-            <View className="px-4 mb-6">
-              <Text className="text-white font-bold text-base mb-3">Top Exercises</Text>
-              <View className="bg-gray-900 rounded-xl overflow-hidden">
-                {stats.top_exercises.slice(0, 5).map((ex, idx) => (
-                  <View
-                    key={ex.exercise_id}
-                    className="flex-row items-center px-4 py-3"
-                    style={
-                      idx < Math.min(stats.top_exercises.length, 5) - 1
-                        ? { borderBottomWidth: 1, borderBottomColor: '#1F2937' }
-                        : undefined
-                    }
-                  >
-                    <Text
-                      className="font-bold mr-3"
-                      style={{ color: '#FF6B35', fontSize: 15, width: 20 }}
-                    >
-                      {idx + 1}
-                    </Text>
-                    <Text className="text-white flex-1" style={{ fontSize: 14 }}>
-                      {ex.exercise_name}
-                    </Text>
-                    <View className="rounded-full px-2 py-0.5 bg-gray-700">
-                      <Text className="text-gray-300" style={{ fontSize: 12 }}>
-                        {ex.times_logged}×
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+              <View style={[styles.overviewGrid, { marginTop: spacing.sm }]}>
+                <StatCard label="Duration" value={formatDuration(stats.overview.total_duration_seconds)} icon={Clock} compact />
+                <StatCard label="Sets" value={stats.overview.total_sets} icon={Hash} compact />
               </View>
             </View>
-          )}
 
-          {/* Strength Levels */}
-          {strengthWithLevel.length > 0 && (
-            <View className="px-4 mb-6">
-              <Text className="text-white font-bold text-base mb-3">Strength Levels</Text>
-              {strengthWithLevel.every(sl => sl.level === null) ? (
-                <Pressable
-                  className="bg-gray-900 rounded-xl p-4"
-                  onPress={() => router.push('/analytics/measurements')}
-                >
-                  <Text className="text-white font-semibold text-sm">
-                    Add your bodyweight to unlock strength levels
+            {/* Streak */}
+            <View style={styles.section}>
+              <Surface level={2} style={[styles.streakCard, stats.current_streak_weeks > 0 && { borderColor: colors.brand, borderWidth: 1 }]}>
+                <View style={styles.streakRow}>
+                  <Icon icon={Flame} size={20} color={stats.current_streak_weeks > 0 ? colors.brand : colors.textTertiary} />
+                  <Text variant="bodyEmphasis" color={stats.current_streak_weeks > 0 ? 'textPrimary' : 'textTertiary'} style={{ marginLeft: spacing.sm }}>
+                    {stats.current_streak_weeks > 0
+                      ? `${stats.current_streak_weeks} week streak`
+                      : 'Start your streak this week'}
                   </Text>
-                  <Text className="text-gray-500 text-xs mt-1">Tap to go to measurements →</Text>
-                </Pressable>
+                </View>
+              </Surface>
+            </View>
+
+            {/* Volume comparison */}
+            {stats.volume_comparison && (
+              <View style={styles.section}>
+                <Surface level={2} style={styles.compCard}>
+                  <Text variant="body" color="textSecondary">
+                    You lifted as much as{' '}
+                    <Text variant="bodyEmphasis" color="brand">{stats.volume_comparison.label}</Text>
+                  </Text>
+                </Surface>
+              </View>
+            )}
+
+            {/* Last 7 Days */}
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Last 7 Days</Text>
+              <View style={styles.daysRow}>
+                {last7Days.map(({ dayLabel, dateNum, entry }, idx) => {
+                  const hasWorkouts = !!(entry && entry.workout_ids.length > 0);
+                  return (
+                    <Pressable
+                      key={idx}
+                      style={styles.dayCol}
+                      onPress={() => { if (hasWorkouts && entry) handleDayPress(entry); }}
+                      accessibilityLabel={`${dayLabel} ${dateNum}${hasWorkouts ? ', has workouts' : ''}`}
+                    >
+                      <Text variant="overline" color="textTertiary" style={styles.dayLabel}>{dayLabel}</Text>
+                      <View style={[styles.dayDot, hasWorkouts ? styles.dayDotActive : styles.dayDotEmpty]}>
+                        <Text variant="label" color={hasWorkouts ? 'textPrimary' : 'textDisabled'}>{dateNum}</Text>
+                      </View>
+                      {hasWorkouts && entry && entry.muscles.slice(0, 1).map((m, mi) => (
+                        <Text key={mi} variant="overline" color="textTertiary" style={styles.muscleLabel} numberOfLines={1}>
+                          {abbreviateMuscle(m)}
+                        </Text>
+                      ))}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Muscle Sets */}
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Muscle Sets</Text>
+              {topMuscles.length === 0 ? (
+                <Surface level={2} style={styles.emptyCard}>
+                  <Text variant="body" color="textTertiary">No data for this period</Text>
+                </Surface>
               ) : (
-                <View className="bg-gray-900 rounded-xl overflow-hidden">
+                <Surface level={2} style={styles.barsCard}>
+                  {(() => {
+                    const maxSets = Math.max(...topMuscles.map(m => m.sets), 1);
+                    return topMuscles.map((m) => (
+                      <View key={m.muscle} style={styles.barRow}>
+                        <Text variant="caption" color="textTertiary" style={styles.barLabel} numberOfLines={1}>
+                          {abbreviateMuscle(m.muscle)}
+                        </Text>
+                        <View style={styles.barTrack}>
+                          <View style={[styles.barFill, { width: `${(m.sets / maxSets) * 100}%` as any }]} />
+                        </View>
+                        <Text variant="caption" color="textSecondary" style={styles.barCount}>{m.sets}</Text>
+                      </View>
+                    ));
+                  })()}
+                </Surface>
+              )}
+            </View>
+
+            {/* Top Exercises */}
+            {stats.top_exercises.length > 0 && (
+              <View style={styles.section}>
+                <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Top Exercises</Text>
+                <Surface level={2}>
+                  {stats.top_exercises.slice(0, 5).map((ex, idx) => (
+                    <View
+                      key={ex.exercise_id}
+                      style={[styles.exRow, idx < Math.min(stats.top_exercises.length, 5) - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+                    >
+                      <Text variant="bodyEmphasis" color="brand" style={styles.exRank}>{idx + 1}</Text>
+                      <Text variant="body" color="textPrimary" style={{ flex: 1 }} numberOfLines={1}>{ex.exercise_name}</Text>
+                      <View style={styles.exBadge}>
+                        <Text variant="caption" color="textTertiary">{ex.times_logged}×</Text>
+                      </View>
+                    </View>
+                  ))}
+                </Surface>
+              </View>
+            )}
+
+            {/* Strength Levels */}
+            {strengthWithLevel.length > 0 && (
+              <View style={styles.section}>
+                <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Strength Levels</Text>
+                <Surface level={2}>
                   {strengthWithLevel.map((sl, idx) => {
-                    const levelColor = sl.level ? (LEVEL_COLORS[sl.level] ?? '#9CA3AF') : '#9CA3AF';
+                    const levelColor = sl.level ? (LEVEL_COLORS[sl.level] ?? colors.textTertiary) : colors.textTertiary;
                     return (
                       <View
                         key={sl.wger_id}
-                        className="flex-row items-center px-4 py-3"
-                        style={
-                          idx < strengthWithLevel.length - 1
-                            ? { borderBottomWidth: 1, borderBottomColor: '#1F2937' }
-                            : undefined
-                        }
+                        style={[styles.levelRow, idx < strengthWithLevel.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
                       >
-                        <Text className="text-white flex-1 text-sm" numberOfLines={1}>
-                          {sl.exercise_name}
-                        </Text>
-                        <View
-                          className="rounded-full px-2 py-0.5 mr-2"
-                          style={{ backgroundColor: levelColor + '33' }}
-                        >
-                          <Text style={{ color: levelColor, fontSize: 11, fontWeight: '600' }}>
-                            {sl.level}
-                          </Text>
+                        <Text variant="body" color="textPrimary" style={{ flex: 1 }} numberOfLines={1}>{sl.exercise_name}</Text>
+                        <View style={[styles.levelBadge, { backgroundColor: levelColor + '33' }]}>
+                          <Text variant="overline" style={{ color: levelColor }}>{sl.level}</Text>
                         </View>
                         {sl.projected_1rm_kg != null && (
-                          <Text className="text-gray-400" style={{ fontSize: 12 }}>
+                          <Text variant="caption" color="textTertiary" style={{ marginLeft: spacing.sm }}>
                             1RM: {sl.projected_1rm_kg.toFixed(1)} kg
                           </Text>
                         )}
                       </View>
                     );
                   })}
-                </View>
-              )}
-            </View>
-          )}
-        </>
-      )}
+                </Surface>
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
 
-      <WorkoutDayModal
-        visible={modalVisible}
-        workoutIds={modalWorkoutIds}
-        onClose={() => setModalVisible(false)}
-      />
-    </ScrollView>
+      {/* Workout day sheet */}
+      <Sheet visible={sheetVisible} onClose={() => setSheetVisible(false)}>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Workouts that day</Text>
+        {sheetWorkoutIds.map((id, idx) => (
+          <Pressable
+            key={id}
+            style={[styles.sheetRow, idx < sheetWorkoutIds.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+            onPress={() => { setSheetVisible(false); router.push(`/workouts/${id}`); }}
+            accessibilityLabel={`Workout ${idx + 1}`}
+          >
+            <Text variant="body" color="textPrimary" style={{ flex: 1 }}>Workout {idx + 1}</Text>
+            <Icon icon={ChevronRight} size={16} color={colors.textTertiary} />
+          </Pressable>
+        ))}
+        <View style={{ marginTop: spacing.base }}>
+          <Button label="Close" onPress={() => setSheetVisible(false)} variant="secondary" size="md" fullWidth />
+        </View>
+      </Sheet>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+  },
+  measureBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodScroll: { marginBottom: spacing.lg },
+  periodContent: { paddingHorizontal: spacing.base, gap: spacing.sm },
+  periodChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+  },
+  periodChipActive: { backgroundColor: colors.brand },
+  section: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  sectionLabel: { marginBottom: spacing.sm },
+  overviewGrid: { flexDirection: 'row', gap: spacing.sm },
+  streakCard: { padding: spacing.base },
+  streakRow: { flexDirection: 'row', alignItems: 'center' },
+  compCard: { padding: spacing.base },
+  daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayCol: { alignItems: 'center', flex: 1 },
+  dayLabel: { marginBottom: spacing.xs, fontSize: 10 },
+  dayDot: { width: 36, height: 36, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
+  dayDotActive: { backgroundColor: colors.brand },
+  dayDotEmpty: { backgroundColor: colors.surface2 },
+  muscleLabel: { fontSize: 8, marginTop: 2 },
+  emptyCard: { padding: spacing.xl, alignItems: 'center' },
+  barsCard: { padding: spacing.base, gap: spacing.sm },
+  barRow: { flexDirection: 'row', alignItems: 'center' },
+  barLabel: { width: 48 },
+  barTrack: { flex: 1, height: 6, backgroundColor: colors.surface3, borderRadius: radii.full, overflow: 'hidden', marginHorizontal: spacing.sm },
+  barFill: { height: '100%', backgroundColor: colors.brand, borderRadius: radii.full },
+  barCount: { width: 24, textAlign: 'right' },
+  exRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md, gap: spacing.md },
+  exRank: { width: 20 },
+  exBadge: {
+    backgroundColor: colors.surface3,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  levelRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md },
+  levelBadge: { borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+});

@@ -5,13 +5,21 @@ import {
   FlatList,
   Modal,
   ScrollView,
-  Text,
-  TouchableOpacity,
+  StyleSheet,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronRight, Flame } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Avatar } from '../../src/components/Avatar';
+import { Button } from '../../src/components/Button';
+import { Icon } from '../../src/components/Icon';
+import { Pressable } from '../../src/components/Pressable';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface PublicUser {
   id: string;
@@ -44,16 +52,12 @@ interface FollowUser {
 
 type ModalType = 'followers' | 'following' | null;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
+const LEVEL_COLORS: Record<string, string> = {
+  Beginner: colors.info,
+  Intermediate: colors.success,
+  Advanced: colors.brand,
+  Elite: colors.setDropset,
+};
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -64,103 +68,36 @@ function formatRelative(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
-
-function Avatar({ name, size = 80 }: { name: string; size?: number }) {
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: '#FF6B35',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text
-        style={{
-          color: '#fff',
-          fontWeight: 'bold',
-          fontSize: size * 0.3,
-        }}
-      >
-        {initials(name)}
-      </Text>
-    </View>
-  );
-}
-
-// ─── FollowUserRow ────────────────────────────────────────────────────────────
-
 function FollowUserRow({ item }: { item: FollowUser }) {
   return (
-    <View className="flex-row items-center px-4 py-3 border-b border-gray-800">
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: '#FF6B35',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
-        }}
-      >
-        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
-          {initials(item.full_name || item.username)}
-        </Text>
-      </View>
-      <View>
-        <Text className="text-white font-semibold text-sm">
-          {item.full_name}
-        </Text>
-        <Text className="text-gray-400 text-xs">@{item.username}</Text>
+    <View style={styles.followRow}>
+      <Avatar username={item.full_name || item.username} avatarUrl={item.avatar_url} size={40} />
+      <View style={{ flex: 1, marginLeft: spacing.md }}>
+        <Text variant="bodyEmphasis" color="textPrimary">{item.full_name}</Text>
+        <Text variant="caption" color="textTertiary">@{item.username}</Text>
       </View>
     </View>
   );
 }
 
-// ─── FollowModal ──────────────────────────────────────────────────────────────
-
-interface FollowModalProps {
-  userId: string;
-  type: ModalType;
-  onClose: () => void;
-}
-
-function FollowModal({ userId, type, onClose }: FollowModalProps) {
+function FollowModal({ userId, type, onClose }: { userId: string; type: ModalType; onClose: () => void }) {
   const [users, setUsers] = useState<FollowUser[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchUsers = useCallback(
-    async (cursor?: string) => {
-      if (!type) return;
-      try {
-        const url = cursor
-          ? `/users/${userId}/${type}?cursor=${encodeURIComponent(cursor)}`
-          : `/users/${userId}/${type}`;
-        const res = await api.get<{
-          data: {
-            followers?: FollowUser[];
-            following?: FollowUser[];
-            next_cursor: string | null;
-          };
-        }>(url);
-        const items =
-          type === 'followers'
-            ? res.data.followers ?? []
-            : res.data.following ?? [];
-        setUsers((prev) => (cursor ? [...prev, ...items] : items));
-        setNextCursor(res.data.next_cursor);
-      } catch {
-        // show empty list on error
-      }
-    },
-    [userId, type]
-  );
+  const fetchUsers = useCallback(async (cursor?: string) => {
+    if (!type) return;
+    try {
+      const url = cursor
+        ? `/users/${userId}/${type}?cursor=${encodeURIComponent(cursor)}`
+        : `/users/${userId}/${type}`;
+      const res = await api.get<{ data: { followers?: FollowUser[]; following?: FollowUser[]; next_cursor: string | null } }>(url);
+      const items = type === 'followers' ? res.data.followers ?? [] : res.data.following ?? [];
+      setUsers((prev) => (cursor ? [...prev, ...items] : items));
+      setNextCursor(res.data.next_cursor);
+    } catch {}
+  }, [userId, type]);
 
   useEffect(() => {
     if (!type) return;
@@ -177,28 +114,18 @@ function FollowModal({ userId, type, onClose }: FollowModalProps) {
   }, [nextCursor, loadingMore, fetchUsers]);
 
   return (
-    <Modal
-      visible={!!type}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 bg-gray-950">
-        {/* Modal header */}
-        <View className="flex-row items-center justify-between px-4 pt-6 pb-4 border-b border-gray-800">
-          <Text className="text-white text-lg font-bold capitalize">
-            {type}
-          </Text>
-          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Text style={{ color: '#FF6B35', fontSize: 15, fontWeight: '600' }}>
-              Done
-            </Text>
-          </TouchableOpacity>
+    <Modal visible={!!type} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.modalRoot} edges={['top']}>
+        <View style={styles.modalHeader}>
+          <Text variant="title3" color="textPrimary" style={{ textTransform: 'capitalize' }}>{type}</Text>
+          <Pressable onPress={onClose} accessibilityLabel="Close">
+            <Text variant="label" color="brand">Done</Text>
+          </Pressable>
         </View>
 
         {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="#FF6B35" size="large" />
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.brand} size="large" />
           </View>
         ) : (
           <FlatList
@@ -207,311 +134,213 @@ function FollowModal({ userId, type, onClose }: FollowModalProps) {
             renderItem={({ item }) => <FollowUserRow item={item} />}
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.3}
-            ListFooterComponent={
-              loadingMore ? (
-                <ActivityIndicator color="#FF6B35" className="py-4" />
-              ) : null
-            }
-            ListEmptyComponent={
-              <View className="items-center py-16">
-                <Text className="text-gray-500">No users yet</Text>
-              </View>
-            }
+            ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.lg }} /> : null}
+            ListEmptyComponent={<EmptyState title="No users yet" />}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
         )}
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-
   const [user, setUser] = useState<PublicUser | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'active'>('none');
   const [followLoading, setFollowLoading] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
 
-  // ── Fetch user + stats in parallel ───────────────────────────────────────
-
   useEffect(() => {
     if (!id) return;
-
     const load = async () => {
       setLoading(true);
-      setError(null);
-
       const [userResult, statsResult] = await Promise.allSettled([
         api.get<{ data: { user: PublicUser } }>(`/users/${id}`),
         api.get<{ data: UserStats }>(`/users/${id}/stats`),
       ]);
-
       if (userResult.status === 'fulfilled') {
-        const fetchedUser = userResult.value.data.user;
-        setUser(fetchedUser);
-        setFollowStatus(fetchedUser.follow_status);
-      } else {
-        setError('Could not load user profile.');
+        const u = userResult.value.data.user;
+        setUser(u);
+        setFollowStatus(u.follow_status);
       }
-
-      if (statsResult.status === 'fulfilled') {
-        setStats(statsResult.value.data);
-      }
-      // stats failure is non-fatal — screen still renders
-
+      if (statsResult.status === 'fulfilled') setStats(statsResult.value.data);
       setLoading(false);
     };
-
     load();
   }, [id]);
-
-  // ── Follow / unfollow ─────────────────────────────────────────────────────
 
   const handleFollow = useCallback(async () => {
     if (!user || followLoading) return;
     setFollowLoading(true);
-
     try {
       if (followStatus === 'none') {
-        const res = await api.post<{ data: { status: 'active' | 'pending' } }>(
-          `/users/${id}/follow`
-        );
+        const res = await api.post<{ data: { status: 'active' | 'pending' } }>(`/users/${id}/follow`);
         setFollowStatus(res.data.status);
-        // Update counts optimistically
         if (res.data.status === 'active') {
-          setUser((prev) =>
-            prev ? { ...prev, follower_count: prev.follower_count + 1, follow_status: 'active', is_following: true } : prev
-          );
+          setUser(prev => prev ? { ...prev, follower_count: prev.follower_count + 1, follow_status: 'active', is_following: true } : prev);
         } else {
-          setUser((prev) =>
-            prev ? { ...prev, follow_status: 'pending' } : prev
-          );
+          setUser(prev => prev ? { ...prev, follow_status: 'pending' } : prev);
         }
       } else if (followStatus === 'active') {
-        await api.delete<{ data: { unfollowed: true } }>(`/users/${id}/follow`);
+        await api.delete(`/users/${id}/follow`);
         setFollowStatus('none');
-        setUser((prev) =>
-          prev
-            ? {
-                ...prev,
-                follower_count: Math.max(0, prev.follower_count - 1),
-                follow_status: 'none',
-                is_following: false,
-              }
-            : prev
-        );
+        setUser(prev => prev ? { ...prev, follower_count: Math.max(0, prev.follower_count - 1), follow_status: 'none', is_following: false } : prev);
       }
-    } catch {
-      // silently fail — state stays as-is
-    } finally {
-      setFollowLoading(false);
-    }
+    } catch {} finally { setFollowLoading(false); }
   }, [user, followLoading, followStatus, id]);
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center">
-        <ActivityIndicator color="#FF6B35" size="large" />
-        <Text className="text-gray-400 mt-3">Loading…</Text>
+      <View style={[styles.root, styles.centered]}>
+        <ActivityIndicator color={colors.brand} size="large" />
       </View>
     );
   }
 
-  if (error || !user) {
+  if (!user) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center px-6">
-        <Text className="text-red-400 text-base text-center">
-          {error ?? 'User not found.'}
-        </Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text style={{ color: '#FF6B35' }}>Go back</Text>
-        </TouchableOpacity>
+      <View style={[styles.root, styles.centered]}>
+        <EmptyState illustration="404" title="User not found" action={{ label: 'Go back', onPress: () => router.back() }} />
       </View>
     );
   }
 
-  const visibleStrengthLevels =
-    stats?.strength_levels.filter((s) => s.level !== null) ?? [];
+  const visibleStrengthLevels = stats?.strength_levels.filter((s) => s.level !== null) ?? [];
 
   return (
     <>
-      <ScrollView className="flex-1 bg-gray-950" contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Back button */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="px-4 pt-14 pb-2"
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: '#FF6B35', fontSize: 15, fontWeight: '600' }}>
-            ← Back
-          </Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <Header title={user.username} back />
 
-        {/* Avatar + name section */}
-        <View className="items-center px-4 pt-4 pb-6">
-          <Avatar name={user.full_name || user.username} size={80} />
-
-          <Text className="text-white text-2xl font-bold mt-4 text-center">
-            {user.full_name}
-          </Text>
-          <Text className="text-gray-400 text-sm mt-1">@{user.username}</Text>
-
-          {user.bio ? (
-            <Text className="text-gray-400 text-sm italic mt-2 text-center px-6">
-              {user.bio}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Stats row */}
-        <View className="flex-row border-t border-b border-gray-800 mx-4">
-          {/* Workouts */}
-          <View className="flex-1 items-center py-4">
-            <Text className="text-white text-xl font-bold">
-              {stats?.total_workouts ?? '—'}
-            </Text>
-            <Text className="text-gray-400 text-xs mt-1">Workouts</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          {/* Avatar + bio */}
+          <View style={styles.heroSection}>
+            <Avatar username={user.full_name || user.username} avatarUrl={user.avatar_url} size={80} />
+            <Text variant="title2" color="textPrimary" style={styles.fullName}>{user.full_name}</Text>
+            <Text variant="label" color="textTertiary">@{user.username}</Text>
+            {user.bio ? (
+              <Text variant="body" color="textSecondary" style={styles.bio}>{user.bio}</Text>
+            ) : null}
           </View>
 
-          {/* Separator */}
-          <View className="w-px bg-gray-800" />
-
-          {/* Followers */}
-          <TouchableOpacity
-            className="flex-1 items-center py-4"
-            activeOpacity={0.7}
-            onPress={() => setModalType('followers')}
-          >
-            <Text className="text-white text-xl font-bold">
-              {user.follower_count}
-            </Text>
-            <Text className="text-gray-400 text-xs mt-1">Followers</Text>
-          </TouchableOpacity>
-
-          {/* Separator */}
-          <View className="w-px bg-gray-800" />
-
-          {/* Following */}
-          <TouchableOpacity
-            className="flex-1 items-center py-4"
-            activeOpacity={0.7}
-            onPress={() => setModalType('following')}
-          >
-            <Text className="text-white text-xl font-bold">
-              {user.following_count}
-            </Text>
-            <Text className="text-gray-400 text-xs mt-1">Following</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Follow button */}
-        <View className="px-4 mt-5">
-          {followStatus === 'pending' ? (
-            <View className="rounded-xl py-3 items-center bg-gray-700">
-              <Text className="text-gray-300 font-semibold">Requested</Text>
+          {/* Stats row */}
+          <Surface level={2} style={styles.statsRow}>
+            <View style={styles.statCell}>
+              <Text variant="numeric" color="textPrimary">{stats?.total_workouts ?? '—'}</Text>
+              <Text variant="overline" color="textTertiary">Workouts</Text>
             </View>
-          ) : followStatus === 'active' ? (
-            <TouchableOpacity
-              onPress={handleFollow}
-              disabled={followLoading}
-              activeOpacity={0.8}
-              className="rounded-xl py-3 items-center border border-orange-500"
-            >
-              <Text style={{ color: '#FF6B35', fontWeight: '600' }}>
-                {followLoading ? 'Updating…' : 'Following'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              onPress={handleFollow}
-              disabled={followLoading}
-              activeOpacity={0.8}
-              className="rounded-xl py-3 items-center"
-              style={{ backgroundColor: '#FF6B35' }}
-            >
-              <Text className="text-white font-semibold">
-                {followLoading ? 'Loading…' : 'Follow'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            <View style={styles.statDivider} />
+            <Pressable style={styles.statCell} onPress={() => setModalType('followers')} accessibilityLabel="Followers">
+              <Text variant="numeric" color="textPrimary">{user.follower_count}</Text>
+              <Text variant="overline" color="textTertiary">Followers</Text>
+            </Pressable>
+            <View style={styles.statDivider} />
+            <Pressable style={styles.statCell} onPress={() => setModalType('following')} accessibilityLabel="Following">
+              <Text variant="numeric" color="textPrimary">{user.following_count}</Text>
+              <Text variant="overline" color="textTertiary">Following</Text>
+            </Pressable>
+          </Surface>
 
-        {/* Streak stats */}
-        {stats ? (
-          <View className="px-4 mt-5">
-            <Text className="text-gray-400 text-sm">
-              {'🔥 '}
-              <Text className="text-white font-semibold">
-                {stats.current_streak} day streak
-              </Text>
-              {'  •  Longest: '}
-              <Text className="text-white font-semibold">
-                {stats.longest_streak} days
-              </Text>
-            </Text>
+          {/* Follow button */}
+          <View style={styles.followBtnRow}>
+            {followStatus === 'pending' ? (
+              <Button label="Requested" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
+            ) : followStatus === 'active' ? (
+              <Button label="Following" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
+            ) : (
+              <Button label="Follow" onPress={handleFollow} variant="primary" size="md" fullWidth loading={followLoading} />
+            )}
           </View>
-        ) : null}
 
-        {/* Recent Workouts */}
-        {stats && stats.recent_workouts.length > 0 ? (
-          <View className="px-4 mt-7">
-            <Text className="text-white text-base font-bold mb-3">
-              Recent Workouts
-            </Text>
-            {stats.recent_workouts.slice(0, 3).map((w) => (
-              <TouchableOpacity
-                key={w.id}
-                onPress={() => router.push(`/workouts/${w.id}` as never)}
-                activeOpacity={0.7}
-                className="flex-row items-center justify-between bg-gray-900 rounded-xl px-4 py-3 mb-2"
-              >
-                <Text className="text-white text-sm font-medium flex-1 mr-3" numberOfLines={1}>
-                  {w.workout_name}
-                </Text>
-                <Text className="text-gray-400 text-xs">
-                  {formatRelative(w.started_at)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
-
-        {/* Strength Levels */}
-        {visibleStrengthLevels.length > 0 ? (
-          <View className="px-4 mt-7">
-            <Text className="text-white text-base font-bold mb-3">
-              Strength Levels
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {visibleStrengthLevels.map((s) => (
-                <View
-                  key={s.exercise_name}
-                  className="bg-gray-800 rounded-full px-3 py-1.5"
-                >
-                  <Text className="text-gray-200 text-xs">
-                    {s.exercise_name}:{' '}
-                    <Text style={{ color: '#FF6B35' }}>{s.level}</Text>
-                  </Text>
+          {/* Streak */}
+          {stats && (stats.current_streak > 0 || stats.longest_streak > 0) ? (
+            <View style={styles.section}>
+              <Surface level={2} style={styles.streakCard}>
+                <Icon icon={Flame} size={18} color={stats.current_streak > 0 ? colors.brand : colors.textTertiary} />
+                <View style={{ marginLeft: spacing.md }}>
+                  <Text variant="bodyEmphasis" color="textPrimary">{stats.current_streak} day streak</Text>
+                  <Text variant="caption" color="textTertiary">Longest: {stats.longest_streak} days</Text>
                 </View>
-              ))}
+              </Surface>
             </View>
-          </View>
-        ) : null}
-      </ScrollView>
+          ) : null}
 
-      {/* Followers / Following modal */}
-      <FollowModal
-        userId={id}
-        type={modalType}
-        onClose={() => setModalType(null)}
-      />
+          {/* Recent workouts */}
+          {stats && stats.recent_workouts.length > 0 ? (
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Recent Workouts</Text>
+              <Surface level={2}>
+                {stats.recent_workouts.slice(0, 3).map((w, idx) => (
+                  <Pressable
+                    key={w.id}
+                    onPress={() => router.push(`/workouts/${w.id}` as never)}
+                    style={[styles.workoutRow, idx < 2 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+                    accessibilityLabel={w.workout_name}
+                  >
+                    <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }} numberOfLines={1}>{w.workout_name}</Text>
+                    <Text variant="caption" color="textTertiary">{formatRelative(w.started_at)}</Text>
+                    <View style={{ marginLeft: spacing.xs }}><Icon icon={ChevronRight} size={14} color={colors.textTertiary} /></View>
+                  </Pressable>
+                ))}
+              </Surface>
+            </View>
+          ) : null}
+
+          {/* Strength levels */}
+          {visibleStrengthLevels.length > 0 ? (
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Strength Levels</Text>
+              <View style={styles.levelChips}>
+                {visibleStrengthLevels.map((s) => {
+                  const c = s.level ? (LEVEL_COLORS[s.level] ?? colors.textTertiary) : colors.textTertiary;
+                  return (
+                    <View key={s.exercise_name} style={[styles.levelChip, { borderColor: c + '60' }]}>
+                      <Text variant="caption" color="textSecondary">{s.exercise_name}</Text>
+                      <Text variant="overline" style={{ color: c, marginTop: 2 }}>{s.level}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
+
+      <FollowModal userId={id} type={modalType} onClose={() => setModalType(null)} />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  heroSection: { alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.xl },
+  fullName: { marginTop: spacing.md },
+  bio: { marginTop: spacing.sm, textAlign: 'center', paddingHorizontal: spacing.xl },
+  statsRow: { flexDirection: 'row', marginHorizontal: spacing.base, marginBottom: spacing.base },
+  statCell: { flex: 1, alignItems: 'center', paddingVertical: spacing.base, gap: spacing.xxs },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 40, backgroundColor: colors.border, alignSelf: 'center' },
+  followBtnRow: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  section: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  sectionLabel: { marginBottom: spacing.sm },
+  streakCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.base },
+  workoutRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md, gap: spacing.sm },
+  levelChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  levelChip: { borderWidth: 1, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  // Modal
+  modalRoot: { flex: 1, backgroundColor: colors.bg },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  followRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+});

@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, ActivityIndicator } from 'react-native';
+import { View, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/lib/api';
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Avatar } from '../../src/components/Avatar';
+import { Icon } from '../../src/components/Icon';
+import { Pressable } from '../../src/components/Pressable';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing } from '../../src/theme/tokens';
 
 interface FollowerRow {
   id: string;
@@ -20,57 +29,56 @@ export default function FollowersScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
-    (async () => {
-      try {
-        const res = await api.get<{ data: { followers: FollowerRow[] } }>(`/users/${user.id}/followers?limit=50`);
-        setItems(res.data.followers ?? []);
-      } catch {
-        // silent
-      } finally {
-        setLoading(false);
-      }
-    })();
+    api.get<{ data: { followers: FollowerRow[] } }>(`/users/${user.id}/followers?limit=50`)
+      .then(res => setItems(res.data.followers ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [user?.id]);
 
   return (
-    <View className="flex-1 bg-gray-950">
-      <View className="flex-row items-center px-4 pt-14 pb-4 border-b border-gray-800">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3 p-1">
-          <Text className="text-white text-xl">←</Text>
-        </TouchableOpacity>
-        <Text className="text-white font-bold text-xl">Followers</Text>
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header title="Followers" back />
 
       {loading ? (
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#FF6B35" /></View>
-      ) : items.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-gray-500 text-center">No followers yet.</Text>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.brand} size="large" />
         </View>
       ) : (
         <FlatList
           data={items}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <Pressable
               onPress={() => router.push(`/users/${item.id}` as any)}
-              className="flex-row items-center px-4 py-3 border-b border-gray-900"
+              style={styles.row}
+              accessibilityLabel={item.username}
             >
-              {item.avatar_url ? (
-                <Image source={{ uri: item.avatar_url }} className="w-10 h-10 rounded-full mr-3" />
-              ) : (
-                <View className="w-10 h-10 rounded-full bg-orange-500 mr-3 items-center justify-center">
-                  <Text className="text-white font-bold">{item.username.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
-              <View className="flex-1">
-                <Text className="text-white font-semibold text-sm">{item.username}</Text>
-                {item.full_name ? <Text className="text-gray-400 text-xs">{item.full_name}</Text> : null}
+              <Avatar username={item.full_name || item.username} avatarUrl={item.avatar_url} size={40} />
+              <View style={styles.rowText}>
+                <Text variant="bodyEmphasis" color="textPrimary">{item.username}</Text>
+                {item.full_name ? <Text variant="caption" color="textTertiary">{item.full_name}</Text> : null}
               </View>
-            </TouchableOpacity>
+              <Icon icon={ChevronRight} size={16} color={colors.textTertiary} />
+            </Pressable>
           )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={
+            <EmptyState
+              title="No followers yet"
+              description="Train hard. Show up. They'll find you."
+            />
+          }
+          contentContainerStyle={{ flexGrow: 1 }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md, gap: spacing.md },
+  rowText: { flex: 1 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+});

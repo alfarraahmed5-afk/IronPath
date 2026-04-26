@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   ScrollView,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Trophy, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { api } from '../../src/lib/api';
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Icon } from '../../src/components/Icon';
+import { EmptyState } from '../../src/components/EmptyState';
+import { Pressable } from '../../src/components/Pressable';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface ExerciseDetail {
   id: string;
@@ -66,20 +74,11 @@ const REP_RECORD_TYPES = new Set(['most_reps', '3rm', '5rm', '10rm']);
 const DURATION_RECORD_TYPES = new Set(['longest_duration']);
 const DISTANCE_RECORD_TYPES = new Set(['longest_distance']);
 
-const AVATAR_COLORS = [
-  '#FF6B35',
-  '#6B35FF',
-  '#35B8FF',
-  '#FF3578',
-  '#35FF8A',
-  '#FFB835',
-];
+const AVATAR_COLORS = [colors.brand, colors.info, colors.success, '#06B6D4', '#F59E0B'];
 
 function getAvatarColor(name: string): string {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
@@ -101,15 +100,12 @@ function formatPRValue(record_type: string, value: number): string {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function formatSetSummary(sets: HistorySet[]): string {
   const completed = sets.filter((s) => s.is_completed);
   if (completed.length === 0) return 'No completed sets';
-
-  // Group consecutive sets with same weight+reps
   const parts: string[] = [];
   let i = 0;
   while (i < completed.length) {
@@ -119,23 +115,13 @@ function formatSetSummary(sets: HistorySet[]): string {
       i + count < completed.length &&
       completed[i + count].weight_kg === cur.weight_kg &&
       completed[i + count].reps === cur.reps
-    ) {
-      count++;
-    }
-
-    if (cur.weight_kg !== null && cur.reps !== null) {
-      parts.push(`${count} × ${cur.weight_kg} kg`);
-    } else if (cur.reps !== null) {
-      parts.push(`${count} × ${cur.reps} reps`);
-    } else if (cur.weight_kg !== null) {
-      parts.push(`${count} × ${cur.weight_kg} kg`);
-    } else {
-      parts.push(`${count} set${count > 1 ? 's' : ''}`);
-    }
-
+    ) { count++; }
+    if (cur.weight_kg !== null && cur.reps !== null) parts.push(`${count} × ${cur.weight_kg} kg`);
+    else if (cur.reps !== null) parts.push(`${count} × ${cur.reps} reps`);
+    else if (cur.weight_kg !== null) parts.push(`${count} × ${cur.weight_kg} kg`);
+    else parts.push(`${count} set${count > 1 ? 's' : ''}`);
     i += count;
   }
-
   return parts.join(' · ');
 }
 
@@ -146,16 +132,19 @@ function InstructionsText({ text }: { text: string }) {
   const displayed = isLong && !expanded ? text.slice(0, THRESHOLD) + '…' : text;
 
   return (
-    <View>
-      <Text className="text-gray-300 text-sm leading-relaxed">{displayed}</Text>
+    <Surface level={2} style={styles.instructionsCard}>
+      <Text variant="body" color="textSecondary">{displayed}</Text>
       {isLong && (
-        <TouchableOpacity onPress={() => setExpanded((v) => !v)} activeOpacity={0.7} className="mt-1">
-          <Text style={{ color: '#FF6B35' }} className="text-sm font-medium">
-            {expanded ? 'Show less' : 'Show more'}
-          </Text>
-        </TouchableOpacity>
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          style={styles.showMoreBtn}
+          accessibilityLabel={expanded ? 'Show less' : 'Show more'}
+        >
+          <Text variant="label" color="brand">{expanded ? 'Show less' : 'Show more'}</Text>
+          <Icon icon={expanded ? ChevronUp : ChevronDown} size={14} color={colors.brand} />
+        </Pressable>
       )}
-    </View>
+    </Surface>
   );
 }
 
@@ -167,55 +156,37 @@ export default function ExerciseDetailScreen() {
   const [personalRecords, setPersonalRecords] = useState<PR[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
-
-    api
-      .get<{ data: ExerciseDetailResponse }>(`/exercises/${id}`)
+    api.get<{ data: ExerciseDetailResponse }>(`/exercises/${id}`)
       .then((res) => {
         setExercise(res.data.exercise);
         setPersonalRecords(res.data.personal_records);
         setHistory(res.data.history);
       })
-      .catch(() => {
-        setError('Failed to load exercise.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch(() => router.back())
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center">
-        <ActivityIndicator size="large" color="#FF6B35" />
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
   }
 
-  if (error || !exercise) {
+  if (!exercise) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center px-8">
-        <Text className="text-gray-400 text-base text-center">{error ?? 'Exercise not found.'}</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4" activeOpacity={0.7}>
-          <Text style={{ color: '#FF6B35' }} className="text-base font-medium">
-            Go back
-          </Text>
-        </TouchableOpacity>
+      <View style={[styles.root, styles.centered]}>
+        <EmptyState illustration="404" title="Exercise not found" action={{ label: 'Go back', onPress: () => router.back() }} />
       </View>
     );
   }
 
   const avatarColor = getAvatarColor(exercise.name);
-  const initials = exercise.name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w.charAt(0).toUpperCase())
-    .join('');
+  const initials = exercise.name.split(' ').slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join('');
 
   const allMuscles = [
     ...exercise.primary_muscles.map((m) => ({ label: capitalize(m), primary: true })),
@@ -223,64 +194,38 @@ export default function ExerciseDetailScreen() {
   ];
 
   return (
-    <View className="flex-1 bg-gray-950">
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-14 pb-4 gap-3">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="mr-1">
-          <Text className="text-white text-2xl">←</Text>
-        </TouchableOpacity>
-        <Text className="text-white text-xl font-bold flex-1" numberOfLines={2}>
-          {exercise.name}
-        </Text>
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header title={exercise.name} back />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Hero image or fallback */}
         {exercise.image_url ? (
           <Image
             source={{ uri: exercise.image_url }}
-            className="w-full rounded-b-xl"
-            style={{ height: 200 }}
-            resizeMode="cover"
+            style={styles.hero}
+            contentFit="cover"
+            cachePolicy="memory-disk"
           />
         ) : (
-          <View
-            className="w-full rounded-b-xl items-center justify-center"
-            style={{ height: 200, backgroundColor: avatarColor }}
-          >
-            <Text className="text-white text-5xl font-bold opacity-80">{initials}</Text>
+          <View style={[styles.hero, styles.heroFallback, { backgroundColor: avatarColor }]}>
+            <Text variant="display3" color="textPrimary" style={{ opacity: 0.8 }}>{initials}</Text>
           </View>
         )}
 
-        <View className="px-4 pt-4">
-          {/* Info pills */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-            className="mb-4"
-          >
+        <View style={styles.content}>
+          {/* Muscle / equipment pills */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
             {exercise.equipment && (
-              <View className="bg-gray-800 rounded-full px-3 py-1">
-                <Text className="text-gray-300 text-xs font-medium">
-                  {capitalize(exercise.equipment)}
-                </Text>
+              <View style={styles.pillEquipment}>
+                <Text variant="label" color="textSecondary">{capitalize(exercise.equipment)}</Text>
               </View>
             )}
             {allMuscles.map((m, idx) => (
               <View
                 key={idx}
-                className="rounded-full px-3 py-1"
-                style={
-                  m.primary
-                    ? { backgroundColor: 'rgba(255,107,53,0.18)' }
-                    : { backgroundColor: '#1F2937' }
-                }
+                style={[styles.pillMuscle, m.primary ? styles.pillMusclePrimary : styles.pillMuscleSecondary]}
               >
-                <Text
-                  className="text-xs font-medium"
-                  style={m.primary ? { color: '#FF6B35' } : { color: '#9CA3AF' }}
-                >
+                <Text variant="label" style={{ color: m.primary ? colors.brand : colors.textTertiary }}>
                   {m.label}
                 </Text>
               </View>
@@ -289,32 +234,31 @@ export default function ExerciseDetailScreen() {
 
           {/* Description */}
           {exercise.description ? (
-            <View className="mb-5">
-              <Text className="text-gray-300 text-sm leading-relaxed">{exercise.description}</Text>
+            <View style={styles.section}>
+              <Text variant="body" color="textSecondary">{exercise.description}</Text>
             </View>
           ) : null}
 
           {/* Personal Records */}
           {personalRecords.length > 0 && (
-            <View className="mb-6">
-              <Text className="text-white text-lg font-bold mb-3">Personal Records</Text>
-              <View className="flex-row flex-wrap gap-3">
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Icon icon={Trophy} size={16} color={colors.brand} />
+                <Text variant="title3" color="brand" style={{ marginLeft: spacing.xs }}>Personal Records</Text>
+              </View>
+              <View style={styles.prGrid}>
                 {personalRecords.map((pr, idx) => (
-                  <View
-                    key={idx}
-                    className="bg-gray-900 rounded-xl p-3 border border-gray-800"
-                    style={{ minWidth: '44%', flex: 1 }}
-                  >
-                    <Text className="text-gray-400 text-xs mb-1">
+                  <Surface key={idx} level={2} style={styles.prCard}>
+                    <Text variant="overline" color="textTertiary">
                       {PR_DISPLAY_NAMES[pr.record_type] ?? capitalize(pr.record_type)}
                     </Text>
-                    <Text className="text-white font-bold text-base">
+                    <Text variant="numeric" color="brand" style={{ marginTop: spacing.xxs }}>
                       {formatPRValue(pr.record_type, pr.value)}
                     </Text>
-                    <Text className="text-gray-600 text-xs mt-1">
+                    <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>
                       {formatDate(pr.achieved_at)}
                     </Text>
-                  </View>
+                  </Surface>
                 ))}
               </View>
             </View>
@@ -322,35 +266,57 @@ export default function ExerciseDetailScreen() {
 
           {/* History */}
           {history.length > 0 && (
-            <View className="mb-6">
-              <Text className="text-white text-lg font-bold mb-3">History</Text>
-              <View className="gap-2">
-                {history.map((entry) => (
-                  <View
-                    key={entry.workout_id}
-                    className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800"
-                  >
-                    <Text className="text-gray-400 text-xs mb-1.5">
-                      {formatDate(entry.started_at)}
-                    </Text>
-                    <Text className="text-gray-300 text-sm" numberOfLines={2}>
-                      {formatSetSummary(entry.sets)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+            <View style={styles.section}>
+              <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.md }}>History</Text>
+              {history.map((entry, idx) => (
+                <Surface key={entry.workout_id} level={2} style={[styles.historyCard, idx > 0 && { marginTop: spacing.sm }]}>
+                  <Text variant="overline" color="textTertiary">{formatDate(entry.started_at)}</Text>
+                  <Text variant="body" color="textSecondary" numberOfLines={2} style={{ marginTop: spacing.xxs }}>
+                    {formatSetSummary(entry.sets)}
+                  </Text>
+                </Surface>
+              ))}
             </View>
           )}
 
           {/* Instructions */}
           {exercise.instructions ? (
-            <View className="mb-8">
-              <Text className="text-white text-lg font-bold mb-3">Instructions</Text>
+            <View style={styles.section}>
+              <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.md }}>Instructions</Text>
               <InstructionsText text={exercise.instructions} />
             </View>
           ) : null}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  hero: { width: '100%', height: 200 },
+  heroFallback: { alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: spacing.base, paddingTop: spacing.base },
+  pillsRow: { gap: spacing.sm, marginBottom: spacing.base },
+  pillEquipment: {
+    backgroundColor: colors.surface3,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  pillMuscle: {
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  pillMusclePrimary: { backgroundColor: colors.brandGlow },
+  pillMuscleSecondary: { backgroundColor: colors.surface3 },
+  section: { marginBottom: spacing.xl },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  prGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  prCard: { padding: spacing.md, minWidth: '44%', flex: 1 },
+  historyCard: { padding: spacing.md },
+  instructionsCard: { padding: spacing.base },
+  showMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+});

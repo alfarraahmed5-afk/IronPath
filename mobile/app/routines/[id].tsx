@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Play } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
 import { useWorkoutStore, WorkoutExercise } from '../../src/stores/workoutStore';
-
-const ORANGE = '#FF6B35';
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface RoutineSet {
   position: number;
@@ -39,36 +45,19 @@ interface RoutineDetail {
 
 function formatSetSummary(sets: RoutineSet[], loggingType: string): string {
   if (!sets || sets.length === 0) return '0 sets';
-
   const setCount = sets.length;
   const first = sets[0];
-
   if (loggingType === 'weight_reps' || loggingType === 'bodyweight_reps') {
-    if (first.target_reps !== null && first.target_weight_kg !== null) {
-      return `${setCount} sets · ${first.target_reps} reps @ ${first.target_weight_kg} kg`;
-    }
-    if (first.target_reps !== null) {
-      return `${setCount} sets · ${first.target_reps} reps`;
-    }
-    if (first.target_weight_kg !== null) {
-      return `${setCount} sets · ${first.target_weight_kg} kg`;
-    }
+    if (first.target_reps !== null && first.target_weight_kg !== null) return `${setCount} sets · ${first.target_reps} reps @ ${first.target_weight_kg} kg`;
+    if (first.target_reps !== null) return `${setCount} sets · ${first.target_reps} reps`;
+    if (first.target_weight_kg !== null) return `${setCount} sets · ${first.target_weight_kg} kg`;
   }
-
-  if (loggingType === 'duration') {
-    if (first.target_duration_seconds !== null) {
-      const mins = Math.floor(first.target_duration_seconds / 60);
-      const secs = first.target_duration_seconds % 60;
-      return `${setCount} sets · ${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+  if (loggingType === 'duration' && first.target_duration_seconds !== null) {
+    const mins = Math.floor(first.target_duration_seconds / 60);
+    const secs = first.target_duration_seconds % 60;
+    return `${setCount} sets · ${mins}:${secs.toString().padStart(2, '0')}`;
   }
-
-  if (loggingType === 'distance') {
-    if (first.target_distance_meters !== null) {
-      return `${setCount} sets · ${first.target_distance_meters}m`;
-    }
-  }
-
+  if (loggingType === 'distance' && first.target_distance_meters !== null) return `${setCount} sets · ${first.target_distance_meters}m`;
   return `${setCount} sets`;
 }
 
@@ -80,29 +69,15 @@ export default function RoutineDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) {
-      router.back();
-      return;
-    }
-
-    const fetchRoutine = async () => {
-      try {
-        const response = await api.get<{ data: { routine: RoutineDetail } }>(`/routines/${id}`);
-        setRoutine(response.data.routine);
-      } catch (error) {
-        console.error('Failed to fetch routine:', error);
-        router.back();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRoutine();
+    if (!id) { router.back(); return; }
+    api.get<{ data: { routine: RoutineDetail } }>(`/routines/${id}`)
+      .then(r => setRoutine(r.data.routine))
+      .catch(() => router.back())
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleStartWorkout = () => {
     if (!routine) return;
-
     const workoutExercises: WorkoutExercise[] = routine.exercises.map(ex => ({
       exercise_id: ex.exercise_id,
       exercise_name: ex.exercise_name,
@@ -113,23 +88,22 @@ export default function RoutineDetailScreen() {
       notes: ex.notes,
       sets: [],
     }));
-
     startWorkout(routine.name, routine.id, workoutExercises);
     router.push('/workout/active');
   };
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center">
-        <ActivityIndicator size="large" color={ORANGE} />
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
   }
 
   if (!routine) {
     return (
-      <View className="flex-1 bg-gray-950 items-center justify-center">
-        <Text className="text-gray-400">Routine not found</Text>
+      <View style={[styles.root, styles.centered]}>
+        <EmptyState illustration="404" title="Routine not found" action={{ label: 'Go back', onPress: () => router.back() }} />
       </View>
     );
   }
@@ -137,65 +111,82 @@ export default function RoutineDetailScreen() {
   const totalSets = routine.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
   return (
-    <ScrollView className="flex-1 bg-gray-950" contentContainerStyle={{ paddingBottom: 32 }}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-12 pb-4 border-b border-gray-800">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3 p-2">
-          <Text className="text-gray-400 text-xl">←</Text>
-        </TouchableOpacity>
-        <Text className="text-white font-bold text-2xl flex-1">{routine.name}</Text>
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header title={routine.name} back />
 
-      {/* Description */}
-      {routine.description && (
-        <View className="px-4 pt-4 pb-2">
-          <Text className="text-gray-300 text-sm">{routine.description}</Text>
-        </View>
-      )}
-
-      {/* Stats */}
-      <View className="px-4 py-4 flex-row items-center gap-4">
-        <Text className="text-gray-400 text-sm">
-          {routine.exercises.length} exercise{routine.exercises.length !== 1 ? 's' : ''}
-        </Text>
-        <Text className="text-gray-400 text-sm">·</Text>
-        <Text className="text-gray-400 text-sm">
-          {totalSets} set{totalSets !== 1 ? 's' : ''}
-        </Text>
-      </View>
-
-      {/* Start Workout Button */}
-      <TouchableOpacity
-        onPress={handleStartWorkout}
-        className="mx-4 py-4 rounded-2xl items-center justify-center mb-6"
-        style={{ backgroundColor: ORANGE }}
-      >
-        <Text className="text-white font-bold text-base">Start Workout</Text>
-      </TouchableOpacity>
-
-      {/* Exercises */}
-      <View className="px-4 gap-3">
-        {routine.exercises.map(exercise => (
-          <View key={exercise.position} className="bg-gray-900 px-4 py-4 rounded-xl">
-            <View className="flex-row items-start justify-between mb-2">
-              <Text className="text-white font-bold text-base flex-1">
-                {exercise.exercise_name}
-              </Text>
-              {exercise.superset_group !== null && (
-                <View className="ml-2 px-2 py-1 rounded-full bg-gray-800">
-                  <Text className="text-gray-400 text-xs font-semibold">SS</Text>
-                </View>
-              )}
-            </View>
-            <Text className="text-gray-400 text-sm">
-              {formatSetSummary(exercise.sets, exercise.logging_type)}
-            </Text>
-            {exercise.notes && (
-              <Text className="text-gray-500 text-xs mt-2">{exercise.notes}</Text>
-            )}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {routine.description ? (
+          <View style={styles.descSection}>
+            <Text variant="body" color="textSecondary">{routine.description}</Text>
           </View>
-        ))}
-      </View>
-    </ScrollView>
+        ) : null}
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <Text variant="caption" color="textTertiary">
+            {routine.exercises.length} exercise{routine.exercises.length !== 1 ? 's' : ''}
+          </Text>
+          <Text variant="caption" color="textTertiary">·</Text>
+          <Text variant="caption" color="textTertiary">
+            {totalSets} set{totalSets !== 1 ? 's' : ''}
+          </Text>
+        </View>
+
+        {/* Start button */}
+        <View style={styles.startBar}>
+          <Button
+            label="Start Workout"
+            onPress={handleStartWorkout}
+            variant="primary"
+            size="lg"
+            fullWidth
+          />
+        </View>
+
+        {/* Exercises */}
+        <View style={styles.exerciseList}>
+          {routine.exercises.map(exercise => (
+            <Surface key={exercise.position} level={2} style={styles.exerciseCard}>
+              <View style={styles.exerciseHeader}>
+                <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }}>
+                  {exercise.exercise_name}
+                </Text>
+                {exercise.superset_group !== null && (
+                  <View style={styles.supersetBadge}>
+                    <Text variant="overline" color="textTertiary">SS</Text>
+                  </View>
+                )}
+              </View>
+              <Text variant="caption" color="textTertiary">
+                {formatSetSummary(exercise.sets, exercise.logging_type)}
+              </Text>
+              {exercise.notes ? (
+                <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
+                  {exercise.notes}
+                </Text>
+              ) : null}
+            </Surface>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  descSection: { paddingHorizontal: spacing.base, paddingTop: spacing.base },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.base, paddingVertical: spacing.md },
+  startBar: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  exerciseList: { paddingHorizontal: spacing.base, gap: spacing.sm },
+  exerciseCard: { padding: spacing.base },
+  exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.xs },
+  supersetBadge: {
+    backgroundColor: colors.surface3,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    marginLeft: spacing.sm,
+  },
+});

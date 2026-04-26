@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
-  Text,
   TextInput,
   FlatList,
   ScrollView,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Search, X, Plus } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { api } from '../../src/lib/api';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Icon } from '../../src/components/Icon';
+import { EmptyState } from '../../src/components/EmptyState';
+import { Pressable } from '../../src/components/Pressable';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface Exercise {
   id: string;
@@ -48,12 +55,11 @@ const LOGGING_TYPE_LABELS: Record<Exercise['logging_type'], string> = {
 };
 
 const AVATAR_COLORS = [
-  '#FF6B35',
-  '#6B35FF',
-  '#35B8FF',
-  '#FF3578',
-  '#35FF8A',
-  '#FFB835',
+  colors.brand,
+  colors.info,
+  colors.success,
+  '#06B6D4',
+  '#F59E0B',
 ];
 
 function getAvatarColor(name: string): string {
@@ -81,43 +87,37 @@ function ExerciseCard({ exercise, onPress }: { exercise: Exercise; onPress: () =
   const initials = exercise.name.charAt(0).toUpperCase();
 
   return (
-    <TouchableOpacity
-      className="flex-row items-center px-4 py-3 border-b border-gray-800"
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <Pressable onPress={onPress} style={styles.exerciseRow} accessibilityLabel={exercise.name}>
       {exercise.image_url ? (
         <Image
           source={{ uri: exercise.image_url }}
-          className="w-10 h-10 rounded-lg mr-3"
-          resizeMode="cover"
+          style={styles.thumbnail}
+          contentFit="cover"
+          cachePolicy="memory-disk"
         />
       ) : (
-        <View
-          className="w-10 h-10 rounded-lg mr-3 items-center justify-center"
-          style={{ backgroundColor: avatarColor }}
-        >
-          <Text className="text-white font-bold text-base">{initials}</Text>
+        <View style={[styles.thumbnailFallback, { backgroundColor: avatarColor }]}>
+          <Text variant="bodyEmphasis" color="textPrimary">{initials}</Text>
         </View>
       )}
 
-      <View className="flex-1 mr-2">
-        <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+      <View style={styles.exerciseInfo}>
+        <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>
           {exercise.name}
         </Text>
         {subtitle.length > 0 && (
-          <Text className="text-gray-400 text-xs mt-0.5" numberOfLines={1}>
+          <Text variant="caption" color="textTertiary" numberOfLines={1}>
             {subtitle}
           </Text>
         )}
       </View>
 
-      <View className="bg-gray-700 rounded-full px-2 py-0.5">
-        <Text className="text-gray-300 text-xs">
+      <View style={styles.typeBadge}>
+        <Text variant="overline" color="textTertiary">
           {LOGGING_TYPE_LABELS[exercise.logging_type]}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -166,7 +166,6 @@ export default function ExercisesScreen() {
     []
   );
 
-  // Reset + fetch when filters change
   useEffect(() => {
     setOffset(0);
     setHasMore(true);
@@ -175,7 +174,6 @@ export default function ExercisesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, equipment]);
 
-  // Debounce search input
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -192,46 +190,28 @@ export default function ExercisesScreen() {
     }
   };
 
-  const renderEmpty = () => {
-    if (loading) return null;
-    return (
-      <View className="flex-1 items-center justify-center py-20">
-        <Text className="text-gray-500 text-base">No exercises found</Text>
-      </View>
-    );
-  };
-
-  const renderFooter = () => {
-    if (!loading) return null;
-    return (
-      <View className="py-6 items-center">
-        <ActivityIndicator size="small" color="#FF6B35" />
-      </View>
-    );
-  };
-
   return (
-    <View className="flex-1 bg-gray-950">
+    <SafeAreaView style={styles.root} edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 pt-14 pb-4">
-        <Text className="text-white text-3xl font-bold">Exercises</Text>
-        <TouchableOpacity
+      <View style={styles.header}>
+        <Text variant="title1" color="textPrimary">Exercises</Text>
+        <Pressable
           onPress={() => router.push('/exercises/create')}
-          className="w-9 h-9 rounded-full bg-gray-800 items-center justify-center"
-          activeOpacity={0.7}
+          style={styles.addButton}
+          accessibilityLabel="Create exercise"
         >
-          <Text className="text-white text-xl font-light leading-none">+</Text>
-        </TouchableOpacity>
+          <Icon icon={Plus} size={20} color={colors.textPrimary} />
+        </Pressable>
       </View>
 
       {/* Search bar */}
-      <View className="px-4 mb-3">
-        <View className="flex-row items-center bg-gray-800 rounded-xl px-3 py-2.5">
-          <Text className="text-gray-400 text-base mr-2">🔍</Text>
+      <View style={styles.searchContainer}>
+        <Surface level={2} style={styles.searchBar}>
+          <Icon icon={Search} size={16} color={colors.textTertiary} />
           <TextInput
-            className="flex-1 text-white text-sm"
+            style={styles.searchInput}
             placeholder="Search exercises…"
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={colors.textTertiary}
             value={searchInput}
             onChangeText={setSearchInput}
             returnKeyType="search"
@@ -239,36 +219,40 @@ export default function ExercisesScreen() {
             autoCapitalize="none"
           />
           {searchInput.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchInput('')} activeOpacity={0.7}>
-              <Text className="text-gray-400 text-base ml-1">✕</Text>
-            </TouchableOpacity>
+            <Pressable
+              onPress={() => setSearchInput('')}
+              style={styles.clearButton}
+              accessibilityLabel="Clear search"
+            >
+              <Icon icon={X} size={14} color={colors.textTertiary} />
+            </Pressable>
           )}
-        </View>
+        </Surface>
       </View>
 
       {/* Equipment filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="mb-3"
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        style={styles.filtersScroll}
+        contentContainerStyle={styles.filtersContent}
       >
         {EQUIPMENT_FILTERS.map((filter) => {
           const selected = equipment === filter.value;
           return (
-            <TouchableOpacity
+            <Pressable
               key={filter.value}
               onPress={() => setEquipment(filter.value)}
-              className={`rounded-full px-4 py-1.5 ${selected ? '' : 'bg-gray-800'}`}
-              style={selected ? { backgroundColor: '#FF6B35' } : undefined}
-              activeOpacity={0.7}
+              style={[styles.filterChip, selected && styles.filterChipActive]}
+              accessibilityLabel={`Filter by ${filter.label}`}
             >
               <Text
-                className={`text-sm font-medium ${selected ? 'text-white' : 'text-gray-400'}`}
+                variant="label"
+                color={selected ? 'textPrimary' : 'textTertiary'}
               >
                 {filter.label}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
       </ScrollView>
@@ -283,12 +267,116 @@ export default function ExercisesScreen() {
             onPress={() => router.push(`/exercises/${item.id}`)}
           />
         )}
-        ListEmptyComponent={renderEmpty}
-        ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          loading ? null : (
+            <EmptyState
+              illustration="exercises"
+              title="No matches"
+              description="Try a different filter or muscle group."
+            />
+          )
+        }
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.footer}>
+              <ActivityIndicator size="small" color={colors.brand} />
+            </View>
+          ) : null
+        }
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
         contentContainerStyle={exercises.length === 0 ? { flexGrow: 1 } : undefined}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchContainer: {
+    paddingHorizontal: spacing.base,
+    marginBottom: spacing.sm,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderRadius: radii.md,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: 'Barlow_400Regular',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  clearButton: {
+    padding: spacing.xs,
+  },
+  filtersScroll: {
+    marginBottom: spacing.sm,
+  },
+  filtersContent: {
+    paddingHorizontal: spacing.base,
+    gap: spacing.sm,
+  },
+  filterChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+  },
+  filterChipActive: {
+    backgroundColor: colors.brand,
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  thumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+  },
+  thumbnailFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseInfo: { flex: 1 },
+  typeBadge: {
+    backgroundColor: colors.surface3,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginLeft: spacing.base + 40 + spacing.md,
+  },
+  footer: { paddingVertical: spacing.lg, alignItems: 'center' },
+});

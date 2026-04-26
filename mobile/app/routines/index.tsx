@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SectionList, RefreshControl } from 'react-native';
+import { View, SectionList, ScrollView, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Plus, Trophy } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-
-const ORANGE = '#FF6B35';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Icon } from '../../src/components/Icon';
+import { Pressable } from '../../src/components/Pressable';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface Routine {
   id: string;
@@ -24,7 +30,6 @@ interface FolderGroup {
 interface Section {
   title: string;
   data: Routine[];
-  isUngrouped?: boolean;
 }
 
 export default function RoutinesScreen() {
@@ -37,139 +42,151 @@ export default function RoutinesScreen() {
     try {
       const response = await api.get<{ data: { folders: FolderGroup[]; ungrouped: Routine[] } }>('/routines');
       const { folders, ungrouped } = response.data;
-
       const newSections: Section[] = [];
-
-      // Add folder sections
-      if (folders && folders.length > 0) {
+      if (folders?.length > 0) {
         folders.forEach(folder => {
-          newSections.push({
-            title: folder.name,
-            data: folder.routines || [],
-          });
+          newSections.push({ title: folder.name, data: folder.routines ?? [] });
         });
       }
-
-      // Add ungrouped section
-      if (ungrouped && ungrouped.length > 0) {
-        newSections.push({
-          title: 'My Routines',
-          data: ungrouped,
-          isUngrouped: true,
-        });
+      if (ungrouped?.length > 0) {
+        newSections.push({ title: 'My Routines', data: ungrouped });
       }
-
       setSections(newSections);
-    } catch (error) {
-      console.error('Failed to fetch routines:', error);
+    } catch {
+      // silently fail
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchRoutines();
-  }, []);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchRoutines();
-  };
+  useEffect(() => { fetchRoutines(); }, []);
 
   const hasRoutines = sections.some(s => s.data.length > 0);
 
+  const PrebuiltCard = () => (
+    <Pressable onPress={() => router.push('/routines/prebuilt')} style={styles.prebuiltCard} accessibilityLabel="Browse pre-built programs">
+      <Surface level={2} style={[styles.prebuiltInner, { borderColor: colors.brand }]}>
+        <View style={styles.prebuiltIcon}>
+          <Icon icon={Trophy} size={20} color={colors.brand} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="title3" color="textPrimary">Pre-Built Programs</Text>
+          <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>Browse curated workout routines</Text>
+        </View>
+      </Surface>
+    </Pressable>
+  );
+
   return (
-    <View className="flex-1 bg-gray-950">
+    <SafeAreaView style={styles.root} edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 pt-14 pb-6 border-b border-gray-800">
-        <Text className="text-white font-bold text-3xl">Routines</Text>
-        <TouchableOpacity
+      <View style={styles.header}>
+        <Text variant="title1" color="textPrimary">Routines</Text>
+        <Pressable
           onPress={() => router.push('/routines/create')}
-          className="w-10 h-10 rounded-full items-center justify-center"
-          style={{ backgroundColor: ORANGE }}
+          style={styles.addButton}
+          accessibilityLabel="Create routine"
         >
-          <Text className="text-white font-bold text-lg">+</Text>
-        </TouchableOpacity>
+          <Icon icon={Plus} size={20} color={colors.textOnBrand} />
+        </Pressable>
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-400">Loading routines...</Text>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
       ) : !hasRoutines ? (
         <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.emptyScroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchRoutines} tintColor={colors.brand} />}
         >
-          {/* Pre-Built Programs Card */}
-          <TouchableOpacity
-            onPress={() => router.push('/routines/prebuilt')}
-            className="rounded-2xl mb-6 overflow-hidden border-2"
-            style={{ borderColor: ORANGE }}
-          >
-            <View className="bg-gray-900 px-4 py-6 items-center">
-              <Text className="text-white font-bold text-lg mb-2">Pre-Built Programs</Text>
-              <Text className="text-gray-400 text-center text-sm">Browse curated workout routines</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Empty State */}
-          <View className="items-center mt-12">
-            <Text className="text-white font-semibold text-lg mb-2">No routines yet</Text>
-            <Text className="text-gray-400 text-center text-sm">
-              Create your first routine or browse pre-built programs.
-            </Text>
-          </View>
+          <PrebuiltCard />
+          <EmptyState
+            title="No routines yet"
+            description="Create your first routine or browse pre-built programs."
+          />
         </ScrollView>
       ) : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <Pressable
               onPress={() => router.push(`/routines/${item.id}`)}
-              className="bg-gray-900 mx-4 mb-3 px-4 py-4 rounded-xl"
+              style={styles.routineRow}
+              accessibilityLabel={item.name}
             >
-              <Text className="text-white font-bold text-base mb-1">{item.name}</Text>
-              <View className="flex-row items-center">
-                <Text className="text-gray-400 text-sm">
+              <Surface level={2} style={styles.routineCard}>
+                <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.name}</Text>
+                <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>
                   {item.exercise_count} exercise{item.exercise_count !== 1 ? 's' : ''}
                 </Text>
-              </View>
-              {item.description && (
-                <Text className="text-gray-500 text-xs mt-2 line-clamp-1">
-                  {item.description}
-                </Text>
-              )}
-            </TouchableOpacity>
+                {item.description ? (
+                  <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xxs }}>
+                    {item.description}
+                  </Text>
+                ) : null}
+              </Surface>
+            </Pressable>
           )}
           renderSectionHeader={({ section: { title } }) => (
-            <View className="px-4 mt-4 mb-3">
-              <Text className="text-gray-500 text-xs uppercase font-semibold tracking-wide">
-                {title}
-              </Text>
+            <View style={styles.sectionHeader}>
+              <Text variant="overline" color="textTertiary">{title}</Text>
             </View>
           )}
           ListHeaderComponent={
-            <View className="px-4 py-4">
-              <TouchableOpacity
-                onPress={() => router.push('/routines/prebuilt')}
-                className="rounded-2xl overflow-hidden border-2 mb-4"
-                style={{ borderColor: ORANGE }}
-              >
-                <View className="bg-gray-900 px-4 py-6 items-center">
-                  <Text className="text-white font-bold text-lg mb-2">Pre-Built Programs</Text>
-                  <Text className="text-gray-400 text-center text-sm">Browse curated workout routines</Text>
-                </View>
-              </TouchableOpacity>
+            <View style={styles.listHeader}>
+              <PrebuiltCard />
             </View>
           }
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchRoutines} tintColor={colors.brand} />}
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyScroll: { paddingHorizontal: spacing.base, paddingTop: spacing.base, flexGrow: 1 },
+  prebuiltCard: { marginBottom: spacing.base },
+  prebuiltInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.base,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  prebuiltIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    backgroundColor: colors.brandGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeader: { paddingHorizontal: spacing.base, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  listHeader: { paddingHorizontal: spacing.base, paddingTop: spacing.base },
+  routineRow: { paddingHorizontal: spacing.base, marginBottom: spacing.sm },
+  routineCard: { padding: spacing.base },
+});

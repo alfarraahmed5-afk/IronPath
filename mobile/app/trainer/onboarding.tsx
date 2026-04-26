@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   ScrollView,
   TextInput,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/lib/api';
-
-const ORANGE = '#FF6B35';
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { Pressable } from '../../src/components/Pressable';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 type Goal = 'strength' | 'hypertrophy' | 'endurance' | 'general';
 type Experience = 'beginner' | 'intermediate' | 'advanced';
@@ -41,7 +45,6 @@ const EQUIPMENT_OPTIONS: { key: Equipment; label: string; desc: string }[] = [
 
 const DAYS_OPTIONS = [2, 3, 4, 5, 6];
 
-// Default initial weights per experience level
 const DEFAULT_WEIGHTS: Record<Experience, { label: string; wger_id: number; weight_kg: number }[]> = {
   beginner: [
     { label: 'Squat', wger_id: 110, weight_kg: 60 },
@@ -66,6 +69,31 @@ const DEFAULT_WEIGHTS: Record<Experience, { label: string; wger_id: number; weig
   ],
 };
 
+const TOTAL_STEPS = 5;
+
+function StepDots({ step, total }: { step: number; total: number }) {
+  return (
+    <View style={styles.dotsRow}>
+      {Array.from({ length: total }, (_, i) => (
+        <View key={i} style={[styles.dot, i <= step ? styles.dotActive : styles.dotInactive]} />
+      ))}
+    </View>
+  );
+}
+
+function SelectCard({ label, desc, selected, onPress }: { label: string; desc: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.selectCard, selected && styles.selectCardActive]}
+      accessibilityLabel={label}
+    >
+      <Text variant="bodyEmphasis" color={selected ? 'brand' : 'textPrimary'}>{label}</Text>
+      <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>{desc}</Text>
+    </Pressable>
+  );
+}
+
 export default function TrainerOnboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -76,11 +104,8 @@ export default function TrainerOnboarding() {
   const [weights, setWeights] = useState<{ label: string; wger_id: number; weight_kg: number }[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const totalSteps = 5;
-
   function goNext() {
     if (step === 1 && weights.length === 0) {
-      // Populate weight defaults when experience is confirmed
       setWeights(DEFAULT_WEIGHTS[experience].map(w => ({ ...w })));
     }
     setStep(s => s + 1);
@@ -115,176 +140,192 @@ export default function TrainerOnboarding() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-gray-950"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-14 pb-4 border-b border-gray-800">
-        <TouchableOpacity onPress={goBack} className="mr-3 p-1">
-          <Text className="text-white text-xl">←</Text>
-        </TouchableOpacity>
-        <Text className="text-white font-bold text-xl flex-1">AI Trainer Setup</Text>
-        <Text className="text-gray-500 text-sm">{step + 1}/{totalSteps}</Text>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header title="AI Trainer Setup" back />
+
+      {/* Progress dots */}
+      <View style={styles.dotsContainer}>
+        <StepDots step={step} total={TOTAL_STEPS} />
+        <Text variant="caption" color="textTertiary">{step + 1} of {TOTAL_STEPS}</Text>
       </View>
 
       {/* Progress bar */}
-      <View className="h-1 bg-gray-800 mx-4 rounded-full mt-3">
-        <View
-          className="h-1 rounded-full"
-          style={{ backgroundColor: ORANGE, width: `${((step + 1) / totalSteps) * 100}%` }}
-        />
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${((step + 1) / TOTAL_STEPS) * 100}%` as any }]} />
       </View>
 
-      <ScrollView className="flex-1 px-4 pt-6" keyboardShouldPersistTaps="handled">
-        {step === 0 && (
-          <View>
-            <Text className="text-white text-xl font-bold mb-2">What's your goal?</Text>
-            <Text className="text-gray-400 text-sm mb-6">We'll pick the right program template for you.</Text>
-            <View className="gap-3">
-              {GOALS.map(g => (
-                <TouchableOpacity
-                  key={g.key}
-                  onPress={() => setGoal(g.key)}
-                  className="rounded-xl p-4 border-2"
-                  style={{ backgroundColor: '#111827', borderColor: goal === g.key ? ORANGE : '#374151' }}
-                >
-                  <Text className="text-white font-semibold">{g.label}</Text>
-                  <Text className="text-gray-400 text-sm mt-0.5">{g.desc}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
-        {step === 1 && (
-          <View>
-            <Text className="text-white text-xl font-bold mb-2">Experience level?</Text>
-            <Text className="text-gray-400 text-sm mb-6">This determines your starting volume and progression speed.</Text>
-            <View className="gap-3">
-              {EXPERIENCE_LEVELS.map(e => (
-                <TouchableOpacity
-                  key={e.key}
-                  onPress={() => setExperience(e.key)}
-                  className="rounded-xl p-4 border-2"
-                  style={{ backgroundColor: '#111827', borderColor: experience === e.key ? ORANGE : '#374151' }}
-                >
-                  <Text className="text-white font-semibold">{e.label}</Text>
-                  <Text className="text-gray-400 text-sm mt-0.5">{e.desc}</Text>
-                </TouchableOpacity>
-              ))}
+          {step === 0 && (
+            <View>
+              <Text variant="title2" color="textPrimary" style={styles.stepTitle}>What's your goal?</Text>
+              <Text variant="body" color="textTertiary" style={styles.stepDesc}>We'll pick the right program template for you.</Text>
+              <View style={styles.cardList}>
+                {GOALS.map(g => (
+                  <SelectCard key={g.key} label={g.label} desc={g.desc} selected={goal === g.key} onPress={() => setGoal(g.key)} />
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {step === 2 && (
-          <View>
-            <Text className="text-white text-xl font-bold mb-2">Days per week?</Text>
-            <Text className="text-gray-400 text-sm mb-6">How many days can you train consistently?</Text>
-            <View className="flex-row flex-wrap gap-3">
-              {DAYS_OPTIONS.map(d => (
-                <TouchableOpacity
-                  key={d}
-                  onPress={() => setDaysPerWeek(d)}
-                  className="rounded-xl py-4 border-2 items-center justify-center"
-                  style={{
-                    width: '30%',
-                    backgroundColor: '#111827',
-                    borderColor: daysPerWeek === d ? ORANGE : '#374151',
-                  }}
-                >
-                  <Text
-                    className="font-bold text-xl"
-                    style={{ color: daysPerWeek === d ? ORANGE : '#fff' }}
+          {step === 1 && (
+            <View>
+              <Text variant="title2" color="textPrimary" style={styles.stepTitle}>Experience level?</Text>
+              <Text variant="body" color="textTertiary" style={styles.stepDesc}>This determines your starting volume and progression speed.</Text>
+              <View style={styles.cardList}>
+                {EXPERIENCE_LEVELS.map(e => (
+                  <SelectCard key={e.key} label={e.label} desc={e.desc} selected={experience === e.key} onPress={() => setExperience(e.key)} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {step === 2 && (
+            <View>
+              <Text variant="title2" color="textPrimary" style={styles.stepTitle}>Days per week?</Text>
+              <Text variant="body" color="textTertiary" style={styles.stepDesc}>How many days can you train consistently?</Text>
+              <View style={styles.daysGrid}>
+                {DAYS_OPTIONS.map(d => (
+                  <Pressable
+                    key={d}
+                    onPress={() => setDaysPerWeek(d)}
+                    style={[styles.dayCard, daysPerWeek === d && styles.dayCardActive]}
+                    accessibilityLabel={`${d} days`}
                   >
-                    {d}
-                  </Text>
-                  <Text className="text-gray-400 text-xs">days</Text>
-                </TouchableOpacity>
-              ))}
+                    <Text variant="display3" color={daysPerWeek === d ? 'brand' : 'textPrimary'}>{d}</Text>
+                    <Text variant="overline" color="textTertiary">days</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {step === 3 && (
-          <View>
-            <Text className="text-white text-xl font-bold mb-2">Available equipment?</Text>
-            <Text className="text-gray-400 text-sm mb-6">We'll match a program to what you have access to.</Text>
-            <View className="gap-3">
-              {EQUIPMENT_OPTIONS.map(e => (
-                <TouchableOpacity
-                  key={e.key}
-                  onPress={() => setEquipment(e.key)}
-                  className="rounded-xl p-4 border-2"
-                  style={{ backgroundColor: '#111827', borderColor: equipment === e.key ? ORANGE : '#374151' }}
-                >
-                  <Text className="text-white font-semibold">{e.label}</Text>
-                  <Text className="text-gray-400 text-sm mt-0.5">{e.desc}</Text>
-                </TouchableOpacity>
-              ))}
+          {step === 3 && (
+            <View>
+              <Text variant="title2" color="textPrimary" style={styles.stepTitle}>Available equipment?</Text>
+              <Text variant="body" color="textTertiary" style={styles.stepDesc}>We'll match a program to what you have access to.</Text>
+              <View style={styles.cardList}>
+                {EQUIPMENT_OPTIONS.map(e => (
+                  <SelectCard key={e.key} label={e.label} desc={e.desc} selected={equipment === e.key} onPress={() => setEquipment(e.key)} />
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {step === 4 && (
-          <View>
-            <Text className="text-white text-xl font-bold mb-2">Starting weights</Text>
-            <Text className="text-gray-400 text-sm mb-6">
-              These are pre-filled based on your experience. Adjust to match your current working weights.
-            </Text>
-            <View className="gap-4">
-              {weights.map((w, idx) => (
-                <View key={w.wger_id} className="flex-row items-center gap-3">
-                  <Text className="text-white flex-1 font-medium">{w.label}</Text>
-                  <View className="flex-row items-center bg-gray-900 rounded-xl px-3 py-2 gap-2">
-                    <TextInput
-                      className="text-white text-right w-16 text-base"
-                      keyboardType="decimal-pad"
-                      value={String(w.weight_kg)}
-                      onChangeText={v => updateWeight(idx, v)}
-                      selectTextOnFocus
-                    />
-                    <Text className="text-gray-400 text-sm">kg</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-            <View className="mt-6 p-4 bg-gray-900 rounded-xl border border-gray-800">
-              <Text className="text-gray-400 text-xs">
-                Your weights will adjust automatically as you train. You can always override them later.
+          {step === 4 && (
+            <View>
+              <Text variant="title2" color="textPrimary" style={styles.stepTitle}>Starting weights</Text>
+              <Text variant="body" color="textTertiary" style={styles.stepDesc}>
+                Pre-filled based on your experience. Adjust to match your current working weights.
               </Text>
+              <View style={styles.weightsList}>
+                {weights.map((w, idx) => (
+                  <Surface key={w.wger_id} level={2} style={styles.weightRow}>
+                    <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }}>{w.label}</Text>
+                    <View style={styles.weightInputWrap}>
+                      <TextInput
+                        style={styles.weightInput}
+                        keyboardType="decimal-pad"
+                        value={String(w.weight_kg)}
+                        onChangeText={v => updateWeight(idx, v)}
+                        selectTextOnFocus
+                      />
+                      <Text variant="label" color="textTertiary">kg</Text>
+                    </View>
+                  </Surface>
+                ))}
+              </View>
+              <Surface level={2} style={styles.noteCard}>
+                <Text variant="caption" color="textTertiary">
+                  Your weights will adjust automatically as you train. You can always override them later.
+                </Text>
+              </Surface>
             </View>
-          </View>
-        )}
+          )}
 
-        <View className="h-8" />
-      </ScrollView>
+          <View style={{ height: spacing['3xl'] }} />
+        </ScrollView>
 
-      {/* Footer */}
-      <View className="px-4 pb-10 pt-4 border-t border-gray-800">
-        {step < 4 ? (
-          <TouchableOpacity
-            onPress={goNext}
-            className="rounded-xl py-4 items-center"
-            style={{ backgroundColor: ORANGE }}
-          >
-            <Text className="text-white font-bold text-base">Continue</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={saving}
-            className="rounded-xl py-4 items-center"
-            style={{ backgroundColor: ORANGE, opacity: saving ? 0.7 : 1 }}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text className="text-white font-bold text-base">Start My Program</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-    </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={styles.footer}>
+          {step < TOTAL_STEPS - 1 ? (
+            <Button label="Continue" onPress={goNext} variant="primary" size="lg" fullWidth />
+          ) : (
+            <Button
+              label={saving ? 'Building…' : 'Start My Program'}
+              onPress={handleSubmit}
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={saving}
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  dotsContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.base, paddingTop: spacing.md },
+  dotsRow: { flexDirection: 'row', gap: spacing.sm },
+  dot: { width: 8, height: 8, borderRadius: radii.full },
+  dotActive: { backgroundColor: colors.brand },
+  dotInactive: { backgroundColor: colors.surface3 },
+  progressTrack: {
+    height: 3,
+    backgroundColor: colors.surface2,
+    marginHorizontal: spacing.base,
+    borderRadius: radii.full,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: colors.brand, borderRadius: radii.full },
+  scrollContent: { paddingHorizontal: spacing.base, paddingTop: spacing.xl },
+  stepTitle: { marginBottom: spacing.xs },
+  stepDesc: { marginBottom: spacing.xl },
+  cardList: { gap: spacing.sm },
+  selectCard: {
+    padding: spacing.base,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectCardActive: {
+    borderColor: colors.brand,
+    backgroundColor: colors.brandGlow,
+  },
+  daysGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  dayCard: {
+    flex: 1,
+    minWidth: '28%',
+    paddingVertical: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  dayCardActive: { borderColor: colors.brand, backgroundColor: colors.brandGlow },
+  weightsList: { gap: spacing.sm },
+  weightRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.base },
+  weightInputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface3, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  weightInput: {
+    width: 60,
+    color: colors.textPrimary,
+    fontFamily: 'Barlow_400Regular',
+    fontSize: 15,
+    textAlign: 'right',
+  },
+  noteCard: { padding: spacing.base, marginTop: spacing.lg },
+  footer: {
+    paddingHorizontal: spacing.base,
+    paddingBottom: spacing['2xl'],
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+});

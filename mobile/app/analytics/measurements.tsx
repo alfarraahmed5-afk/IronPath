@@ -1,19 +1,26 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
-  Text,
+  StyleSheet,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Plus, Trash2, Scale } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { Header } from '../../src/components/Header';
+import { Text } from '../../src/components/Text';
+import { Surface } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { Icon } from '../../src/components/Icon';
+import { Pressable } from '../../src/components/Pressable';
+import { EmptyState } from '../../src/components/EmptyState';
+import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface Measurement {
   id: string;
@@ -35,11 +42,8 @@ interface Measurement {
 
 type MeasurementDraft = Omit<Measurement, 'id' | 'measured_at'>;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const NUMERIC_FIELDS: { key: keyof MeasurementDraft; label: string }[] = [
@@ -58,55 +62,30 @@ const NUMERIC_FIELDS: { key: keyof MeasurementDraft; label: string }[] = [
 ];
 
 const GRID_FIELDS: (keyof Omit<MeasurementDraft, 'bodyweight_kg' | 'body_fat_percentage' | 'notes'>)[] = [
-  'neck_cm',
-  'chest_cm',
-  'waist_cm',
-  'hips_cm',
-  'left_arm_cm',
-  'right_arm_cm',
-  'left_thigh_cm',
-  'right_thigh_cm',
-  'left_calf_cm',
-  'right_calf_cm',
+  'neck_cm', 'chest_cm', 'waist_cm', 'hips_cm',
+  'left_arm_cm', 'right_arm_cm', 'left_thigh_cm', 'right_thigh_cm',
+  'left_calf_cm', 'right_calf_cm',
 ];
 
 const GRID_LABELS: Record<string, string> = {
-  neck_cm: 'Neck',
-  chest_cm: 'Chest',
-  waist_cm: 'Waist',
-  hips_cm: 'Hips',
-  left_arm_cm: 'L. Arm',
-  right_arm_cm: 'R. Arm',
-  left_thigh_cm: 'L. Thigh',
-  right_thigh_cm: 'R. Thigh',
-  left_calf_cm: 'L. Calf',
-  right_calf_cm: 'R. Calf',
+  neck_cm: 'Neck', chest_cm: 'Chest', waist_cm: 'Waist', hips_cm: 'Hips',
+  left_arm_cm: 'L. Arm', right_arm_cm: 'R. Arm',
+  left_thigh_cm: 'L. Thigh', right_thigh_cm: 'R. Thigh',
+  left_calf_cm: 'L. Calf', right_calf_cm: 'R. Calf',
 };
 
 function emptyDraft(): MeasurementDraft {
   return {
-    bodyweight_kg: null,
-    body_fat_percentage: null,
-    neck_cm: null,
-    chest_cm: null,
-    waist_cm: null,
-    hips_cm: null,
-    left_arm_cm: null,
-    right_arm_cm: null,
-    left_thigh_cm: null,
-    right_thigh_cm: null,
-    left_calf_cm: null,
-    right_calf_cm: null,
-    notes: null,
+    bodyweight_kg: null, body_fat_percentage: null,
+    neck_cm: null, chest_cm: null, waist_cm: null, hips_cm: null,
+    left_arm_cm: null, right_arm_cm: null,
+    left_thigh_cm: null, right_thigh_cm: null,
+    left_calf_cm: null, right_calf_cm: null, notes: null,
   };
 }
 
-// ─── Add Measurement Modal ────────────────────────────────────────────────────
-
 function AddMeasurementModal({
-  visible,
-  onClose,
-  onSaved,
+  visible, onClose, onSaved,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -114,7 +93,6 @@ function AddMeasurementModal({
 }) {
   const [draft, setDraft] = useState<MeasurementDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
-  const today = new Date();
 
   function setNumeric(key: keyof MeasurementDraft, raw: string) {
     const parsed = raw === '' ? null : parseFloat(raw);
@@ -124,14 +102,11 @@ function AddMeasurementModal({
   async function handleSave() {
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = {
-        measured_at: new Date().toISOString(),
-      };
+      const payload: Record<string, unknown> = { measured_at: new Date().toISOString() };
       for (const f of NUMERIC_FIELDS) {
         if (draft[f.key] != null) payload[f.key] = draft[f.key];
       }
       if (draft.notes) payload.notes = draft.notes;
-
       const res = await api.post<{ data: { measurement: Measurement } }>('/analytics/measurements', payload);
       onSaved(res.data.measurement);
       setDraft(emptyDraft());
@@ -151,58 +126,43 @@ function AddMeasurementModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleCancel}>
       <KeyboardAvoidingView
-        className="flex-1 bg-gray-950"
+        style={styles.modalRoot}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Modal header */}
-        <View className="flex-row items-center justify-between px-5 pt-6 pb-4 border-b border-gray-800">
-          <Pressable onPress={handleCancel}>
-            <Text className="text-gray-400 font-semibold" style={{ fontSize: 15 }}>
-              Cancel
-            </Text>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={handleCancel} accessibilityLabel="Cancel">
+            <Text variant="label" color="textSecondary">Cancel</Text>
           </Pressable>
-          <Text className="text-white font-bold" style={{ fontSize: 18 }}>
-            Log Measurements
-          </Text>
-          <Pressable onPress={handleSave} disabled={saving}>
-            <Text
-              className="font-bold"
-              style={{ color: saving ? '#9CA3AF' : '#FF6B35', fontSize: 15 }}
-            >
+          <Text variant="title3" color="textPrimary">Log Measurements</Text>
+          <Pressable onPress={handleSave} accessibilityLabel="Save">
+            <Text variant="label" color={saving ? 'textDisabled' : 'brand'}>
               {saving ? 'Saving…' : 'Save'}
             </Text>
           </Pressable>
         </View>
 
         <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.modalScroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Date row */}
-          <View className="py-4 border-b border-gray-800">
-            <Text className="text-gray-400 text-xs mb-1">Date</Text>
-            <Text className="text-white font-semibold" style={{ fontSize: 15 }}>
-              {formatDate(today.toISOString())}
-            </Text>
+          {/* Date */}
+          <View style={styles.dateRow}>
+            <Text variant="overline" color="textTertiary">Date</Text>
+            <Text variant="bodyEmphasis" color="textPrimary">{formatDate(new Date().toISOString())}</Text>
           </View>
 
-          {/* Numeric fields */}
+          {/* Fields */}
           {NUMERIC_FIELDS.map((field) => (
-            <View
-              key={field.key}
-              className="flex-row items-center py-4 border-b border-gray-800"
-            >
-              <Text className="text-white flex-1" style={{ fontSize: 15 }}>
-                {field.label}
-              </Text>
+            <View key={field.key} style={styles.fieldRow}>
+              <Text variant="body" color="textPrimary" style={{ flex: 1 }}>{field.label}</Text>
               <TextInput
-                className="bg-gray-800 rounded-lg px-3 py-2 text-white text-right"
-                style={{ width: 100, fontSize: 15 }}
+                style={styles.fieldInput}
                 keyboardType="decimal-pad"
                 placeholder="—"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.textTertiary}
                 value={draft[field.key] != null ? String(draft[field.key]) : ''}
                 onChangeText={(t) => setNumeric(field.key, t)}
               />
@@ -210,123 +170,91 @@ function AddMeasurementModal({
           ))}
 
           {/* Notes */}
-          <View className="py-4">
-            <Text className="text-white mb-2" style={{ fontSize: 15 }}>
-              Notes
-            </Text>
-            <TextInput
-              className="bg-gray-800 rounded-xl p-3 text-white"
-              style={{ fontSize: 14, minHeight: 80, textAlignVertical: 'top' }}
-              placeholder="Optional notes…"
-              placeholderTextColor="#6B7280"
-              multiline
-              value={draft.notes ?? ''}
-              onChangeText={(t) => setDraft((prev) => ({ ...prev, notes: t || null }))}
-            />
+          <View style={styles.notesSection}>
+            <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.sm }}>Notes</Text>
+            <Surface level={2} style={styles.notesInput}>
+              <TextInput
+                style={styles.notesText}
+                placeholder="Optional notes…"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                value={draft.notes ?? ''}
+                onChangeText={(t) => setDraft((prev) => ({ ...prev, notes: t || null }))}
+              />
+            </Surface>
           </View>
         </ScrollView>
 
-        {/* Bottom save button */}
-        <View className="px-5 pb-8 pt-4 border-t border-gray-800">
-          <Pressable
-            className="rounded-xl py-4 items-center"
-            style={{ backgroundColor: saving ? '#9CA3AF' : '#FF6B35' }}
+        <View style={styles.modalFooter}>
+          <Button
+            label={saving ? 'Saving…' : 'Save Measurement'}
             onPress={handleSave}
-            disabled={saving}
-          >
-            <Text className="text-white font-bold" style={{ fontSize: 16 }}>
-              {saving ? 'Saving…' : 'Save Measurement'}
-            </Text>
-          </Pressable>
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={saving}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-// ─── Measurement Card ─────────────────────────────────────────────────────────
-
-function MeasurementCard({
-  item,
-  onDelete,
-}: {
-  item: Measurement;
-  onDelete: (id: string) => void;
-}) {
+function MeasurementCard({ item, onDelete }: { item: Measurement; onDelete: (id: string) => void }) {
   const gridEntries = GRID_FIELDS.filter((k) => item[k] != null);
 
   function confirmDelete() {
-    Alert.alert(
-      'Delete Measurement',
-      'Are you sure you want to delete this entry?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => onDelete(item.id),
-        },
-      ],
-    );
+    Alert.alert('Delete Measurement', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
+    ]);
   }
 
   return (
-    <View className="bg-gray-900 rounded-xl mx-4 mb-4 p-4">
-      {/* Header row */}
-      <View className="flex-row items-start justify-between mb-2">
-        <Text className="text-white font-bold" style={{ fontSize: 16 }}>
-          {formatDate(item.measured_at)}
-        </Text>
-        <Pressable onPress={confirmDelete} hitSlop={8}>
-          <Text style={{ fontSize: 18 }}>🗑️</Text>
+    <Surface level={2} style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text variant="bodyEmphasis" color="textPrimary">{formatDate(item.measured_at)}</Text>
+        <Pressable onPress={confirmDelete} accessibilityLabel="Delete measurement">
+          <Icon icon={Trash2} size={18} color={colors.danger} />
         </Pressable>
       </View>
 
-      {/* Bodyweight */}
       {item.bodyweight_kg != null && (
-        <Text className="font-bold mb-1" style={{ color: '#FF6B35', fontSize: 22 }}>
-          ⚖️ {item.bodyweight_kg} kg
-        </Text>
+        <View style={styles.weightRow}>
+          <Icon icon={Scale} size={18} color={colors.brand} />
+          <Text variant="numeric" color="brand" style={{ marginLeft: spacing.sm }}>
+            {item.bodyweight_kg} kg
+          </Text>
+        </View>
       )}
 
-      {/* Body fat */}
       {item.body_fat_percentage != null && (
-        <Text className="text-gray-400 mb-2" style={{ fontSize: 14 }}>
+        <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.sm }}>
           {item.body_fat_percentage}% body fat
         </Text>
       )}
 
-      {/* Grid of other measurements */}
       {gridEntries.length > 0 && (
-        <View className="flex-row flex-wrap mt-1" style={{ gap: 8 }}>
+        <View style={styles.gridWrap}>
           {gridEntries.map((k) => (
-            <View
-              key={k}
-              className="bg-gray-800 rounded-lg px-3 py-1.5"
-              style={{ minWidth: '44%', flexBasis: '44%', flexGrow: 1 }}
-            >
-              <Text className="text-gray-400" style={{ fontSize: 11 }}>
-                {GRID_LABELS[k]}
-              </Text>
-              <Text className="text-white font-semibold" style={{ fontSize: 14 }}>
+            <Surface key={k} level={3} style={styles.gridCell}>
+              <Text variant="overline" color="textTertiary">{GRID_LABELS[k]}</Text>
+              <Text variant="bodyEmphasis" color="textPrimary" style={{ marginTop: spacing.xxs }}>
                 {item[k]} cm
               </Text>
-            </View>
+            </Surface>
           ))}
         </View>
       )}
 
-      {/* Notes */}
-      {item.notes && (
-        <Text className="text-gray-400 mt-3 italic" style={{ fontSize: 13 }}>
+      {item.notes ? (
+        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.sm, fontStyle: 'italic' }}>
           {item.notes}
         </Text>
-      )}
-    </View>
+      ) : null}
+    </Surface>
   );
 }
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MeasurementsScreen() {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -339,7 +267,6 @@ export default function MeasurementsScreen() {
     const isInitial = !cursor;
     if (isInitial) setLoadingInitial(true);
     else setLoadingMore(true);
-
     try {
       const url = cursor
         ? `/analytics/measurements?cursor=${encodeURIComponent(cursor)}`
@@ -356,91 +283,139 @@ export default function MeasurementsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchMeasurements();
-  }, [fetchMeasurements]);
-
-  function handleSaved(m: Measurement) {
-    setMeasurements((prev) => [m, ...prev]);
-  }
-
-  async function handleDelete(id: string) {
-    try {
-      await api.delete(`/analytics/measurements/${id}`);
-      setMeasurements((prev) => prev.filter((m) => m.id !== id));
-    } catch {
-      Alert.alert('Error', 'Could not delete measurement.');
-    }
-  }
-
-  function handleLoadMore() {
-    if (nextCursor && !loadingMore) {
-      fetchMeasurements(nextCursor);
-    }
-  }
-
-  const ListHeader = (
-    <View className="flex-row items-center justify-between px-4 pt-14 pb-5">
-      <Text className="text-white font-bold" style={{ fontSize: 28 }}>
-        Body Measurements
-      </Text>
-      <Pressable
-        className="rounded-full px-4 py-2"
-        style={{ backgroundColor: '#FF6B35' }}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text className="text-white font-bold" style={{ fontSize: 14 }}>
-          + Log
-        </Text>
-      </Pressable>
-    </View>
-  );
-
-  const ListEmpty = loadingInitial ? (
-    <View className="items-center mt-16">
-      <Text className="text-gray-500">Loading…</Text>
-    </View>
-  ) : (
-    <View className="items-center mt-16 px-8">
-      <Text className="text-gray-400 text-center" style={{ fontSize: 15 }}>
-        No measurements yet.{'\n'}Tap{' '}
-        <Text className="font-bold" style={{ color: '#FF6B35' }}>
-          + Log
-        </Text>{' '}
-        to record your first.
-      </Text>
-    </View>
-  );
-
-  const ListFooter =
-    loadingMore ? (
-      <View className="items-center py-6">
-        <Text className="text-gray-500">Loading more…</Text>
-      </View>
-    ) : null;
+  useEffect(() => { fetchMeasurements(); }, [fetchMeasurements]);
 
   return (
-    <View className="flex-1 bg-gray-950">
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <Header
+        title="Measurements"
+        back
+        right={
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            style={styles.addBtn}
+            accessibilityLabel="Log measurement"
+          >
+            <Icon icon={Plus} size={18} color={colors.textOnBrand} />
+          </Pressable>
+        }
+      />
+
       <FlatList
         data={measurements}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <MeasurementCard item={item} onDelete={handleDelete} />
+          <View style={styles.cardWrap}>
+            <MeasurementCard item={item} onDelete={async (id) => {
+              try {
+                await api.delete(`/analytics/measurements/${id}`);
+                setMeasurements((prev) => prev.filter((m) => m.id !== id));
+              } catch {
+                Alert.alert('Error', 'Could not delete measurement.');
+              }
+            }} />
+          </View>
         )}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
-        ListFooterComponent={ListFooter}
-        onEndReached={handleLoadMore}
+        ListEmptyComponent={
+          loadingInitial ? null : (
+            <EmptyState
+              title="No measurements yet"
+              description="Tap the + button to record your first."
+              action={{ label: 'Log Measurement', onPress: () => setModalVisible(true) }}
+            />
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footer}>
+              <Text variant="caption" color="textTertiary">Loading more…</Text>
+            </View>
+          ) : null
+        }
+        onEndReached={() => { if (nextCursor && !loadingMore) fetchMeasurements(nextCursor); }}
         onEndReachedThreshold={0.3}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={{ paddingBottom: 48, flexGrow: 1 }}
       />
 
       <AddMeasurementModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSaved={handleSaved}
+        onSaved={(m) => setMeasurements((prev) => [m, ...prev])}
       />
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.full,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardWrap: { paddingHorizontal: spacing.base, marginBottom: spacing.md },
+  card: { padding: spacing.base },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  weightRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
+  gridWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  gridCell: { padding: spacing.sm, minWidth: '44%', flex: 1 },
+  footer: { paddingVertical: spacing.lg, alignItems: 'center' },
+  // Modal
+  modalRoot: { flex: 1, backgroundColor: colors.bg },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  modalScroll: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+  dateRow: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing.xs,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  fieldInput: {
+    width: 100,
+    backgroundColor: colors.surface2,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.textPrimary,
+    fontFamily: 'Barlow_400Regular',
+    fontSize: 15,
+    textAlign: 'right',
+  },
+  notesSection: { paddingTop: spacing.lg },
+  notesInput: { padding: spacing.md },
+  notesText: {
+    color: colors.textPrimary,
+    fontFamily: 'Barlow_400Regular',
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalFooter: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing['2xl'],
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+});
