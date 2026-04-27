@@ -94,6 +94,23 @@ export default function FinishWorkoutScreen() {
     };
   }, [resumeTimer]);
 
+  // Fetch exercise metadata (primary_muscles) for the current workout's exercises
+  // so we can render the muscle-group breakdown in the summary.
+  const [exerciseMeta, setExerciseMeta] = useState<Record<string, { primary_muscles: string[] }>>({});
+  useEffect(() => {
+    if (!workout || workout.exercises.length === 0) return;
+    const ids = [...new Set(workout.exercises.map(ex => ex.exercise_id))];
+    const params = new URLSearchParams({ ids: ids.join(',') });
+    api.get<{ data: { exercises: Array<{ id: string; primary_muscles: string[] }> } }>(`/exercises/by-ids?${params.toString()}`)
+      .then(r => {
+        const map: Record<string, { primary_muscles: string[] }> = {};
+        for (const ex of r.data?.exercises ?? []) map[ex.id] = { primary_muscles: ex.primary_muscles ?? [] };
+        setExerciseMeta(map);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout?.exercises.map(e => e.exercise_id).join(',')]);
+
   if (!workout) {
     return (
       <View style={[styles.root, styles.centered]}>
@@ -106,6 +123,37 @@ export default function FinishWorkoutScreen() {
     .flatMap(ex => ex.sets.filter(s => s.is_completed && s.set_type !== 'warmup')).length;
   const incompleteCount = workout.exercises
     .flatMap(ex => ex.sets.filter(s => !s.is_completed)).length;
+
+  // Total volume — only weight×reps + bodyweight×reps sets count
+  const totalVolumeKg = workout.exercises.reduce((sum, ex) => {
+    if (ex.logging_type !== 'weight_reps' && ex.logging_type !== 'bodyweight_reps') return sum;
+    return sum + ex.sets
+      .filter(s => s.is_completed && s.set_type !== 'warmup')
+      .reduce((s, set) => s + (set.weight_kg ?? 0) * (set.reps ?? 0), 0);
+  }, 0);
+
+  // Muscle breakdown: sum volume per primary muscle group
+  const muscleVolume = new Map<string, number>();
+  for (const ex of workout.exercises) {
+    if (ex.logging_type !== 'weight_reps' && ex.logging_type !== 'bodyweight_reps') continue;
+    const muscles = exerciseMeta[ex.exercise_id]?.primary_muscles ?? [];
+    if (muscles.length === 0) continue;
+    const exVol = ex.sets
+      .filter(s => s.is_completed && s.set_type !== 'warmup')
+      .reduce((s, set) => s + (set.weight_kg ?? 0) * (set.reps ?? 0), 0);
+    if (exVol <= 0) continue;
+    // Distribute volume evenly across the exercise's primary muscles
+    const each = exVol / muscles.length;
+    for (const m of muscles) {
+      const norm = m.toLowerCase();
+      muscleVolume.set(norm, (muscleVolume.get(norm) ?? 0) + each);
+    }
+  }
+  const muscleBreakdown = [...muscleVolume.entries()]
+    .map(([muscle, kg]) => ({ muscle, kg }))
+    .sort((a, b) => b.kg - a.kg)
+    .slice(0, 6);
+  const breakdownMax = muscleBreakdown[0]?.kg ?? 0;
 
   async function handleSave() {
     if (saving) return;
@@ -185,26 +233,53 @@ export default function FinishWorkoutScreen() {
           </Surface>
         )}
 
-        {/* Summary */}
+        {/* Summary — 2x2 grid: Sets / Volume / Exercises / Duration */}
         <Surface level={2} style={styles.summaryCard}>
           <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.md }}>Summary</Text>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCell}>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryGridCell}>
               <Text variant="numeric" color="textPrimary">{completedNonWarmupSets}</Text>
               <Text variant="overline" color="textTertiary">Sets</Text>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryCell}>
+            <View style={styles.summaryGridCell}>
+              <Text variant="numeric" color="brand">
+                {totalVolumeKg >= 1000 ? `${(totalVolumeKg / 1000).toFixed(1)}k` : Math.round(totalVolumeKg)}
+              </Text>
+              <Text variant="overline" color="textTertiary">Volume (kg)</Text>
+            </View>
+            <View style={styles.summaryGridCell}>
               <Text variant="numeric" color="textPrimary">{workout.exercises.length}</Text>
               <Text variant="overline" color="textTertiary">Exercises</Text>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryCell}>
+            <View style={styles.summaryGridCell}>
               <Text variant="numeric" color="textPrimary">{formatDuration(workout.elapsed_seconds)}</Text>
               <Text variant="overline" color="textTertiary">Duration</Text>
             </View>
           </View>
         </Surface>
+
+        {/* Muscle group breakdown */}
+        {muscleBreakdown.length > 0 && (
+          <Surface level={2} style={styles.summaryCard}>
+            <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.md }}>Muscle Groups</Text>
+            {muscleBreakdown.map((m) => {
+              const pct = breakdownMax > 0 ? (m.kg / breakdownMax) * 100 : 0;
+              return (
+                <View key={m.muscle} style={styles.muscleRow}>
+                  <Text variant="caption" color="textSecondary" style={{ width: 80, textTransform: 'capitalize' }}>
+                    {m.muscle}
+                  </Text>
+                  <View style={styles.muscleBarTrack}>
+                    <View style={[styles.muscleBarFill, { width: `${pct}%` as any }]} />
+                  </View>
+                  <Text variant="caption" color="textTertiary" style={{ width: 56, textAlign: 'right' }}>
+                    {m.kg >= 1000 ? `${(m.kg / 1000).toFixed(1)}k` : Math.round(m.kg)} kg
+                  </Text>
+                </View>
+              );
+            })}
+          </Surface>
+        )}
 
         {/* Workout name */}
         <Input
@@ -304,8 +379,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.md,
   },
-  summaryCard: { padding: spacing.base },
+  summaryCard: { padding: spacing.base, marginBottom: spacing.base },
   summaryRow: { flexDirection: 'row', alignItems: 'center' },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0 },
+  summaryGridCell: {
+    width: '50%', alignItems: 'center', gap: spacing.xxs,
+    paddingVertical: spacing.sm,
+  },
+  muscleRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: spacing.sm, paddingVertical: spacing.xs,
+  },
+  muscleBarTrack: {
+    flex: 1, height: 8, borderRadius: 4,
+    backgroundColor: colors.surface3, overflow: 'hidden',
+  },
+  muscleBarFill: {
+    height: '100%', backgroundColor: colors.brand, borderRadius: 4,
+  },
   summaryCell: { flex: 1, alignItems: 'center', gap: spacing.xxs },
   summaryDivider: { width: StyleSheet.hairlineWidth, height: 40, backgroundColor: colors.border },
   visRow: { flexDirection: 'row' },

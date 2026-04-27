@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Settings, Flame, ChevronRight, Activity } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -73,19 +73,14 @@ const LEVEL_COLORS: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [followerCount, setFollowerCount] = useState('0');
   const [followingCount, setFollowingCount] = useState('0');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    fetchAll(user.id);
-  }, [user?.id]);
-
-  async function fetchAll(userId: string) {
+  const fetchAll = useCallback(async (userId: string) => {
     setLoading(true);
     try {
       const [profileRes, statsRes, followersRes, followingRes] = await Promise.allSettled([
@@ -94,7 +89,13 @@ export default function ProfileScreen() {
         api.get<{ followers: unknown[]; next_cursor: string | null }>(`/users/${userId}/followers?limit=50`),
         api.get<{ following: unknown[]; next_cursor: string | null }>(`/users/${userId}/following?limit=50`),
       ]);
-      if (profileRes.status === 'fulfilled') setProfile((profileRes.value as any).data);
+      if (profileRes.status === 'fulfilled') {
+        const fresh = (profileRes.value as any).data;
+        setProfile(fresh);
+        // Keep the global authStore in sync — fixes the bug where username
+        // updates via /users/me PATCH didn't visually reflect until restart.
+        if (fresh && setUser) setUser({ ...(user as any), ...fresh });
+      }
       if (statsRes.status === 'fulfilled') setStats((statsRes.value as any).data);
       if (followersRes.status === 'fulfilled') {
         const fd = followersRes.value as any;
@@ -109,7 +110,15 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setUser]);
+
+  // Refetch on focus so updates from Edit Profile show immediately on return.
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) fetchAll(user.id);
+    }, [user?.id, fetchAll])
+  );
 
   if (loading) {
     return (
@@ -121,10 +130,14 @@ export default function ProfileScreen() {
     );
   }
 
-  const displayUsername = profile?.username ?? user?.username ?? '';
-  const displayFullName = profile?.full_name ?? user?.full_name ?? null;
-  const displayAvatar = profile?.avatar_url ?? user?.avatar_url ?? null;
-  const displayBio = profile?.bio ?? null;
+  // Prefer authStore over local profile state — authStore is updated
+  // immediately by Edit Profile via setUser(), and the focus refetch will
+  // overwrite both shortly after. Falling back to local profile on first
+  // mount (when authStore.user might be missing fields like bio).
+  const displayUsername = user?.username ?? profile?.username ?? '';
+  const displayFullName = user?.full_name ?? profile?.full_name ?? null;
+  const displayAvatar = user?.avatar_url ?? profile?.avatar_url ?? null;
+  const displayBio = (user as any)?.bio ?? profile?.bio ?? null;
   const recentWorkouts = (stats?.recent_workouts ?? []).slice(0, 5);
   const strengthLevels = (stats?.strength_levels ?? []).filter(s => s.level);
 

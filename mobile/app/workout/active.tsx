@@ -76,14 +76,13 @@ interface SetRowProps {
   loggingType: string;
   onToggleComplete: () => void;
   onUpdateSet: (updated: Partial<WorkoutSet>) => void;
-  onChangeType: (type: WorkoutSet['set_type']) => void;
+  onLongPress: () => void;
 }
 
-function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onChangeType }: SetRowProps) {
+function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onLongPress }: SetRowProps) {
   const isCompleted = set.is_completed;
   const typeColor = SET_TYPE_COLORS[set.set_type] ?? colors.setNormal;
   const canComplete = setHasRequiredValues(set, loggingType);
-  const [showTypePicker, setShowTypePicker] = useState(false);
 
   return (
     <View style={[styles.setRow, isCompleted && styles.setRowComplete]}>
@@ -96,7 +95,8 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onChan
           }
           onToggleComplete();
         }}
-        onLongPress={() => setShowTypePicker(true)}
+        onLongPress={() => { haptic.medium(); onLongPress(); }}
+        delayLongPress={300}
         style={[styles.setNumBtn, {
           backgroundColor: isCompleted ? colors.success : typeColor + '30',
           borderColor: isCompleted ? colors.success : typeColor,
@@ -164,31 +164,6 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onChan
         />
       )}
 
-      {/* Set type picker sheet */}
-      <Sheet visible={showTypePicker} onClose={() => setShowTypePicker(false)} snapPoint={0.5}>
-        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Set Type</Text>
-        {SET_TYPE_OPTIONS.map((opt) => {
-          const selected = set.set_type === opt.key;
-          const c = SET_TYPE_COLORS[opt.key];
-          return (
-            <Pressable
-              key={opt.key}
-              onPress={() => { onChangeType(opt.key); setShowTypePicker(false); }}
-              style={[styles.typePickerRow, selected && { backgroundColor: c + '15', borderColor: c }]}
-              accessibilityLabel={opt.label}
-            >
-              <View style={[styles.typeBadge, { backgroundColor: c + '30', borderColor: c }]}>
-                <Text variant="label" style={{ color: c }}>{SET_TYPE_LABELS[opt.key]}</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: spacing.md }}>
-                <Text variant="bodyEmphasis" color={selected ? 'textPrimary' : 'textSecondary'}>{opt.label}</Text>
-                <Text variant="caption" color="textTertiary">{opt.desc}</Text>
-              </View>
-              {selected && <Icon icon={Check} size={16} color={c} />}
-            </Pressable>
-          );
-        })}
-      </Sheet>
     </View>
   );
 }
@@ -196,12 +171,12 @@ function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onChan
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
   onUpdateSets: (sets: WorkoutSet[]) => void;
-  onChangeSetType: (setPosition: number, type: WorkoutSet['set_type']) => void;
+  onLongPressSet: (setPosition: number) => void;
   onRemove: () => void;
   onPRCheck?: (exerciseId: string, exerciseName: string, set: WorkoutSet, loggingType: string) => void;
 }
 
-function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove, onPRCheck }: ExerciseCardProps) {
+function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCheck }: ExerciseCardProps) {
   const { startRestTimer } = useWorkoutStore();
 
   const handleUpdateSet = (setPosition: number, updates: Partial<WorkoutSet>) => {
@@ -309,7 +284,7 @@ function ExerciseCard({ exercise, onUpdateSets, onChangeSetType, onRemove, onPRC
           loggingType={exercise.logging_type}
           onToggleComplete={() => handleToggleComplete(s.position)}
           onUpdateSet={(updates) => handleUpdateSet(s.position, updates)}
-          onChangeType={(type) => onChangeSetType(s.position, type)}
+          onLongPress={() => onLongPressSet(s.position)}
         />
       ))}
 
@@ -577,6 +552,11 @@ export default function ActiveWorkoutScreen() {
   } = useWorkoutStore();
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showTimerSheet, setShowTimerSheet] = useState(false);
+  // Single, parent-level set-type picker context. The previous bug was that
+  // each SetRow rendered its own Sheet/Modal — with 10–30 sets onscreen,
+  // multiple Modal instances stomped each other and nothing rendered when
+  // long-pressing.
+  const [typeCtx, setTypeCtx] = useState<{ exercisePos: number; setPos: number; currentType: WorkoutSet['set_type'] } | null>(null);
   // Live PR map: exercise_id -> { record_type -> max_value }
   const [prMap, setPrMap] = useState<Record<string, Record<string, number>>>({});
   const toast = useToast();
@@ -730,7 +710,10 @@ export default function ActiveWorkoutScreen() {
             key={ex.exercise_id + ex.position}
             exercise={ex}
             onUpdateSets={(sets) => updateExerciseSets(ex.position, sets)}
-            onChangeSetType={(setPos, type) => setSetType(ex.position, setPos, type)}
+            onLongPressSet={(setPos) => {
+              const target = ex.sets.find(s => s.position === setPos);
+              setTypeCtx({ exercisePos: ex.position, setPos, currentType: target?.set_type ?? 'normal' });
+            }}
             onPRCheck={handlePRCheck}
             onRemove={() => {
               Alert.alert('Remove Exercise', `Remove ${ex.exercise_name}?`, [
@@ -769,6 +752,38 @@ export default function ActiveWorkoutScreen() {
         onReset={() => { setElapsed(0); }}
         onSetElapsed={setElapsed}
       />
+
+      {/* Single, parent-level Set Type picker (was previously rendered N times,
+          one per SetRow — multiple Modals collided and the menu wouldn't show) */}
+      <Sheet visible={typeCtx !== null} onClose={() => setTypeCtx(null)} snapPoint={0.55}>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Set Type</Text>
+        {SET_TYPE_OPTIONS.map((opt) => {
+          const selected = typeCtx?.currentType === opt.key;
+          const c = SET_TYPE_COLORS[opt.key];
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => {
+                if (typeCtx) {
+                  setSetType(typeCtx.exercisePos, typeCtx.setPos, opt.key);
+                }
+                setTypeCtx(null);
+              }}
+              style={[styles.typePickerRow, selected && { backgroundColor: c + '15', borderColor: c }]}
+              accessibilityLabel={opt.label}
+            >
+              <View style={[styles.typeBadge, { backgroundColor: c + '30', borderColor: c }]}>
+                <Text variant="label" style={{ color: c }}>{SET_TYPE_LABELS[opt.key]}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text variant="bodyEmphasis" color={selected ? 'textPrimary' : 'textSecondary'}>{opt.label}</Text>
+                <Text variant="caption" color="textTertiary">{opt.desc}</Text>
+              </View>
+              {selected && <Icon icon={Check} size={16} color={c} />}
+            </Pressable>
+          );
+        })}
+      </Sheet>
     </View>
   );
 }

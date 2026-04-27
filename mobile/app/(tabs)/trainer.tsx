@@ -125,7 +125,14 @@ export default function TrainerScreen() {
   }, []);
 
   function handleStartSession() {
-    if (!session || session.exercises.length === 0) return;
+    if (!session) return;
+    // If the template returned 0 exercises (e.g. wger_id mismatch), start a
+    // blank named workout — the user can add exercises in-flight.
+    if (session.exercises.length === 0) {
+      useWorkoutStore.getState().startWorkout(`${session.template_name || 'AI Trainer'} · ${session.session_label || 'Session'}`, null, []);
+      router.push('/workout/active');
+      return;
+    }
     // Convert the trainer session into the workout store's WorkoutExercise shape
     const exercises: WorkoutExercise[] = session.exercises.map((ex, i) => ({
       exercise_id: ex.exercise_id,
@@ -250,7 +257,15 @@ export default function TrainerScreen() {
               <Text variant="caption" color="textTertiary">Session {session.session_number}</Text>
             </View>
 
-            {session.exercises.map((ex, idx) => (
+            {session.exercises.length === 0 ? (
+              <Surface level={2} style={styles.emptyExercises}>
+                <Text variant="bodyEmphasis" color="textPrimary">No prescribed exercises</Text>
+                <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
+                  Your program template hasn't been linked to specific exercises yet.
+                  Tap below to start a blank workout — you can add exercises manually.
+                </Text>
+              </Surface>
+            ) : session.exercises.map((ex, idx) => (
               <Surface key={ex.exercise_id + idx} level={2} style={styles.exerciseCard}>
                 <View style={styles.exRow}>
                   <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1, marginRight: spacing.sm }}>
@@ -279,12 +294,14 @@ export default function TrainerScreen() {
             ))}
 
             <Button
-              label="Start This Session"
+              label={session.exercises.length === 0 ? 'Start Empty Workout' : 'Start This Session'}
               onPress={handleStartSession}
               variant="primary"
               size="lg"
               fullWidth
-              disabled={session.is_paused || session.exercises.length === 0}
+              // Only disable when paused. If exercises is empty we still let
+              // the user start a blank workout (they can add exercises in-flight).
+              disabled={session.is_paused}
             />
           </View>
         )}
@@ -388,6 +405,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: { paddingHorizontal: spacing.base, paddingBottom: 32, gap: spacing.md },
   pausedBanner: { padding: spacing.base, borderWidth: 1, borderRadius: 12 },
+  emptyExercises: { padding: spacing.base, alignItems: 'center' },
   exerciseCard: { padding: spacing.base },
   exRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
   exMeta: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center', flexWrap: 'wrap' },

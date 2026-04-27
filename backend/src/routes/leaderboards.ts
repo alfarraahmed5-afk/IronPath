@@ -361,7 +361,9 @@ router.get('/challenges', async (req: Request, res: Response, next: NextFunction
 
     if (error) throw new AppError('FETCH_FAILED', 500, 'Failed to fetch challenges');
 
-    return res.json({ data: data ?? [] });
+    // The DB column is `name` but the client expects `title`.
+    const challenges = (data ?? []).map((c: any) => ({ ...c, title: c.name }));
+    return res.json({ data: challenges });
   } catch (err) {
     next(err);
   }
@@ -396,7 +398,9 @@ router.get('/challenges/:id', async (req: Request, res: Response, next: NextFunc
     const is_enrolled = enrolledIds.includes(userId);
     const participant_count = enrolledIds.length || result.rankings.length;
 
-    return res.json({ data: { challenge, ...result, is_enrolled, participant_count } });
+    // DB column is `name`, client expects `title`
+    const challengeForClient = { ...challenge, title: challenge.name };
+    return res.json({ data: { challenge: challengeForClient, ...result, is_enrolled, participant_count } });
   } catch (err) {
     next(err);
   }
@@ -433,7 +437,8 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
       .from('leaderboard_challenges')
       .insert({
         gym_id: gymId,
-        title: body.title,
+        // DB column is `name`, not `title` — admin route does the same mapping
+        name: body.title,
         description: body.description,
         metric: body.metric,
         exercise_id: body.exercise_id ?? null,
@@ -447,7 +452,9 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
       .single();
 
     if (error) throw error;
-    return res.status(201).json({ data: { challenge } });
+    // Map back to client shape
+    const challengeForClient = { ...challenge, title: challenge.name };
+    return res.status(201).json({ data: { challenge: challengeForClient } });
   } catch (err) {
     next(err);
   }

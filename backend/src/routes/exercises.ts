@@ -55,6 +55,20 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (err) { next(err); }
 });
 
+// GET /exercises/by-ids?ids=uuid,uuid — bulk metadata fetch.
+// MUST be defined BEFORE /:id so 'by-ids' isn't interpreted as an id param.
+router.get('/by-ids', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const ids = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (ids.length === 0) return res.json({ data: { exercises: [] } });
+    const { data } = await supabase.from('exercises')
+      .select('id, name, primary_muscles, secondary_muscles, equipment, logging_type, image_url')
+      .in('id', ids);
+    res.json({ data: { exercises: data ?? [] } });
+  } catch (err) { next(err); }
+});
+
 // GET /exercises/:id
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
