@@ -16,6 +16,7 @@ import { StatCard } from '../../src/components/StatCard';
 import { Pressable } from '../../src/components/Pressable';
 import { Sheet } from '../../src/components/Sheet';
 import { Button } from '../../src/components/Button';
+import { LineChart } from '../../src/components/LineChart';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 type Period = '30d' | '3m' | '1y' | 'all';
@@ -87,6 +88,8 @@ export default function AnalyticsScreen() {
   const [loading, setLoading] = useState(false);
   const [sheetWorkoutIds, setSheetWorkoutIds] = useState<string[]>([]);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [volumePoints, setVolumePoints] = useState<{ date: string; value: number }[]>([]);
+  const [bwPoints, setBwPoints] = useState<{ date: string; value: number }[]>([]);
 
   const fetchStats = useCallback(async (p: Period) => {
     setLoading(true);
@@ -100,7 +103,25 @@ export default function AnalyticsScreen() {
     }
   }, []);
 
-  useEffect(() => { fetchStats(period); }, [period, fetchStats]);
+  const fetchCharts = useCallback(async (p: Period) => {
+    const granularity = p === '30d' ? 'day' : p === '3m' ? 'week' : 'month';
+    try {
+      const [vol, bw] = await Promise.all([
+        api.get<{ data: { points: { date: string; volume_kg: number }[] } }>(
+          `/analytics/volume-over-time?period=${p}&granularity=${granularity}`
+        ),
+        api.get<{ data: { points: { date: string; bodyweight_kg: number }[] } }>(
+          `/analytics/bodyweight-history?period=${p}`
+        ),
+      ]);
+      setVolumePoints((vol.data?.points ?? []).map(pt => ({ date: pt.date, value: pt.volume_kg })));
+      setBwPoints((bw.data?.points ?? []).map(pt => ({ date: pt.date, value: pt.bodyweight_kg })));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => { fetchStats(period); fetchCharts(period); }, [period, fetchStats, fetchCharts]);
 
   const last7Days = (() => {
     const today = new Date();
@@ -204,6 +225,28 @@ export default function AnalyticsScreen() {
                 </Surface>
               </View>
             )}
+
+            {/* Volume over time chart */}
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Volume Over Time</Text>
+              <LineChart
+                points={volumePoints}
+                height={140}
+                formatY={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`}
+                emptyLabel="Log workouts to see your volume trend"
+              />
+            </View>
+
+            {/* Bodyweight history chart */}
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Bodyweight</Text>
+              <LineChart
+                points={bwPoints}
+                height={120}
+                formatY={(v) => `${v.toFixed(1)} kg`}
+                emptyLabel="Log measurements to track bodyweight"
+              />
+            </View>
 
             {/* Last 7 Days */}
             <View style={styles.section}>

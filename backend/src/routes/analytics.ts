@@ -919,5 +919,79 @@ router.get('/reports/:id', async (req: Request, res: Response, next: NextFunctio
 });
 
 // ---------------------------------------------------------------------------
+// Endpoint: GET /analytics/volume-over-time
+// ?period=30d|3m|1y|all  &granularity=day|week|month
+// ---------------------------------------------------------------------------
+
+router.get('/volume-over-time', cacheControl(120), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const period = (req.query.period as string) || '30d';
+    const granularity = (req.query.granularity as string) || 'week';
+    const cutoff = getPeriodCutoff(period);
+
+    let q = supabase.from('workouts')
+      .select('started_at, total_volume_kg')
+      .eq('user_id', userId)
+      .eq('is_completed', true)
+      .order('started_at', { ascending: true });
+    if (cutoff) q = q.gte('started_at', cutoff);
+    const { data: rows } = await q;
+
+    const buckets = new Map<string, number>();
+    for (const w of rows || []) {
+      const d = new Date(w.started_at);
+      let key: string;
+      if (granularity === 'day') {
+        key = d.toISOString().slice(0, 10);
+      } else if (granularity === 'month') {
+        key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
+      } else {
+        // week: ISO Monday
+        const day = d.getUTCDay();
+        const diff = (day + 6) % 7;
+        const monday = new Date(d);
+        monday.setUTCDate(d.getUTCDate() - diff);
+        key = monday.toISOString().slice(0, 10);
+      }
+      buckets.set(key, (buckets.get(key) ?? 0) + Number(w.total_volume_kg ?? 0));
+    }
+
+    const points = [...buckets.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, volume_kg]) => ({ date, volume_kg: Math.round(volume_kg * 10) / 10 }));
+
+    res.json({ data: { points } });
+  } catch (err: any) {
+    return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Endpoint: GET /analytics/bodyweight-history?period=...
+// ---------------------------------------------------------------------------
+
+router.get('/bodyweight-history', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const period = (req.query.period as string) || '3m';
+    const cutoff = getPeriodCutoff(period);
+
+    let q = supabase.from('body_measurements')
+      .select('measured_at, bodyweight_kg')
+      .eq('user_id', userId)
+      .not('bodyweight_kg', 'is', null)
+      .order('measured_at', { ascending: true });
+    if (cutoff) q = q.gte('measured_at', cutoff);
+    const { data: rows } = await q;
+    const points = (rows || []).map((r: any) => ({
+      date: String(r.measured_at).slice(0, 10),
+      bodyweight_kg: Number(r.bodyweight_kg),
+    }));
+    res.json({ data: { points } });
+  } catch (err: any) {
+    return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+  }
+});
 
 export default router;
