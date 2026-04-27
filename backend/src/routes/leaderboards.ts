@@ -48,7 +48,105 @@ function periodToDbPeriod(period: 'weekly' | 'monthly' | 'all_time'): string {
   return map[period];
 }
 
-// ─── Helper: fetch snapshot + annotate my_rank ────────────────────────────────
+// ─── Helper: period → date range ──────────────────────────────────────────────
+
+function rangeForPeriod(period: 'weekly' | 'monthly' | 'all_time'): { start: string | null; end: string } {
+  const now = new Date();
+  const end = now.toISOString();
+  if (period === 'all_time') return { start: null, end };
+  const start = new Date(now);
+  if (period === 'weekly') {
+    const day = now.getUTCDay();
+    const diff = (day + 6) % 7; // days since Monday
+    start.setUTCDate(now.getUTCDate() - diff);
+    start.setUTCHours(0, 0, 0, 0);
+  } else if (period === 'monthly') {
+    start.setUTCDate(1);
+    start.setUTCHours(0, 0, 0, 0);
+  }
+  return { start: start.toISOString(), end };
+}
+
+// Hydrate user info onto live-aggregated rows.
+async function hydrateUsers(rows: { user_id: string; value: number }[]): Promise<any[]> {
+  if (rows.length === 0) return [];
+  const ids = [...new Set(rows.map(r => r.user_id))];
+  const { data: users } = await supabase.from('users')
+    .select('id, username, full_name, avatar_url')
+    .in('id', ids);
+  const userMap = new Map<string, any>();
+  for (const u of users || []) userMap.set(u.id, u);
+  return rows
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 100)
+    .map((r, i) => ({
+      rank: i + 1,
+      user_id: r.user_id,
+      username: userMap.get(r.user_id)?.username ?? 'Unknown',
+      full_name: userMap.get(r.user_id)?.full_name ?? '',
+      avatar_url: userMap.get(r.user_id)?.avatar_url ?? null,
+      value: r.value,
+    }));
+}
+
+// Compute volume / workouts leaderboard live from the workouts table.
+async function computeWorkoutAggregate(
+  gymId: string,
+  period: 'weekly' | 'monthly' | 'all_time',
+  metric: 'volume' | 'workouts'
+): Promise<any[]> {
+  const { start, end } = rangeForPeriod(period);
+  let q = supabase.from('workouts')
+    .select('user_id, total_volume_kg')
+    .eq('gym_id', gymId)
+    .eq('is_completed', true);
+  if (start) q = q.gte('started_at', start).lte('started_at', end);
+
+  const { data } = await q;
+  const map = new Map<string, number>();
+  for (const w of data || []) {
+    const cur = map.get(w.user_id) ?? 0;
+    if (metric === 'volume') {
+      map.set(w.user_id, cur + Number(w.total_volume_kg ?? 0));
+    } else {
+      map.set(w.user_id, cur + 1);
+    }
+  }
+  const rows = [...map.entries()].map(([user_id, value]) => ({ user_id, value }));
+  return hydrateUsers(rows);
+}
+
+// Compute streak leaderboard live from the streaks table.
+async function computeStreakLeaderboard(gymId: string): Promise<any[]> {
+  const { data } = await supabase.from('streaks')
+    .select('user_id, current_streak_weeks, longest_streak_weeks')
+    .eq('gym_id', gymId);
+  const rows = (data || []).map(s => ({
+    user_id: s.user_id,
+    value: Number(s.longest_streak_weeks || s.current_streak_weeks || 0),
+  })).filter(r => r.value > 0);
+  return hydrateUsers(rows);
+}
+
+// Compute heaviest-lift leaderboard for a single exercise (PR-based).
+async function computeLiftLeaderboard(gymId: string, exerciseId: string): Promise<any[]> {
+  const { data } = await supabase.from('personal_records')
+    .select('user_id, value')
+    .eq('gym_id', gymId)
+    .eq('exercise_id', exerciseId)
+    .eq('record_type', 'heaviest_weight');
+  // Take the max value per user (in case there are multiple historical PRs)
+  const map = new Map<string, number>();
+  for (const r of data || []) {
+    const cur = map.get(r.user_id) ?? 0;
+    const v = Number(r.value ?? 0);
+    if (v > cur) map.set(r.user_id, v);
+  }
+  const rows = [...map.entries()].map(([user_id, value]) => ({ user_id, value }));
+  return hydrateUsers(rows);
+}
+
+// ─── Helper: fetch snapshot + annotate my_rank, with LIVE FALLBACK ────────────
 
 async function fetchSnapshot(params: {
   gymId: string;
@@ -73,8 +171,31 @@ async function fetchSnapshot(params: {
   }
 
   const { data: snapshot } = await query.maybeSingle();
+  let rankings = (snapshot?.rankings as any[]) ?? [];
+  let generatedAt = snapshot?.generated_at ?? null;
 
-  const rankings = (snapshot?.rankings as any[]) ?? [];
+  // LIVE FALLBACK: if no snapshot yet (cron hasn't run, or this is a fresh
+  // gym), compute the leaderboard from the source tables. This guarantees
+  // users see their data immediately even without snapshot generation.
+  if (rankings.length === 0) {
+    try {
+      const periodKey = (period === 'weekly' || period === 'monthly' || period === 'all_time')
+        ? period as 'weekly' | 'monthly' | 'all_time' : 'all_time';
+      if (category === 'most_volume_week' || category === 'most_volume_month' || category === 'most_volume_alltime') {
+        rankings = await computeWorkoutAggregate(gymId, periodKey, 'volume');
+      } else if (category === 'most_workouts_week' || category === 'most_workouts_month' || category === 'most_workouts_alltime') {
+        rankings = await computeWorkoutAggregate(gymId, periodKey, 'workouts');
+      } else if (category === 'longest_streak') {
+        rankings = await computeStreakLeaderboard(gymId);
+      } else if (category === 'heaviest_lift' && exerciseId) {
+        rankings = await computeLiftLeaderboard(gymId, exerciseId);
+      }
+      generatedAt = rankings.length > 0 ? new Date().toISOString() : null;
+    } catch {
+      // Don't blow up the response if a fallback computation fails.
+    }
+  }
+
   const myRankIdx = rankings.findIndex((r: any) => r.user_id === userId);
   const myEntry = myRankIdx >= 0 ? rankings[myRankIdx] : null;
 
@@ -82,7 +203,7 @@ async function fetchSnapshot(params: {
     rankings,
     my_rank: myRankIdx >= 0 ? myRankIdx + 1 : null,
     my_value: myEntry?.value ?? null,
-    generated_at: snapshot?.generated_at ?? null,
+    generated_at: generatedAt,
   };
 }
 
@@ -134,12 +255,18 @@ router.get('/lifts', async (req: Request, res: Response, next: NextFunction) => 
         .eq('exercise_id', exercise.id)
         .maybeSingle();
 
-      const rankings = (snapshot?.rankings as any[]) ?? [];
+      let rankings = (snapshot?.rankings as any[]) ?? [];
+      let generatedAt = snapshot?.generated_at ?? null;
+      // Live fallback when no snapshot exists yet
+      if (rankings.length === 0) {
+        rankings = await computeLiftLeaderboard(gymId, exercise.id);
+        if (rankings.length > 0) generatedAt = new Date().toISOString();
+      }
       summaries.push({
         exercise_id:   exercise.id,
         exercise_name: displayName,
         top_user:      rankings[0] ?? null,
-        generated_at:  snapshot?.generated_at ?? null,
+        generated_at:  generatedAt,
       });
     }
 
@@ -263,7 +390,116 @@ router.get('/challenges/:id', async (req: Request, res: Response, next: NextFunc
 
     const result = await getChallengeRankings(challenge, gymId, userId);
 
-    return res.json({ data: { challenge, ...result } });
+    // Enrollment lives on a `enrolled_user_ids` jsonb array column on
+    // leaderboard_challenges (see migrations/challenge-enrollment.sql).
+    const enrolledIds: string[] = Array.isArray(challenge.enrolled_user_ids) ? challenge.enrolled_user_ids : [];
+    const is_enrolled = enrolledIds.includes(userId);
+    const participant_count = enrolledIds.length || result.rankings.length;
+
+    return res.json({ data: { challenge, ...result, is_enrolled, participant_count } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /leaderboards/challenges — create peer challenge ───────────────────
+
+const createChallengeSchema = z.object({
+  title: z.string().min(3).max(100),
+  description: z.string().max(500).optional().default(''),
+  metric: z.enum(['total_volume', 'workout_count', 'exercise_volume']),
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  exercise_id: z.string().uuid().nullable().optional(),
+});
+
+router.post('/challenges', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const gymId  = req.user!.gym_id!;
+
+    const parsed = createChallengeSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 422, 'Validation failed');
+    const body = parsed.data;
+
+    const startsAt = new Date(body.starts_at).getTime();
+    const endsAt = new Date(body.ends_at).getTime();
+    if (endsAt <= startsAt) throw new AppError('INVALID_DATES', 422, 'ends_at must be after starts_at');
+    if (endsAt - startsAt > 90 * 86400 * 1000) throw new AppError('TOO_LONG', 422, 'Max 90 days');
+
+    const status = startsAt > Date.now() ? 'upcoming' : 'active';
+
+    const { data: challenge, error } = await supabase
+      .from('leaderboard_challenges')
+      .insert({
+        gym_id: gymId,
+        title: body.title,
+        description: body.description,
+        metric: body.metric,
+        exercise_id: body.exercise_id ?? null,
+        starts_at: body.starts_at,
+        ends_at: body.ends_at,
+        status,
+        created_by_user_id: userId,
+        enrolled_user_ids: [userId], // creator is auto-enrolled
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.status(201).json({ data: { challenge } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /leaderboards/challenges/:id/join ──────────────────────────────────
+
+router.post('/challenges/:id/join', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const gymId  = req.user!.gym_id!;
+    const idParsed = uuidSchema.safeParse(req.params.id);
+    if (!idParsed.success) throw new AppError('INVALID_CHALLENGE_ID', 400, 'Invalid challenge id');
+
+    const { data: challenge } = await supabase.from('leaderboard_challenges')
+      .select('id, gym_id, enrolled_user_ids').eq('id', idParsed.data).maybeSingle();
+    if (!challenge || challenge.gym_id !== gymId) throw new AppError('NOT_FOUND', 404, 'Challenge not found');
+
+    const enrolled: string[] = Array.isArray(challenge.enrolled_user_ids) ? challenge.enrolled_user_ids : [];
+    if (!enrolled.includes(userId)) {
+      enrolled.push(userId);
+      const { error } = await supabase.from('leaderboard_challenges')
+        .update({ enrolled_user_ids: enrolled }).eq('id', idParsed.data);
+      if (error) throw error;
+    }
+    return res.json({ data: { is_enrolled: true, participant_count: enrolled.length } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── DELETE /leaderboards/challenges/:id/leave ───────────────────────────────
+
+router.delete('/challenges/:id/leave', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const gymId  = req.user!.gym_id!;
+    const idParsed = uuidSchema.safeParse(req.params.id);
+    if (!idParsed.success) throw new AppError('INVALID_CHALLENGE_ID', 400, 'Invalid challenge id');
+
+    const { data: challenge } = await supabase.from('leaderboard_challenges')
+      .select('id, gym_id, enrolled_user_ids').eq('id', idParsed.data).maybeSingle();
+    if (!challenge || challenge.gym_id !== gymId) throw new AppError('NOT_FOUND', 404, 'Challenge not found');
+
+    const enrolled: string[] = Array.isArray(challenge.enrolled_user_ids) ? challenge.enrolled_user_ids : [];
+    const next = enrolled.filter(id => id !== userId);
+    if (next.length !== enrolled.length) {
+      const { error } = await supabase.from('leaderboard_challenges')
+        .update({ enrolled_user_ids: next }).eq('id', idParsed.data);
+      if (error) throw error;
+    }
+    return res.json({ data: { is_enrolled: false, participant_count: next.length } });
   } catch (err) {
     next(err);
   }

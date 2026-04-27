@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crown, ChevronRight } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
@@ -283,12 +284,10 @@ const STATUS_COLORS: Record<Challenge['status'], string> = {
 };
 
 function ChallengesTab() {
+  const router = useRouter();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selected, setSelected] = useState<Challenge | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailData, setDetailData] = useState<{ rankings: Ranking[]; my_rank: number | null; my_value: number | null } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -302,71 +301,57 @@ function ChallengesTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openChallenge = async (challenge: Challenge) => {
-    setSelected(challenge);
-    setDetailData(null);
-    setDetailLoading(true);
-    try {
-      const res = await api.get<{ data: { challenge: Challenge; rankings: Ranking[]; my_rank: number | null; my_value: number | null } }>(
-        `/leaderboards/challenges/${challenge.id}`
-      );
-      setDetailData(res.data);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
   if (loading) return <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>;
 
   return (
-    <>
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
-        contentContainerStyle={styles.listPad}
-      >
-        {challenges.length === 0 ? (
-          <EmptyState illustration="notifications" title="No challenges yet" />
-        ) : challenges.map(challenge => (
-          <TouchableOpacity key={challenge.id} onPress={() => openChallenge(challenge)} activeOpacity={0.8}>
-            <Surface level={2} style={styles.challengeCard}>
-              <View style={styles.challengeTop}>
-                <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginRight: spacing.sm }}>
-                  {challenge.title}
-                </Text>
-                <View style={[styles.statusPill, { borderColor: STATUS_COLORS[challenge.status] }]}>
-                  <Text variant="overline" style={{ color: STATUS_COLORS[challenge.status] }}>{challenge.status}</Text>
-                </View>
-              </View>
-              {challenge.description ? (
-                <Text variant="body" color="textSecondary" numberOfLines={2} style={{ marginTop: spacing.xs }}>
-                  {challenge.description}
-                </Text>
-              ) : null}
-              <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.sm }}>
-                {formatDate(challenge.starts_at)} – {formatDate(challenge.ends_at)}
-              </Text>
-            </Surface>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    <ScrollView
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
+      contentContainerStyle={styles.listPad}
+    >
+      {/* Create challenge CTA */}
+      <View style={{ marginBottom: spacing.base }}>
+        <Button
+          label="+ Create Challenge"
+          onPress={() => router.push('/challenges/create' as any)}
+          variant="secondary"
+          size="md"
+          fullWidth
+        />
+      </View>
 
-      <Modal visible={selected !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setSelected(null)}>
-              <Text variant="label" color="brand">Close</Text>
-            </TouchableOpacity>
-            <Text variant="title3" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginLeft: spacing.md }}>
-              {selected?.title}
+      {challenges.length === 0 ? (
+        <EmptyState
+          illustration="notifications"
+          title="No challenges yet"
+          description="Create one and invite the gym to compete."
+        />
+      ) : challenges.map(challenge => (
+        <TouchableOpacity
+          key={challenge.id}
+          onPress={() => router.push(`/challenges/${challenge.id}` as any)}
+          activeOpacity={0.8}
+        >
+          <Surface level={2} style={styles.challengeCard}>
+            <View style={styles.challengeTop}>
+              <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginRight: spacing.sm }}>
+                {challenge.title}
+              </Text>
+              <View style={[styles.statusPill, { borderColor: STATUS_COLORS[challenge.status] }]}>
+                <Text variant="overline" style={{ color: STATUS_COLORS[challenge.status] }}>{challenge.status}</Text>
+              </View>
+            </View>
+            {challenge.description ? (
+              <Text variant="body" color="textSecondary" numberOfLines={2} style={{ marginTop: spacing.xs }}>
+                {challenge.description}
+              </Text>
+            ) : null}
+            <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.sm }}>
+              {formatDate(challenge.starts_at)} – {formatDate(challenge.ends_at)}
             </Text>
-          </View>
-          <ScrollView contentContainerStyle={styles.listPad}>
-            {detailLoading ? <ActivityIndicator color={colors.brand} style={{ marginTop: spacing['3xl'] }} /> : null}
-            {detailData ? <RankingsList rankings={detailData.rankings} myRank={detailData.my_rank} myValue={detailData.my_value} /> : null}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-    </>
+          </Surface>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 }
 
