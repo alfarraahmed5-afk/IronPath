@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pause, Play, TrendingUp, Minus, TrendingDown } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
+import { useWorkoutStore, WorkoutExercise } from '../../src/stores/workoutStore';
 import { Text } from '../../src/components/Text';
 import { Surface } from '../../src/components/Surface';
 import { Button } from '../../src/components/Button';
@@ -96,7 +97,25 @@ export default function TrainerScreen() {
         setSession(sessionRes.value.data);
         setNoProgram(false);
       } else {
-        if ((sessionRes.reason as any)?.response?.status === 404) setNoProgram(true);
+        // The api wrapper throws the JSON body on non-2xx responses. Inspect
+        // the error code rather than a response.status that doesn't exist.
+        const err: any = sessionRes.reason;
+        const code = err?.error?.code ?? err?.code;
+        const message: string = err?.error?.message ?? err?.message ?? '';
+        if (code === 'NOT_FOUND' || /no active.*program/i.test(message)) {
+          setNoProgram(true);
+        } else if (code === 'PROGRAM_PAUSED') {
+          // Paused programs return 400 on /next-session; surface a paused-only
+          // view by setting a stub session with is_paused=true and no exercises.
+          setNoProgram(false);
+          setSession({
+            session_label: 'Paused',
+            session_number: 0,
+            template_name: '',
+            is_paused: true,
+            exercises: [],
+          });
+        }
       }
       if (progressRes.status === 'fulfilled') setProgress(progressRes.value.data);
     } finally {
@@ -104,6 +123,33 @@ export default function TrainerScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  function handleStartSession() {
+    if (!session || session.exercises.length === 0) return;
+    // Convert the trainer session into the workout store's WorkoutExercise shape
+    const exercises: WorkoutExercise[] = session.exercises.map((ex, i) => ({
+      exercise_id: ex.exercise_id,
+      exercise_name: ex.exercise_name,
+      logging_type: 'weight_reps',
+      position: i,
+      superset_group: null,
+      rest_seconds: ex.rest_seconds,
+      notes: '',
+      sets: Array.from({ length: ex.sets }, (_, sIdx) => ({
+        position: sIdx,
+        set_type: 'normal' as const,
+        weight_kg: ex.prescribed_weight_kg,
+        reps: ex.reps ?? ex.reps_max ?? null,
+        duration_seconds: ex.target_duration_seconds,
+        distance_meters: null,
+        rpe: null,
+        is_completed: false,
+        completed_at: null,
+      })),
+    }));
+    useWorkoutStore.getState().startWorkout(`${session.template_name} · ${session.session_label}`, null, exercises);
+    router.push('/workout/active');
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -233,12 +279,12 @@ export default function TrainerScreen() {
             ))}
 
             <Button
-              label="Start Workout"
-              onPress={() => router.push('/(tabs)/workouts')}
+              label="Start This Session"
+              onPress={handleStartSession}
               variant="primary"
               size="lg"
               fullWidth
-              disabled={session.is_paused}
+              disabled={session.is_paused || session.exercises.length === 0}
             />
           </View>
         )}

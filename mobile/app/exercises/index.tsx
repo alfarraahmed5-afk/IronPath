@@ -47,6 +47,22 @@ const EQUIPMENT_FILTERS = [
   { label: 'Other', value: 'other' },
 ];
 
+const MUSCLE_FILTERS = [
+  { label: 'All', value: '' },
+  { label: 'Chest', value: 'chest' },
+  { label: 'Back', value: 'back' },
+  { label: 'Lats', value: 'lats' },
+  { label: 'Shoulders', value: 'shoulders' },
+  { label: 'Biceps', value: 'biceps' },
+  { label: 'Triceps', value: 'triceps' },
+  { label: 'Quads', value: 'quads' },
+  { label: 'Hamstrings', value: 'hamstrings' },
+  { label: 'Glutes', value: 'glutes' },
+  { label: 'Calves', value: 'calves' },
+  { label: 'Core', value: 'core' },
+  { label: 'Cardio', value: 'cardio' },
+];
+
 const LOGGING_TYPE_LABELS: Record<Exercise['logging_type'], string> = {
   weight_reps: 'lbs/reps',
   bodyweight_reps: 'BW+reps',
@@ -128,6 +144,7 @@ export default function ExercisesScreen() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [equipment, setEquipment] = useState('');
+  const [muscle, setMuscle] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -135,13 +152,14 @@ export default function ExercisesScreen() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchExercises = useCallback(
-    async (currentOffset: number, currentSearch: string, currentEquipment: string) => {
+    async (currentOffset: number, currentSearch: string, currentEquipment: string, currentMuscle: string) => {
       if (loading) return;
       setLoading(true);
       try {
         const params = new URLSearchParams();
         if (currentSearch) params.set('search', currentSearch);
         if (currentEquipment) params.set('equipment', currentEquipment);
+        if (currentMuscle) params.set('muscle', currentMuscle);
         params.set('limit', String(LIMIT));
         params.set('offset', String(currentOffset));
 
@@ -170,9 +188,9 @@ export default function ExercisesScreen() {
     setOffset(0);
     setHasMore(true);
     setExercises([]);
-    fetchExercises(0, search, equipment);
+    fetchExercises(0, search, equipment, muscle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, equipment]);
+  }, [search, equipment, muscle]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -186,7 +204,7 @@ export default function ExercisesScreen() {
 
   const loadMore = () => {
     if (!loading && hasMore) {
-      fetchExercises(offset, search, equipment);
+      fetchExercises(offset, search, equipment, muscle);
     }
   };
 
@@ -243,6 +261,33 @@ export default function ExercisesScreen() {
             <Pressable
               key={filter.value}
               onPress={() => setEquipment(filter.value)}
+              style={[styles.filterChip, selected && styles.filterChipActive]}
+              accessibilityLabel={`Filter by ${filter.label}`}
+            >
+              <Text
+                variant="label"
+                color={selected ? 'textPrimary' : 'textTertiary'}
+              >
+                {filter.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {/* Muscle filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersScroll}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {MUSCLE_FILTERS.map((filter) => {
+          const selected = muscle === filter.value;
+          return (
+            <Pressable
+              key={filter.value || 'all-muscle'}
+              onPress={() => setMuscle(filter.value)}
               style={[styles.filterChip, selected && styles.filterChipActive]}
               accessibilityLabel={`Filter by ${filter.label}`}
             >
