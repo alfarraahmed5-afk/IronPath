@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Play } from 'lucide-react-native';
+import { Play, Users } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
+import { useAuthStore } from '../../src/stores/authStore';
 import { useWorkoutStore, WorkoutExercise } from '../../src/stores/workoutStore';
 import { Header } from '../../src/components/Header';
 import { Text } from '../../src/components/Text';
 import { Surface } from '../../src/components/Surface';
+import { Avatar } from '../../src/components/Avatar';
+import { Icon } from '../../src/components/Icon';
 import { Button } from '../../src/components/Button';
 import { EmptyState } from '../../src/components/EmptyState';
 import { colors, spacing, radii } from '../../src/theme/tokens';
@@ -37,10 +40,14 @@ interface RoutineExercise {
 
 interface RoutineDetail {
   id: string;
+  user_id: string;
   name: string;
   description: string | null;
   is_gym_template: boolean;
+  is_public?: boolean;
+  copy_count?: number;
   exercises: RoutineExercise[];
+  owner?: { username: string; avatar_url: string | null } | null;
 }
 
 function formatSetSummary(sets: RoutineSet[], loggingType: string): string {
@@ -64,17 +71,40 @@ function formatSetSummary(sets: RoutineSet[], loggingType: string): string {
 export default function RoutineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const currentUserId = useAuthStore(s => s.user?.id);
   const { startWorkout } = useWorkoutStore();
   const [routine, setRoutine] = useState<RoutineDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copying, setCopying] = useState(false);
+
+  function goBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/workouts');
+  }
 
   useEffect(() => {
-    if (!id) { router.back(); return; }
+    if (!id) { goBack(); return; }
     api.get<{ data: { routine: RoutineDetail } }>(`/routines/${id}`)
       .then(r => setRoutine(r.data.routine))
-      .catch(() => router.back())
+      .catch(() => {/* show 404 below */})
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function handleCopy() {
+    if (!routine || copying) return;
+    setCopying(true);
+    try {
+      const res = await api.post<{ data: { id: string } }>(`/routines/${routine.id}/copy`);
+      const newId = res.data?.id;
+      Alert.alert('Copied', 'Saved to your routines.');
+      if (newId) router.replace(`/routines/${newId}` as any);
+    } catch (e: any) {
+      Alert.alert('Could not copy', e?.error?.message ?? 'Try again.');
+    } finally {
+      setCopying(false);
+    }
+  }
 
   const handleStartWorkout = () => {
     if (!routine) return;
@@ -103,7 +133,7 @@ export default function RoutineDetailScreen() {
   if (!routine) {
     return (
       <View style={[styles.root, styles.centered]}>
-        <EmptyState illustration="404" title="Routine not found" action={{ label: 'Go back', onPress: () => router.back() }} />
+        <EmptyState illustration="404" title="Routine not found" action={{ label: 'Go back', onPress: goBack }} />
       </View>
     );
   }
@@ -121,6 +151,24 @@ export default function RoutineDetailScreen() {
           </View>
         ) : null}
 
+        {/* Owner info if shared/non-owner */}
+        {routine.owner && currentUserId && routine.user_id !== currentUserId ? (
+          <View style={styles.ownerRow}>
+            <Avatar username={routine.owner.username} avatarUrl={routine.owner.avatar_url} size={32} />
+            <Text variant="caption" color="textSecondary" style={{ marginLeft: spacing.sm, flex: 1 }}>
+              by @{routine.owner.username}
+            </Text>
+            {!!routine.copy_count && routine.copy_count > 0 && (
+              <View style={styles.copyChip}>
+                <Icon icon={Users} size={10} color={colors.brand} />
+                <Text variant="overline" color="brand" style={{ marginLeft: spacing.xxs }}>
+                  {routine.copy_count} copies
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
+
         {/* Stats */}
         <View style={styles.statsRow}>
           <Text variant="caption" color="textTertiary">
@@ -132,15 +180,36 @@ export default function RoutineDetailScreen() {
           </Text>
         </View>
 
-        {/* Start button */}
+        {/* Start / Copy buttons */}
         <View style={styles.startBar}>
-          <Button
-            label="Start Workout"
-            onPress={handleStartWorkout}
-            variant="primary"
-            size="lg"
-            fullWidth
-          />
+          {currentUserId && routine.user_id !== currentUserId ? (
+            <>
+              <Button
+                label="Copy to My Routines"
+                onPress={handleCopy}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={copying}
+              />
+              <View style={{ height: spacing.sm }} />
+              <Button
+                label="Start Workout"
+                onPress={handleStartWorkout}
+                variant="ghost"
+                size="md"
+                fullWidth
+              />
+            </>
+          ) : (
+            <Button
+              label="Start Workout"
+              onPress={handleStartWorkout}
+              variant="primary"
+              size="lg"
+              fullWidth
+            />
+          )}
         </View>
 
         {/* Exercises */}
@@ -188,5 +257,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     marginLeft: spacing.sm,
+  },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.md,
+  },
+  copyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.brandGlow,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.full,
   },
 });

@@ -111,10 +111,20 @@ routinesRouter.get('/', requireActiveUser, async (req: Request, res: Response, n
 });
 
 // POST /routines
+// POST /routines — create routine with optional inline exercises + sets.
+// Body: { name, description?, folder_id?, is_public?, exercises?: [...] }
+const createRoutineSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  folder_id: z.string().uuid().nullable().optional(),
+  is_public: z.boolean().optional().default(false),
+  exercises: z.array(routineExerciseSchema).optional().default([]),
+});
+
 routinesRouter.post('/', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
-    const parsed = routineBodySchema.safeParse(req.body);
+    const parsed = createRoutineSchema.safeParse(req.body);
     if (!parsed.success) return next(new AppError('VALIDATION_ERROR', 422, 'Validation failed', parsed.error.errors.map(e => ({ field: String(e.path.join('.')), message: e.message }))));
 
     if (parsed.data.folder_id) {
@@ -126,9 +136,133 @@ routinesRouter.post('/', requireActiveUser, async (req: Request, res: Response, 
       user_id: req.user.id, gym_id: req.user.gym_id,
       name: parsed.data.name, description: parsed.data.description || null,
       folder_id: parsed.data.folder_id || null,
+      is_public: parsed.data.is_public ?? false,
     }).select().single();
     if (error) throw error;
-    res.status(201).json({ data: routine });
+
+    // Insert exercises + sets if provided
+    for (const ex of parsed.data.exercises) {
+      const { data: reRow, error: reErr } = await supabase.from('routine_exercises').insert({
+        routine_id: routine.id, exercise_id: ex.exercise_id, position: ex.position,
+        superset_group: ex.superset_group ?? null, rest_seconds: ex.rest_seconds, notes: ex.notes,
+      }).select().single();
+      if (reErr) continue;
+      if (ex.sets.length > 0) {
+        await supabase.from('routine_sets').insert(ex.sets.map(s => ({
+          routine_exercise_id: reRow.id,
+          position: s.position, set_type: s.set_type,
+          target_weight_kg: s.target_weight_kg ?? null,
+          target_reps: s.target_reps ?? null,
+          target_reps_min: s.target_reps_min ?? null,
+          target_reps_max: s.target_reps_max ?? null,
+          target_duration_seconds: s.target_duration_seconds ?? null,
+          target_distance_meters: s.target_distance_meters ?? null,
+        })));
+      }
+    }
+
+    const detail = await getFullRoutineDetail(routine.id);
+    res.status(201).json({ data: detail ?? routine });
+  } catch (err) { next(err); }
+});
+
+// GET /routines/explore — public routines in the user's gym.
+// Sorted by copy_count DESC, then created_at DESC. Includes owner info.
+routinesRouter.get('/explore', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const limit = Math.min(parseInt(String(req.query.limit)) || 20, 50);
+    const search = String(req.query.search || '').trim();
+    const cursor = String(req.query.cursor || '');
+
+    let q = supabase.from('routines')
+      .select('id, user_id, name, description, copy_count, created_at')
+      .eq('gym_id', req.user.gym_id!)
+      .eq('is_public', true)
+      .order('copy_count', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit + 1);
+    if (search) q = q.ilike('name', `%${search}%`);
+    if (cursor) q = q.lt('created_at', cursor);
+
+    const { data: routines, error } = await q;
+    if (error) throw error;
+
+    const ownerIds = [...new Set((routines || []).map((r: any) => r.user_id))];
+    const { data: owners } = ownerIds.length
+      ? await supabase.from('users').select('id, username, avatar_url').in('id', ownerIds)
+      : { data: [] as any[] };
+    const ownerMap = new Map<string, any>();
+    for (const u of owners || []) ownerMap.set(u.id, u);
+
+    // Compute exercise count per routine (one query)
+    const ids = (routines || []).map((r: any) => r.id);
+    const { data: exCounts } = ids.length
+      ? await supabase.from('routine_exercises').select('routine_id').in('routine_id', ids)
+      : { data: [] as any[] };
+    const countMap: Record<string, number> = {};
+    for (const r of exCounts || []) countMap[r.routine_id] = (countMap[r.routine_id] ?? 0) + 1;
+
+    const all = (routines || []).slice(0, limit).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      copy_count: r.copy_count ?? 0,
+      created_at: r.created_at,
+      exercise_count: countMap[r.id] ?? 0,
+      owner: ownerMap.get(r.user_id) ?? null,
+    }));
+    const next_cursor = (routines?.length ?? 0) > limit ? all[all.length - 1]?.created_at : null;
+
+    res.json({ data: { routines: all, next_cursor } });
+  } catch (err) { next(err); }
+});
+
+// POST /routines/:id/copy — copy a public routine into the user's library.
+routinesRouter.post('/:id/copy', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const source = await getFullRoutineDetail(req.params.id);
+    if (!source) return next(new AppError('NOT_FOUND', 404, 'Routine not found'));
+    // Allow if owned OR is_public within same gym
+    if (source.user_id !== req.user.id) {
+      if (source.gym_id !== req.user.gym_id || !source.is_public) {
+        return next(new AppError('FORBIDDEN', 403, 'This routine is not shared'));
+      }
+    }
+
+    const { data: newRoutine, error: rErr } = await supabase.from('routines').insert({
+      user_id: req.user.id, gym_id: req.user.gym_id, folder_id: null,
+      name: source.user_id === req.user.id ? `${source.name} (Copy)` : source.name,
+      description: source.description || null,
+      is_public: false,
+      source_routine_id: source.id,
+    }).select().single();
+    if (rErr) throw rErr;
+
+    for (const ex of source.exercises || []) {
+      const { data: reRow, error: reErr } = await supabase.from('routine_exercises').insert({
+        routine_id: newRoutine.id, exercise_id: ex.exercise_id, position: ex.position,
+        superset_group: ex.superset_group ?? null, rest_seconds: ex.rest_seconds, notes: ex.notes ?? '',
+      }).select().single();
+      if (reErr) continue;
+      for (const s of ex.sets || []) {
+        await supabase.from('routine_sets').insert({
+          routine_exercise_id: reRow.id, position: s.position, set_type: s.set_type,
+          target_weight_kg: s.target_weight_kg ?? null, target_reps: s.target_reps ?? null,
+          target_reps_min: s.target_reps_min ?? null, target_reps_max: s.target_reps_max ?? null,
+          target_duration_seconds: s.target_duration_seconds ?? null, target_distance_meters: s.target_distance_meters ?? null,
+        });
+      }
+    }
+
+    // Bump source copy_count (only if copying someone else's)
+    if (source.user_id !== req.user.id) {
+      await supabase.from('routines').update({ copy_count: (source.copy_count ?? 0) + 1 }).eq('id', source.id);
+    }
+
+    const detail = await getFullRoutineDetail(newRoutine.id);
+    res.status(201).json({ data: detail });
   } catch (err) { next(err); }
 });
 
