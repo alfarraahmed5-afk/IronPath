@@ -22,6 +22,7 @@ import notificationsRouter from './routes/notifications';
 import pushTokensRouter from './routes/pushTokens';
 import adminRouter from './routes/admin';
 import trainerRouter from './routes/trainer';
+import duelsRouter from './routes/duels';
 import { startJobs, initJobs } from './jobs/index';
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/push-tokens', pushTokensRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/trainer', trainerRouter);
+app.use('/api/v1/duels', duelsRouter);
 
 app.use(errorHandler);
 

@@ -145,7 +145,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
     const { data: user, error } = await supabase.from('users')
-      .select('id, username, full_name, avatar_url, bio, role, is_profile_private, gym_id, created_at')
+      .select('id, username, full_name, avatar_url, bio, role, is_profile_private, gym_id, created_at, showcase_pr_ids, pinned_challenge_exercise_id, challenge_wins, challenge_losses')
       .eq('id', req.params.id).eq('gym_id', req.user.gym_id!).single();
     if (error || !user) return next(new AppError('NOT_FOUND', 404, 'User not found'));
     if (user.is_profile_private && user.id !== req.user.id) {
@@ -154,6 +154,105 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       if (!follow) return res.json({ data: { id: user.id, username: user.username, is_profile_private: true } });
     }
     res.json({ data: user });
+  } catch (err) { next(err); }
+});
+
+// ─── PR Showcase ─────────────────────────────────────────────────────────────
+
+// GET /users/:id/showcase — returns up to 3 selected PRs with exercise info
+router.get('/:id/showcase', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const { data: targetUser } = await supabase.from('users')
+      .select('id, gym_id, showcase_pr_ids').eq('id', req.params.id).single();
+    if (!targetUser || targetUser.gym_id !== req.user.gym_id) {
+      return next(new AppError('NOT_FOUND', 404, 'User not found'));
+    }
+    const ids: string[] = Array.isArray(targetUser.showcase_pr_ids) ? targetUser.showcase_pr_ids : [];
+    if (ids.length === 0) return res.json({ data: { showcase: [] } });
+
+    const { data: prs } = await supabase.from('personal_records')
+      .select('id, exercise_id, record_type, value, achieved_at, exercises(id, name, image_url)')
+      .in('id', ids);
+
+    // Preserve user's chosen order
+    const orderMap = new Map(ids.map((id, i) => [id, i]));
+    const ordered = (prs || []).sort((a, b) =>
+      (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+    );
+    res.json({ data: { showcase: ordered } });
+  } catch (err) { next(err); }
+});
+
+// PUT /users/me/showcase — set the up-to-3 pinned PR IDs
+router.put('/me/showcase', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const schema = z.object({ pr_ids: z.array(z.string().uuid()).max(3) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return next(new AppError('VALIDATION_ERROR', 422, 'Validation failed'));
+
+    // Ensure all provided PR IDs belong to the requesting user
+    if (parsed.data.pr_ids.length > 0) {
+      const { data: prs } = await supabase.from('personal_records')
+        .select('id').in('id', parsed.data.pr_ids).eq('user_id', req.user.id);
+      const owned = new Set((prs || []).map(p => p.id));
+      const allOwned = parsed.data.pr_ids.every(id => owned.has(id));
+      if (!allOwned) return next(new AppError('FORBIDDEN', 403, 'Cannot pin PRs you do not own'));
+    }
+
+    const { error } = await supabase.from('users')
+      .update({ showcase_pr_ids: parsed.data.pr_ids })
+      .eq('id', req.user.id);
+    if (error) throw error;
+    res.json({ data: { showcase_pr_ids: parsed.data.pr_ids } });
+  } catch (err) { next(err); }
+});
+
+// PUT /users/me/pinned-challenge — pin an exercise to invite 1v1 challenges
+router.put('/me/pinned-challenge', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const schema = z.object({ exercise_id: z.string().uuid().nullable() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return next(new AppError('VALIDATION_ERROR', 422, 'Validation failed'));
+    const { error } = await supabase.from('users')
+      .update({ pinned_challenge_exercise_id: parsed.data.exercise_id })
+      .eq('id', req.user.id);
+    if (error) throw error;
+    res.json({ data: { pinned_challenge_exercise_id: parsed.data.exercise_id } });
+  } catch (err) { next(err); }
+});
+
+// ─── User PRs (used by Showcase picker) ───────────────────────────────────────
+
+// GET /users/me/prs — list the user's PRs grouped by exercise (best per type)
+router.get('/me/prs', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const { data } = await supabase.from('personal_records')
+      .select('id, exercise_id, record_type, value, achieved_at, exercises(id, name, image_url)')
+      .eq('user_id', req.user.id)
+      .order('achieved_at', { ascending: false });
+    res.json({ data: { prs: data ?? [] } });
+  } catch (err) { next(err); }
+});
+
+// ─── User Achievement Badges ──────────────────────────────────────────────────
+
+// GET /users/:id/badges
+router.get('/:id/badges', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const { data } = await supabase.from('user_achievements')
+      .select('id, badge_type, badge_label, badge_color, ref_id, metadata, earned_at, expires_at')
+      .eq('user_id', req.params.id)
+      .order('earned_at', { ascending: false })
+      .limit(20);
+    // Filter expired
+    const now = Date.now();
+    const active = (data ?? []).filter(b => !b.expires_at || new Date(b.expires_at).getTime() > now);
+    res.json({ data: { badges: active } });
   } catch (err) { next(err); }
 });
 

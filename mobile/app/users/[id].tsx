@@ -9,8 +9,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, Flame } from 'lucide-react-native';
+import { ChevronRight, Flame, Trophy, Swords } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
+import { useAuthStore } from '../../src/stores/authStore';
 import { Header } from '../../src/components/Header';
 import { Text } from '../../src/components/Text';
 import { Surface } from '../../src/components/Surface';
@@ -19,6 +20,8 @@ import { Button } from '../../src/components/Button';
 import { Icon } from '../../src/components/Icon';
 import { Pressable } from '../../src/components/Pressable';
 import { EmptyState } from '../../src/components/EmptyState';
+import { BadgeChip } from '../../src/components/BadgeChip';
+import { Sheet } from '../../src/components/Sheet';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface PublicUser {
@@ -32,6 +35,26 @@ interface PublicUser {
   following_count: number;
   is_following: boolean;
   follow_status: 'none' | 'pending' | 'active';
+  showcase_pr_ids?: string[];
+  pinned_challenge_exercise_id?: string | null;
+  challenge_wins?: number;
+  challenge_losses?: number;
+}
+
+interface ShowcasePR {
+  id: string;
+  exercise_id: string;
+  record_type: string;
+  value: number;
+  achieved_at: string;
+  exercises?: { id: string; name: string } | null;
+}
+
+interface BadgeData {
+  id: string;
+  badge_type: string;
+  badge_label: string;
+  badge_color: string | null;
 }
 
 interface UserStats {
@@ -146,31 +169,73 @@ function FollowModal({ userId, type, onClose }: { userId: string; type: ModalTyp
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const myId = useAuthStore(s => s.user?.id);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [showcase, setShowcase] = useState<ShowcasePR[]>([]);
+  const [badges, setBadges] = useState<BadgeData[]>([]);
+  const [pinnedExerciseName, setPinnedExerciseName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'active'>('none');
   const [followLoading, setFollowLoading] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
+  const [duelSheetOpen, setDuelSheetOpen] = useState(false);
+  const [duelSubmitting, setDuelSubmitting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const load = async () => {
       setLoading(true);
-      const [userResult, statsResult] = await Promise.allSettled([
+      const [userResult, statsResult, showcaseResult, badgesResult] = await Promise.allSettled([
         api.get<{ data: { user: PublicUser } }>(`/users/${id}`),
         api.get<{ data: UserStats }>(`/users/${id}/stats`),
+        api.get<{ data: { showcase: ShowcasePR[] } }>(`/users/${id}/showcase`),
+        api.get<{ data: { badges: BadgeData[] } }>(`/users/${id}/badges`),
       ]);
       if (userResult.status === 'fulfilled') {
-        const u = userResult.value.data.user;
-        setUser(u);
-        setFollowStatus(u.follow_status);
+        // /users/:id returns the user under data.user OR directly under data
+        // depending on private status. Normalize.
+        const raw: any = userResult.value;
+        const u = raw?.data?.user ?? raw?.data;
+        if (u) {
+          setUser(u);
+          setFollowStatus(u.follow_status ?? 'none');
+          if (u.pinned_challenge_exercise_id) {
+            api.get<{ data: { exercises: Array<{ id: string; name: string }> } }>(`/exercises/by-ids?ids=${u.pinned_challenge_exercise_id}`)
+              .then(r => setPinnedExerciseName(r.data?.exercises?.[0]?.name ?? null))
+              .catch(() => {});
+          }
+        }
       }
-      if (statsResult.status === 'fulfilled') setStats(statsResult.value.data);
+      if (statsResult.status === 'fulfilled') setStats((statsResult.value as any).data);
+      if (showcaseResult.status === 'fulfilled') setShowcase((showcaseResult.value as any).data?.showcase ?? []);
+      if (badgesResult.status === 'fulfilled') setBadges((badgesResult.value as any).data?.badges ?? []);
       setLoading(false);
     };
     load();
   }, [id]);
+
+  async function handleSendDuel(metric: string, days: number) {
+    if (!user?.pinned_challenge_exercise_id || duelSubmitting) return;
+    setDuelSubmitting(true);
+    try {
+      const ends_at = new Date(Date.now() + days * 86400 * 1000).toISOString();
+      const res = await api.post<{ data: { duel: { id: string } } }>('/duels', {
+        opponent_id: user.id,
+        exercise_id: user.pinned_challenge_exercise_id,
+        metric,
+        ends_at,
+      });
+      setDuelSheetOpen(false);
+      const newId = res.data?.duel?.id;
+      if (newId) router.push(`/duels/${newId}` as any);
+    } catch (e: any) {
+      // eslint-disable-next-line no-alert
+      alert(e?.error?.message ?? 'Could not send duel');
+    } finally {
+      setDuelSubmitting(false);
+    }
+  }
 
   const handleFollow = useCallback(async () => {
     if (!user || followLoading) return;
@@ -224,6 +289,16 @@ export default function UserProfileScreen() {
             {user.bio ? (
               <Text variant="body" color="textSecondary" style={styles.bio}>{user.bio}</Text>
             ) : null}
+            {/* Achievement badges */}
+            {badges.length > 0 && (
+              <View style={styles.badgeRow}>
+                {badges.slice(0, 4).map(b => (
+                  <View key={b.id} style={{ marginRight: spacing.xs, marginBottom: spacing.xs }}>
+                    <BadgeChip badge={b as any} size="sm" />
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Stats row */}
@@ -244,16 +319,63 @@ export default function UserProfileScreen() {
             </Pressable>
           </Surface>
 
-          {/* Follow button */}
-          <View style={styles.followBtnRow}>
-            {followStatus === 'pending' ? (
-              <Button label="Requested" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
-            ) : followStatus === 'active' ? (
-              <Button label="Following" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
-            ) : (
-              <Button label="Follow" onPress={handleFollow} variant="primary" size="md" fullWidth loading={followLoading} />
+          {/* Action row: Follow + Duel button if pinned exercise */}
+          <View style={styles.actionRow}>
+            <View style={{ flex: 1, marginRight: pinnedExerciseName && user.id !== myId ? spacing.sm : 0 }}>
+              {followStatus === 'pending' ? (
+                <Button label="Requested" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
+              ) : followStatus === 'active' ? (
+                <Button label="Following" onPress={handleFollow} variant="secondary" size="md" fullWidth loading={followLoading} />
+              ) : (
+                <Button label="Follow" onPress={handleFollow} variant="primary" size="md" fullWidth loading={followLoading} />
+              )}
+            </View>
+            {pinnedExerciseName && user.id !== myId && (
+              <View style={{ flex: 1 }}>
+                <Button label="Duel" onPress={() => setDuelSheetOpen(true)} variant="secondary" size="md" fullWidth />
+              </View>
             )}
           </View>
+
+          {/* W/L record */}
+          {(user.challenge_wins ?? 0) + (user.challenge_losses ?? 0) > 0 && (
+            <Surface level={2} style={styles.recordCard}>
+              <View style={styles.recordIconWrap}>
+                <Icon icon={Swords} size={16} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyEmphasis" color="textPrimary">1v1 Record</Text>
+                <Text variant="caption" color="textTertiary">
+                  {user.challenge_wins ?? 0}W · {user.challenge_losses ?? 0}L
+                </Text>
+              </View>
+              {pinnedExerciseName ? (
+                <View style={styles.pinnedTag}>
+                  <Text variant="overline" color="brand">PINNED: {pinnedExerciseName}</Text>
+                </View>
+              ) : null}
+            </Surface>
+          )}
+
+          {/* Showcase PRs */}
+          {showcase.length > 0 && (
+            <View style={styles.section}>
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Showcase PRs</Text>
+              <View style={styles.showcaseRow}>
+                {showcase.map(pr => (
+                  <Surface key={pr.id} level={2} style={[styles.showcaseCard, { borderColor: colors.brand + '40' }]}>
+                    <Trophy size={16} color={colors.brand} strokeWidth={2} />
+                    <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xs }}>
+                      {pr.exercises?.name || 'Exercise'}
+                    </Text>
+                    <Text variant="numeric" color="brand" style={{ fontSize: 18, lineHeight: 22 }}>
+                      {Math.round(pr.value * 10) / 10}{pr.record_type.includes('reps') ? '' : pr.record_type.includes('duration') ? 's' : pr.record_type.includes('distance') ? 'm' : ' kg'}
+                    </Text>
+                  </Surface>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Streak */}
           {stats && (stats.current_streak > 0 || stats.longest_streak > 0) ? (
@@ -310,6 +432,38 @@ export default function UserProfileScreen() {
       </SafeAreaView>
 
       <FollowModal userId={id} type={modalType} onClose={() => setModalType(null)} />
+
+      {/* Duel sheet */}
+      <Sheet visible={duelSheetOpen} onClose={() => setDuelSheetOpen(false)} snapPoint={0.55}>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.xs }}>
+          Challenge {user.username}
+        </Text>
+        <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.base }}>
+          Pinned: {pinnedExerciseName ?? '—'}
+        </Text>
+        <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.sm }}>Metric</Text>
+        {([
+          { key: 'heaviest_weight', label: 'Heaviest Weight' },
+          { key: 'projected_1rm', label: 'Estimated 1RM' },
+          { key: 'most_reps', label: 'Most Reps' },
+          { key: 'best_volume_set', label: 'Top Set Volume' },
+        ] as const).map(opt => (
+          <Pressable
+            key={opt.key}
+            onPress={() => handleSendDuel(opt.key, 7)}
+            style={styles.duelOptRow}
+            accessibilityLabel={opt.label}
+          >
+            <Text variant="body" color="textPrimary" style={{ flex: 1 }}>{opt.label}</Text>
+            <Text variant="overline" color="brand">7 days</Text>
+          </Pressable>
+        ))}
+        {duelSubmitting && (
+          <View style={{ alignItems: 'center', marginTop: spacing.md }}>
+            <ActivityIndicator color={colors.brand} />
+          </View>
+        )}
+      </Sheet>
     </>
   );
 }
@@ -324,6 +478,36 @@ const styles = StyleSheet.create({
   statCell: { flex: 1, alignItems: 'center', paddingVertical: spacing.base, gap: spacing.xxs },
   statDivider: { width: StyleSheet.hairlineWidth, height: 40, backgroundColor: colors.border, alignSelf: 'center' },
   followBtnRow: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  actionRow: { flexDirection: 'row', paddingHorizontal: spacing.base, marginBottom: spacing.lg },
+  badgeRow: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center',
+    marginTop: spacing.md, paddingHorizontal: spacing.lg,
+  },
+  recordCard: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: spacing.base, marginHorizontal: spacing.base, marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  recordIconWrap: {
+    width: 36, height: 36, borderRadius: radii.full,
+    backgroundColor: colors.brandGlow,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pinnedTag: {
+    backgroundColor: colors.brandGlow,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  showcaseRow: { flexDirection: 'row', gap: spacing.sm },
+  showcaseCard: {
+    flex: 1, padding: spacing.md,
+    borderWidth: 1, alignItems: 'flex-start',
+  },
+  duelOptRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: spacing.md, marginBottom: spacing.xs,
+    borderRadius: radii.md, backgroundColor: colors.surface3,
+  },
   section: { paddingHorizontal: spacing.base, marginBottom: spacing.lg },
   sectionLabel: { marginBottom: spacing.sm },
   streakCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.base },

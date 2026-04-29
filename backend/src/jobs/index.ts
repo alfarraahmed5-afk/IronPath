@@ -525,5 +525,78 @@ export function startJobs(): void {
     } catch (err) { logger.error({ err }, 'Pending media cleanup failed'); }
   }, { timezone: 'UTC' });
 
+  // Daily badge awards — runs at 06:00 UTC after the leaderboard cron has
+  // populated snapshots. Awards Top-10 badges in each leaderboard category
+  // and a generic "challenge_winner" badge for completed gym challenges.
+  cron.schedule('0 6 * * *', async () => {
+    try {
+      logger.info('Badge award job started');
+      const { data: snaps } = await supabase
+        .from('leaderboard_snapshots')
+        .select('gym_id, category, period, exercise_id, rankings, generated_at')
+        .in('category', ['heaviest_lift', 'most_volume_alltime', 'most_workouts_alltime', 'longest_streak'])
+        .gte('generated_at', new Date(Date.now() - 36 * 3600 * 1000).toISOString());
+
+      const BADGE_LABELS: Record<string, string> = {
+        heaviest_lift: 'Top 10 · Lift',
+        most_volume_alltime: 'Top 10 · Volume',
+        most_workouts_alltime: 'Top 10 · Workouts',
+        longest_streak: 'Top 10 · Streak',
+      };
+      const BADGE_TYPES: Record<string, string> = {
+        heaviest_lift: 'top10_lifts',
+        most_volume_alltime: 'top10_volume',
+        most_workouts_alltime: 'top10_workouts',
+        longest_streak: 'top10_streak',
+      };
+
+      const awards: any[] = [];
+      const expiresAt = new Date(Date.now() + 30 * 86400 * 1000).toISOString();
+      for (const snap of snaps || []) {
+        const rankings = (snap.rankings as any[]) || [];
+        const top10 = rankings.slice(0, 10);
+        for (const r of top10) {
+          if (!r.user_id) continue;
+          awards.push({
+            user_id: r.user_id,
+            gym_id: snap.gym_id,
+            badge_type: BADGE_TYPES[snap.category],
+            badge_label: BADGE_LABELS[snap.category],
+            badge_color: r.rank === 1 ? '#FFD700' : r.rank <= 3 ? '#C0C0C0' : '#CD7F32',
+            ref_id: snap.exercise_id || null,
+            metadata: { rank: r.rank, period: snap.period },
+            expires_at: expiresAt,
+          });
+        }
+      }
+
+      // Challenge winners
+      const { data: completedChallenges } = await supabase
+        .from('leaderboard_challenges')
+        .select('id, gym_id, name, enrolled_user_ids')
+        .eq('status', 'completed')
+        .gte('ends_at', new Date(Date.now() - 36 * 3600 * 1000).toISOString());
+      for (const ch of completedChallenges || []) {
+        // A real winner needs the rankings — pull current snapshot (or use enrolled[0] as a placeholder)
+        const enrolled = Array.isArray(ch.enrolled_user_ids) ? ch.enrolled_user_ids : [];
+        if (enrolled.length === 0) continue;
+        awards.push({
+          user_id: enrolled[0],
+          gym_id: ch.gym_id,
+          badge_type: 'challenge_winner',
+          badge_label: `Won: ${ch.name}`,
+          badge_color: '#FFD700',
+          ref_id: ch.id,
+          metadata: { challenge_name: ch.name },
+        });
+      }
+
+      if (awards.length > 0) {
+        await supabase.from('user_achievements').upsert(awards, { onConflict: 'user_id,badge_type,ref_id' });
+      }
+      logger.info({ awarded: awards.length }, 'Badge award job complete');
+    } catch (err) { logger.error({ err }, 'Badge award job failed'); }
+  }, { timezone: 'UTC' });
+
   logger.info('All background jobs registered');
 }

@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Settings, Flame, ChevronRight, Activity } from 'lucide-react-native';
+import { Settings, Flame, ChevronRight, Activity, Trophy, Swords } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/lib/api';
@@ -17,6 +17,7 @@ import { Surface } from '../../src/components/Surface';
 import { Button } from '../../src/components/Button';
 import { Icon } from '../../src/components/Icon';
 import { EmptyState } from '../../src/components/EmptyState';
+import { BadgeChip } from '../../src/components/BadgeChip';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,27 @@ interface ProfileData {
   bio: string | null;
   role: string;
   gym_id: string;
+  showcase_pr_ids?: string[];
+  pinned_challenge_exercise_id?: string | null;
+  challenge_wins?: number;
+  challenge_losses?: number;
+}
+
+interface ShowcasePR {
+  id: string;
+  exercise_id: string;
+  record_type: string;
+  value: number;
+  achieved_at: string;
+  exercises?: { id: string; name: string; image_url: string | null } | null;
+}
+
+interface BadgeData {
+  id: string;
+  badge_type: string;
+  badge_label: string;
+  badge_color: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 interface StrengthLevel {
@@ -80,14 +102,20 @@ export default function ProfileScreen() {
   const [followingCount, setFollowingCount] = useState('0');
   const [loading, setLoading] = useState(true);
 
+  const [showcase, setShowcase] = useState<ShowcasePR[]>([]);
+  const [badges, setBadges] = useState<BadgeData[]>([]);
+  const [pinnedExerciseName, setPinnedExerciseName] = useState<string | null>(null);
+
   const fetchAll = useCallback(async (userId: string) => {
     setLoading(true);
     try {
-      const [profileRes, statsRes, followersRes, followingRes] = await Promise.allSettled([
+      const [profileRes, statsRes, followersRes, followingRes, showcaseRes, badgesRes] = await Promise.allSettled([
         api.get<{ data: ProfileData }>('/users/me'),
         api.get<{ data: StatsData }>(`/users/${userId}/stats`),
         api.get<{ followers: unknown[]; next_cursor: string | null }>(`/users/${userId}/followers?limit=50`),
         api.get<{ following: unknown[]; next_cursor: string | null }>(`/users/${userId}/following?limit=50`),
+        api.get<{ data: { showcase: ShowcasePR[] } }>(`/users/${userId}/showcase`),
+        api.get<{ data: { badges: BadgeData[] } }>(`/users/${userId}/badges`),
       ]);
       if (profileRes.status === 'fulfilled') {
         const fresh = (profileRes.value as any).data;
@@ -95,8 +123,18 @@ export default function ProfileScreen() {
         // Keep the global authStore in sync — fixes the bug where username
         // updates via /users/me PATCH didn't visually reflect until restart.
         if (fresh && setUser) setUser({ ...(user as any), ...fresh });
+        // Fetch pinned challenge exercise name
+        if (fresh?.pinned_challenge_exercise_id) {
+          api.get<{ data: { exercises: Array<{ id: string; name: string }> } }>(`/exercises/by-ids?ids=${fresh.pinned_challenge_exercise_id}`)
+            .then(r => setPinnedExerciseName(r.data?.exercises?.[0]?.name ?? null))
+            .catch(() => {});
+        } else {
+          setPinnedExerciseName(null);
+        }
       }
       if (statsRes.status === 'fulfilled') setStats((statsRes.value as any).data);
+      if (showcaseRes.status === 'fulfilled') setShowcase((showcaseRes.value as any).data?.showcase ?? []);
+      if (badgesRes.status === 'fulfilled') setBadges((badgesRes.value as any).data?.badges ?? []);
       if (followersRes.status === 'fulfilled') {
         const fd = followersRes.value as any;
         const c = fd.followers?.length ?? 0;
@@ -169,6 +207,16 @@ export default function ProfileScreen() {
           {displayBio ? (
             <Text variant="body" color="textSecondary" style={styles.bio}>{displayBio}</Text>
           ) : null}
+          {/* Achievement badges row */}
+          {badges.length > 0 && (
+            <View style={styles.badgeRow}>
+              {badges.slice(0, 4).map(b => (
+                <View key={b.id} style={{ marginRight: spacing.xs, marginBottom: spacing.xs }}>
+                  <BadgeChip badge={b as any} size="sm" />
+                </View>
+              ))}
+            </View>
+          )}
           <Button
             label="Edit Profile"
             onPress={() => router.push('/profile/edit')}
@@ -176,6 +224,91 @@ export default function ProfileScreen() {
             size="sm"
             style={{ marginTop: spacing.md }}
           />
+        </View>
+
+        {/* PR Showcase */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text variant="overline" color="textTertiary">Showcase PRs</Text>
+            <TouchableOpacity onPress={() => router.push('/profile/showcase' as any)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Text variant="label" color="brand">{showcase.length === 0 ? 'Add' : 'Edit'}</Text>
+            </TouchableOpacity>
+          </View>
+          {showcase.length === 0 ? (
+            <Surface level={2} style={styles.showcaseEmpty}>
+              <Trophy size={20} color={colors.textTertiary} strokeWidth={1.5} />
+              <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
+                Pin up to 3 PRs to flex on your profile
+              </Text>
+            </Surface>
+          ) : (
+            <View style={styles.showcaseRow}>
+              {showcase.map(pr => (
+                <Surface key={pr.id} level={2} style={[styles.showcaseCard, { borderColor: colors.brand + '40' }]}>
+                  <Trophy size={16} color={colors.brand} strokeWidth={2} />
+                  <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xs }}>
+                    {pr.exercises?.name || 'Exercise'}
+                  </Text>
+                  <Text variant="numeric" color="brand" style={{ fontSize: 18, lineHeight: 22 }}>
+                    {Math.round(pr.value * 10) / 10}{pr.record_type.includes('reps') ? '' : pr.record_type.includes('duration') ? 's' : pr.record_type.includes('distance') ? 'm' : ' kg'}
+                  </Text>
+                  <Text variant="overline" color="textTertiary" style={{ fontSize: 9 }}>
+                    {pr.record_type.replace(/_/g, ' ')}
+                  </Text>
+                </Surface>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 1v1 Challenges card */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text variant="overline" color="textTertiary">1v1 Challenges</Text>
+            <TouchableOpacity onPress={() => router.push('/profile/duel-pin' as any)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Text variant="label" color="brand">{pinnedExerciseName ? 'Change' : 'Pin'}</Text>
+            </TouchableOpacity>
+          </View>
+          <Surface level={2} style={styles.duelCard}>
+            <View style={styles.duelRow}>
+              <View style={[styles.duelIcon, { backgroundColor: colors.brandGlow }]}>
+                <Swords size={18} color={colors.brand} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                {pinnedExerciseName ? (
+                  <>
+                    <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{pinnedExerciseName}</Text>
+                    <Text variant="caption" color="textTertiary">Tap an opponent's profile to challenge them</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text variant="bodyEmphasis" color="textPrimary">No exercise pinned</Text>
+                    <Text variant="caption" color="textTertiary">Pin one to invite 1v1 challenges</Text>
+                  </>
+                )}
+              </View>
+            </View>
+            <View style={styles.duelStatsRow}>
+              <View style={styles.duelStatCell}>
+                <Text variant="numeric" color="success" style={{ fontSize: 20, lineHeight: 24 }}>
+                  {profile?.challenge_wins ?? 0}
+                </Text>
+                <Text variant="overline" color="textTertiary">Wins</Text>
+              </View>
+              <View style={styles.duelStatDivider} />
+              <View style={styles.duelStatCell}>
+                <Text variant="numeric" color="danger" style={{ fontSize: 20, lineHeight: 24 }}>
+                  {profile?.challenge_losses ?? 0}
+                </Text>
+                <Text variant="overline" color="textTertiary">Losses</Text>
+              </View>
+              <View style={styles.duelStatDivider} />
+              <TouchableOpacity style={styles.duelStatCell} onPress={() => router.push('/duels' as any)}>
+                <Text variant="label" color="brand">View All</Text>
+                <Text variant="overline" color="textTertiary">My Duels</Text>
+              </TouchableOpacity>
+            </View>
+          </Surface>
         </View>
 
         {/* Stats row */}
@@ -354,6 +487,40 @@ const styles = StyleSheet.create({
     padding: spacing.base,
   },
   streakRow: { flexDirection: 'row', alignItems: 'center' },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  section: { marginHorizontal: spacing.base, marginBottom: spacing.lg },
+  showcaseEmpty: {
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  showcaseRow: { flexDirection: 'row', gap: spacing.sm },
+  showcaseCard: {
+    flex: 1,
+    padding: spacing.md,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+    gap: 0,
+  },
+  duelCard: { padding: spacing.base },
+  duelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+  duelIcon: { width: 36, height: 36, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
+  duelStatsRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface3,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+  },
+  duelStatCell: { flex: 1, alignItems: 'center', gap: 2 },
+  duelStatDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4 },
   sectionTitle: { paddingHorizontal: spacing.base, marginBottom: spacing.md },
   sectionHeader: {
     flexDirection: 'row',
