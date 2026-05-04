@@ -5,7 +5,9 @@ import { useRouter } from 'expo-router';
 import { Camera } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+// SDK 54+ moved the legacy file-system API to '/legacy'; the root export
+// is now the new class-based API which doesn't have readAsStringAsync.
+import * as FileSystem from 'expo-file-system/legacy';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/lib/api';
 import { Header } from '../../src/components/Header';
@@ -38,7 +40,8 @@ export default function EditProfileScreen() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        // MediaTypeOptions was removed in SDK 54+; pass an array of strings.
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,

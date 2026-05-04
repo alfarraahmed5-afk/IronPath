@@ -33,8 +33,8 @@ function formatDuration(s: number): string {
 
 async function requestPushPermission(): Promise<void> {
   try {
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    if (existing === 'granted') return;
+    const existing: any = await Notifications.getPermissionsAsync();
+    if (existing.status === 'granted' || existing.granted === true) return;
     await new Promise<void>(resolve => {
       Alert.alert(
         'Stay in the Loop',
@@ -44,8 +44,8 @@ async function requestPushPermission(): Promise<void> {
           {
             text: 'Enable',
             onPress: async () => {
-              const { status } = await Notifications.requestPermissionsAsync();
-              if (status === 'granted') {
+              const result: any = await Notifications.requestPermissionsAsync();
+              if (result.status === 'granted' || result.granted === true) {
                 if (Platform.OS === 'android') {
                   await Notifications.setNotificationChannelAsync('default', {
                     name: 'default',

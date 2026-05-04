@@ -77,7 +77,8 @@ export default function CreateExerciseScreen() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        // MediaTypeOptions was removed in SDK 54+; pass an array of strings.
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.85,
