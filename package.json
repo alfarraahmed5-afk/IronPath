@@ -9,7 +9,6 @@
     "build:admin": "npm run build --workspace=admin"
   },
   "overrides": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-native-worklets": "0.7.4"
   }
 }
