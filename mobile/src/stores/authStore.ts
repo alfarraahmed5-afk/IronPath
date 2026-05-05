@@ -56,18 +56,26 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
       setTokens(accessToken, refreshToken);
-      // Validate the token by fetching the current user. If it fails (e.g.
-      // tokens expired beyond the refresh window), wipe credentials so the
-      // next render kicks the user back to login instead of a half-loaded
-      // session.
+      // Try to validate and get fresh user data. Only clear credentials on a
+      // genuine 401 (token expired and refresh failed). Network errors (no
+      // connection, backend cold start, timeout) must NOT log the user out —
+      // they still have valid tokens and will succeed on the next request.
       try {
         const res = await api.get<{ data: AuthUser }>('/users/me');
         set({ user: res.data, isAuthenticated: true, isLoading: false });
-      } catch {
-        await SecureStore.deleteItemAsync('access_token');
-        await SecureStore.deleteItemAsync('refresh_token');
-        clearTokens();
-        set({ user: null, isAuthenticated: false, isLoading: false });
+      } catch (err: any) {
+        const status = err?.status ?? err?.statusCode ?? 0;
+        const isAuthError = status === 401 || err?.code === 'UNAUTHORIZED';
+        if (isAuthError) {
+          await SecureStore.deleteItemAsync('access_token');
+          await SecureStore.deleteItemAsync('refresh_token');
+          clearTokens();
+          set({ user: null, isAuthenticated: false, isLoading: false });
+        } else {
+          // Network/server error — keep tokens, stay authenticated.
+          // Screens will load their data when they mount.
+          set({ isAuthenticated: true, isLoading: false });
+        }
       }
     } catch {
       set({ isLoading: false });

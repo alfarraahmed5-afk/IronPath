@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X } from 'lucide-react-native';
+import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X, ChevronRight } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore, ActiveWorkout } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
@@ -20,6 +20,7 @@ import { Icon } from '../../src/components/Icon';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Pressable } from '../../src/components/Pressable';
 import { Calendar } from '../../src/components/Calendar';
+import { Sheet } from '../../src/components/Sheet';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +68,8 @@ function formatTimeAgo(iso: string): string {
   if (m > 0) return `${m}m ago`;
   return 'Just now';
 }
+
+function pad2(n: number): string { return n < 10 ? `0${n}` : String(n); }
 
 // ─── WorkoutCard ──────────────────────────────────────────────────────────────
 
@@ -138,6 +141,7 @@ export default function WorkoutsScreen() {
   const router = useRouter();
   const startWorkout = useWorkoutStore(s => s.startWorkout);
 
+  // List view state
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +150,18 @@ export default function WorkoutsScreen() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [draftData, setDraftData] = useState<{ draft: ActiveWorkout; idempotency_key: string } | null>(null);
+
+  // Calendar view state
+  const [calView, setCalView] = useState(false);
+  const [calMonth, setCalMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [workoutDates, setWorkoutDates] = useState<Set<string>>(new Set());
+  const [calLoading, setCalLoading] = useState(false);
+  const [daySheetVisible, setDaySheetVisible] = useState(false);
+  const [daySheetIds, setDaySheetIds] = useState<string[]>([]);
+  const [daySheetDate, setDaySheetDate] = useState('');
 
   useEffect(() => {
     const store = useWorkoutStore.getState();
@@ -157,6 +173,27 @@ export default function WorkoutsScreen() {
     fetchWorkouts(null, true);
     fetchRoutines();
   }, []);
+
+  // Fetch calendar dates whenever calView is enabled or month changes
+  useEffect(() => {
+    if (!calView) return;
+    const y = calMonth.getFullYear();
+    const m = calMonth.getMonth();
+    const start = `${y}-${pad2(m + 1)}-01`;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const end = `${y}-${pad2(m + 1)}-${pad2(lastDay)}`;
+    setCalLoading(true);
+    api.get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
+      `/workouts/calendar?start=${start}&end=${end}`
+    )
+      .then(res => {
+        const dates = new Set<string>();
+        for (const d of res.data?.days ?? []) dates.add(d.date);
+        setWorkoutDates(dates);
+      })
+      .catch(() => {})
+      .finally(() => setCalLoading(false));
+  }, [calView, calMonth]);
 
   const fetchWorkouts = useCallback(async (cursorParam: string | null, reset = false) => {
     reset ? setLoading(true) : setLoadingMore(true);
@@ -205,13 +242,24 @@ export default function WorkoutsScreen() {
     setShowResumeModal(false);
   }
 
-  function ListHeader() {
-    return (
-      <View>
-        {/* Section title */}
-        <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Recent Workouts</Text>
-      </View>
-    );
+  async function handleDayPress(date: string) {
+    const y = calMonth.getFullYear();
+    const m = calMonth.getMonth();
+    const res = await api.get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
+      `/workouts/calendar?start=${date}&end=${date}`
+    ).catch(() => null);
+    const ids = res?.data?.days?.find(d => d.date === date)?.workout_ids ?? [];
+    if (ids.length === 1) {
+      router.push(`/workouts/${ids[0]}` as any);
+    } else if (ids.length > 1) {
+      setDaySheetIds(ids);
+      setDaySheetDate(date);
+      setDaySheetVisible(true);
+    }
+  }
+
+  function handleChangeMonth(d: Date) {
+    setCalMonth(d);
   }
 
   return (
@@ -219,9 +267,17 @@ export default function WorkoutsScreen() {
       {/* Header */}
       <View style={styles.topBar}>
         <Text variant="title2" color="textPrimary">Workouts</Text>
+        <TouchableOpacity
+          onPress={() => setCalView(v => !v)}
+          style={[styles.calToggle, calView && styles.calToggleActive]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={calView ? 'Switch to list view' : 'Switch to calendar view'}
+        >
+          <CalendarIcon size={18} color={calView ? colors.brand : colors.textSecondary} strokeWidth={2} />
+        </TouchableOpacity>
       </View>
 
-      {/* Fixed top area */}
+      {/* Start workout actions */}
       <View style={styles.topActions}>
         <Button
           label="Start Workout"
@@ -249,35 +305,55 @@ export default function WorkoutsScreen() {
         )}
       </View>
 
-      {/* Workout list */}
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.brand} size="large" />
-        </View>
-      ) : (
-        <FlatList
-          data={workouts}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <WorkoutCard workout={item} onPress={() => router.push(`/workouts/${item.id}` as any)} />
-          )}
-          ListHeaderComponent={<ListHeader />}
-          ListEmptyComponent={
-            <EmptyState
-              illustration="workouts"
-              title="Your first workout starts here"
-              description="Tap Start to log a session."
-              action={{ label: 'Start Workout', onPress: handleStartWorkout }}
+      {calView ? (
+        /* ── Calendar view ─────────────────────────────────────────────── */
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          {calLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator color={colors.brand} />
+            </View>
+          ) : (
+            <Calendar
+              selectedMonth={calMonth}
+              onChangeMonth={handleChangeMonth}
+              workoutDates={workoutDates}
+              onDayPress={handleDayPress}
             />
-          }
-          ListFooterComponent={
-            loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null
-          }
-          onEndReached={() => { if (hasMore && !loadingMore && !loading) fetchWorkouts(cursor); }}
-          onEndReachedThreshold={0.3}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        />
+          )}
+        </ScrollView>
+      ) : (
+        /* ── List view ─────────────────────────────────────────────────── */
+        loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.brand} size="large" />
+          </View>
+        ) : (
+          <FlatList
+            data={workouts}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <WorkoutCard workout={item} onPress={() => router.push(`/workouts/${item.id}` as any)} />
+            )}
+            ListHeaderComponent={
+              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Recent Workouts</Text>
+            }
+            ListEmptyComponent={
+              <EmptyState
+                illustration="workouts"
+                title="Your first workout starts here"
+                description="Tap Start to log a session."
+                action={{ label: 'Start Workout', onPress: handleStartWorkout }}
+              />
+            }
+            ListFooterComponent={
+              loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null
+            }
+            onEndReached={() => { if (hasMore && !loadingMore && !loading) fetchWorkouts(cursor); }}
+            onEndReachedThreshold={0.3}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 32 }}
+          />
+        )
       )}
 
       {showResumeModal && draftData && (
@@ -288,6 +364,25 @@ export default function WorkoutsScreen() {
           onDiscard={handleDiscard}
         />
       )}
+
+      {/* Day workouts sheet (when a day has multiple workouts) */}
+      <Sheet visible={daySheetVisible} onClose={() => setDaySheetVisible(false)} snapPoint={0.5}>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.xs }}>{daySheetDate}</Text>
+        <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.base }}>
+          {daySheetIds.length} workout{daySheetIds.length !== 1 ? 's' : ''} this day
+        </Text>
+        {daySheetIds.map((id, idx) => (
+          <Pressable
+            key={id}
+            accessibilityLabel={`Workout ${idx + 1}`}
+            onPress={() => { setDaySheetVisible(false); router.push(`/workouts/${id}` as any); }}
+            style={[styles.daySheetRow, idx < daySheetIds.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+          >
+            <Text variant="body" color="textPrimary" style={{ flex: 1 }}>Workout {idx + 1}</Text>
+            <Icon icon={ChevronRight} size={16} color={colors.textTertiary} />
+          </Pressable>
+        ))}
+      </Sheet>
     </SafeAreaView>
   );
 }
@@ -297,10 +392,22 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+  },
+  calToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calToggleActive: {
+    backgroundColor: colors.brandGlow,
   },
   topActions: {
     paddingHorizontal: spacing.base,
@@ -321,7 +428,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.base,
     paddingBottom: spacing.sm,
   },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['3xl'] },
   card: {
     marginHorizontal: spacing.base,
     marginBottom: spacing.sm,
@@ -330,6 +437,11 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
   cardStats: { flexDirection: 'row', gap: spacing.md },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  daySheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',

@@ -1,6 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { useEffect } from 'react';
 import { Newspaper, Dumbbell, Trophy, Sparkles, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TabBarIcon } from '../../src/components/TabBarIcon';
 import { colors } from '../../src/theme/tokens';
@@ -8,6 +9,7 @@ import { colors } from '../../src/theme/tokens';
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const isLoading = useAuthStore(s => s.isLoading);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -23,8 +25,8 @@ export default function TabsLayout() {
           backgroundColor: colors.surface1,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: 50 + insets.bottom,
+          paddingBottom: insets.bottom + 4,
           paddingTop: 6,
         },
         tabBarActiveTintColor: colors.brand,

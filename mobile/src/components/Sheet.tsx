@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import {
   Modal,
   View,
@@ -9,11 +9,11 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  runOnJS,
 } from 'react-native-reanimated';
 import { colors, radii, spacing } from '../theme/tokens';
 
@@ -27,14 +27,12 @@ type Props = {
 };
 
 export function Sheet({ visible, onClose, snapPoint = 0.6, children }: Props) {
+  const insets = useSafeAreaInsets();
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
   useEffect(() => {
     if (visible) {
-      translateY.value = withSpring(SCREEN_HEIGHT * (1 - snapPoint), {
-        damping: 18,
-        stiffness: 200,
-      });
+      translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
     } else {
       translateY.value = withSpring(SCREEN_HEIGHT, { damping: 18, stiffness: 200 });
     }
@@ -51,7 +49,7 @@ export function Sheet({ visible, onClose, snapPoint = 0.6, children }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
-        <Animated.View style={[styles.sheet, animStyle, { height: SCREEN_HEIGHT * snapPoint }]}>
+        <Animated.View style={[styles.sheet, animStyle, { height: SCREEN_HEIGHT * snapPoint, paddingBottom: insets.bottom + spacing['2xl'] }]}>
           <View style={styles.handle} />
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -79,7 +77,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
     paddingHorizontal: spacing.base,
-    paddingBottom: spacing['2xl'],
   },
   handle: {
     width: 36,

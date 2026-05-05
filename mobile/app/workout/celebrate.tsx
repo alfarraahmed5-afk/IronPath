@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Trophy } from 'lucide-react-native';
 import { Text } from '../../src/components/Text';
@@ -27,7 +28,7 @@ export default function CelebrateScreen() {
   }, []);
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root} edges={['bottom']}>
       {/* Hero — fixed region */}
       <View style={styles.hero}>
         <View style={styles.trophyHalo}>
@@ -71,7 +72,7 @@ export default function CelebrateScreen() {
           fullWidth
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
