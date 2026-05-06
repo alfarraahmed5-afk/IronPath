@@ -11,7 +11,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
     const { data: user, error } = await supabase.from('users')
-      .select('id, username, full_name, avatar_url, bio, role, sex, date_of_birth, bodyweight_kg, is_profile_private, gym_id, created_at')
+      .select('id, username, full_name, avatar_url, bio, role, sex, date_of_birth, bodyweight_kg, is_profile_private, gym_id, created_at, showcase_pr_ids, pinned_challenge_exercise_id')
       .eq('id', req.user.id).single();
     if (error || !user) return next(new AppError('NOT_FOUND', 404, 'User not found'));
     res.json({ data: user });
@@ -148,16 +148,50 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .select('id, username, full_name, avatar_url, bio, role, is_profile_private, gym_id, created_at, showcase_pr_ids, pinned_challenge_exercise_id, challenge_wins, challenge_losses')
       .eq('id', req.params.id).eq('gym_id', req.user.gym_id!).single();
     if (error || !user) return next(new AppError('NOT_FOUND', 404, 'User not found'));
-    if (user.is_profile_private && user.id !== req.user.id) {
-      const { data: follow } = await supabase.from('follows')
-        .select('id').eq('follower_id', req.user.id).eq('following_id', user.id).eq('status', 'active').maybeSingle();
-      if (!follow) return res.json({ data: { id: user.id, username: user.username, is_profile_private: true } });
+
+    // Fetch follower/following counts and the viewer's follow status in parallel
+    const [followerRes, followingRes, followRes] = await Promise.all([
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id).eq('status', 'active'),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id).eq('status', 'active'),
+      req.user.id !== user.id
+        ? supabase.from('follows').select('status').eq('follower_id', req.user.id).eq('following_id', user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const follower_count = followerRes.count ?? 0;
+    const following_count = followingRes.count ?? 0;
+    const follow_status: string = (followRes.data as any)?.status ?? 'none';
+
+    if (user.is_profile_private && user.id !== req.user.id && follow_status !== 'active') {
+      return res.json({ data: { id: user.id, username: user.username, is_profile_private: true, follower_count, following_count, follow_status } });
     }
-    res.json({ data: user });
+    res.json({ data: { ...user, follower_count, following_count, follow_status } });
   } catch (err) { next(err); }
 });
 
 // ─── PR Showcase ─────────────────────────────────────────────────────────────
+
+// GET /users/me/showcase — returns the logged-in user's selected showcase PRs
+// MUST be defined before /:id/showcase so 'me' is not treated as a uuid param.
+router.get('/me/showcase', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const { data: targetUser } = await supabase.from('users')
+      .select('id, gym_id, showcase_pr_ids').eq('id', req.user.id).single();
+    if (!targetUser) return next(new AppError('NOT_FOUND', 404, 'User not found'));
+    const ids: string[] = Array.isArray(targetUser.showcase_pr_ids) ? targetUser.showcase_pr_ids : [];
+    if (ids.length === 0) return res.json({ data: { showcase: [] } });
+
+    const { data: prs } = await supabase.from('personal_records')
+      .select('id, exercise_id, record_type, value, achieved_at, exercises(id, name, image_url)')
+      .in('id', ids);
+
+    const orderMap = new Map(ids.map((id, i) => [id, i]));
+    const ordered = (prs || []).sort((a, b) =>
+      (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+    );
+    res.json({ data: { showcase: ordered } });
+  } catch (err) { next(err); }
+});
 
 // GET /users/:id/showcase — returns up to 3 selected PRs with exercise info
 router.get('/:id/showcase', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
@@ -241,18 +275,37 @@ router.get('/me/prs', requireActiveUser, async (req: Request, res: Response, nex
 // ─── User Achievement Badges ──────────────────────────────────────────────────
 
 // GET /users/:id/badges
+const BADGE_META: Record<string, { label: string; color: string }> = {
+  first_rep:     { label: 'First Rep',      color: '#CD7F32' },
+  ten_strong:    { label: 'Ten Strong',     color: '#3B82F6' },
+  half_century:  { label: 'Half Century',   color: '#3B82F6' },
+  century:       { label: 'Century Club',   color: '#FFD700' },
+  iron_month:    { label: 'Iron Month',     color: '#FF6B35' },
+  iron_quarter:  { label: 'Iron Quarter',   color: '#FFD700' },
+  pr_machine:    { label: 'PR Machine',     color: '#FFD700' },
+  heavy_lifter:  { label: 'Heavy Lifter',   color: '#FF6B35' },
+  consistent:    { label: 'Consistent',     color: '#22C55E' },
+  early_bird:    { label: 'Early Bird',     color: '#F59E0B' },
+  night_owl:     { label: 'Night Owl',      color: '#8B5CF6' },
+  gym_legend:    { label: 'Gym Legend',     color: '#FFD700' },
+};
+
 router.get('/:id/badges', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
-    const { data } = await supabase.from('user_achievements')
-      .select('id, badge_type, badge_label, badge_color, ref_id, metadata, earned_at, expires_at')
+    const { data } = await supabase.from('user_badges')
+      .select('id, badge_key, awarded_at')
       .eq('user_id', req.params.id)
-      .order('earned_at', { ascending: false })
+      .order('awarded_at', { ascending: false })
       .limit(20);
-    // Filter expired
-    const now = Date.now();
-    const active = (data ?? []).filter(b => !b.expires_at || new Date(b.expires_at).getTime() > now);
-    res.json({ data: { badges: active } });
+    const badges = (data ?? []).map(b => ({
+      id: b.id,
+      badge_type: b.badge_key,
+      badge_label: BADGE_META[b.badge_key]?.label ?? b.badge_key,
+      badge_color: BADGE_META[b.badge_key]?.color ?? null,
+      awarded_at: b.awarded_at,
+    }));
+    res.json({ data: { badges } });
   } catch (err) { next(err); }
 });
 
@@ -308,7 +361,7 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
 
     const [workoutsRes, streakRes, prsRes, recentRes, targetUserRes] = await Promise.all([
       supabase.from('workouts').select('total_volume_kg').eq('user_id', targetId).eq('is_completed', true),
-      supabase.from('streaks').select('current_streak_weeks').eq('user_id', targetId).maybeSingle(),
+      supabase.from('streaks').select('current_streak_weeks, longest_streak_weeks').eq('user_id', targetId).maybeSingle(),
       supabase.from('personal_records').select('exercise_id, record_type, value, exercises!inner(name, wger_id)').eq('user_id', targetId).eq('record_type', 'projected_1rm'),
       supabase.from('workouts').select('id, name, started_at, total_volume_kg').eq('user_id', targetId).eq('is_completed', true).order('started_at', { ascending: false }).limit(5),
       supabase.from('users').select('bodyweight_kg, sex').eq('id', targetId).maybeSingle(),
@@ -316,7 +369,8 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
 
     const total_workouts = (workoutsRes.data ?? []).length;
     const total_volume_kg = (workoutsRes.data ?? []).reduce((s, w) => s + (w.total_volume_kg ?? 0), 0);
-    const current_streak_weeks = streakRes.data?.current_streak_weeks ?? 0;
+    const current_streak = streakRes.data?.current_streak_weeks ?? 0;
+    const longest_streak = (streakRes.data as any)?.longest_streak_weeks ?? 0;
 
     // Strength level classification
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -341,7 +395,14 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
       return { exercise_name: std.name, projected_1rm_kg, level };
     });
 
-    res.json({ data: { total_workouts, total_volume_kg, current_streak_weeks, strength_levels, recent_workouts: recentRes.data ?? [] } });
+    const recent_workouts = (recentRes.data ?? []).map((w: any) => ({
+      id: w.id,
+      workout_name: w.name,
+      started_at: w.started_at,
+      total_volume_kg: w.total_volume_kg,
+    }));
+
+    res.json({ data: { total_workouts, total_volume_kg, current_streak, longest_streak, strength_levels, recent_workouts } });
   } catch (err) { next(err); }
 });
 
@@ -481,7 +542,10 @@ router.get('/:id/followers', requireActiveUser, async (req: Request, res: Respon
     const ids = (rows ?? []).map(r => r.follower_id);
     const { data: users } = await supabase.from('users').select('id, username, full_name, avatar_url').in('id', ids);
     const uMap = new Map((users ?? []).map(u => [u.id, u]));
-    const followers = (rows ?? []).map(r => ({ ...uMap.get(r.follower_id), followed_at: r.created_at }));
+    const followers = (rows ?? []).map(r => {
+      const u = uMap.get(r.follower_id);
+      return { user_id: r.follower_id, username: u?.username ?? '', full_name: u?.full_name ?? '', avatar_url: u?.avatar_url ?? null, followed_at: r.created_at };
+    });
     res.json({ data: { followers, next_cursor: followers.length === 20 ? rows![19].created_at : null } });
   } catch (err) { next(err); }
 });
@@ -496,7 +560,10 @@ router.get('/:id/following', requireActiveUser, async (req: Request, res: Respon
     const ids = (rows ?? []).map(r => r.following_id);
     const { data: users } = await supabase.from('users').select('id, username, full_name, avatar_url').in('id', ids);
     const uMap = new Map((users ?? []).map(u => [u.id, u]));
-    const following = (rows ?? []).map(r => ({ ...uMap.get(r.following_id), followed_at: r.created_at }));
+    const following = (rows ?? []).map(r => {
+      const u = uMap.get(r.following_id);
+      return { user_id: r.following_id, username: u?.username ?? '', full_name: u?.full_name ?? '', avatar_url: u?.avatar_url ?? null, followed_at: r.created_at };
+    });
     res.json({ data: { following, next_cursor: following.length === 20 ? rows![19].created_at : null } });
   } catch (err) { next(err); }
 });

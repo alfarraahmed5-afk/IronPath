@@ -100,9 +100,7 @@ export async function checkAndAwardBadges(ctx: BadgeContext): Promise<void> {
         .from('user_badges')
         .insert({
           user_id: ctx.userId,
-          gym_id: ctx.gymId,
-          badge_type: badge,
-          workout_id: ctx.workoutId,
+          badge_key: badge,
         })
         .select('id')
         .single();
