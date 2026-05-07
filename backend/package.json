@@ -13,6 +13,7 @@
     "seed:routines": "node scripts/seed-prebuilt-routines.js",
     "recategorize": "node scripts/recategorize-exercises.js",
     "backfill:exercise-metadata": "node scripts/backfill-exercise-metadata.js",
+    "clean:exercises": "node scripts/clean-exercises.js",
     "migrate:challenge-enrollment": "node scripts/migrate-challenge-enrollment.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
