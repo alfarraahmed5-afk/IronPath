@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X, ChevronRight } from 'lucide-react-native';
+import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X, ChevronRight, BookOpen } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore, ActiveWorkout } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
@@ -314,9 +314,14 @@ export default function WorkoutsScreen() {
           fullWidth
         />
 
-        {routines.length > 0 && (
-          <View style={{ marginTop: spacing.md }}>
-            <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.sm }}>Quick Start</Text>
+        <View style={{ marginTop: spacing.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+            <Text variant="overline" color="textTertiary">My Routines</Text>
+            <TouchableOpacity onPress={() => router.push('/routines' as any)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Text variant="label" color="brand">See all</Text>
+            </TouchableOpacity>
+          </View>
+          {routines.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
               {routines.map(routine => (
                 <TouchableOpacity
@@ -327,9 +332,21 @@ export default function WorkoutsScreen() {
                   <Text variant="label" color="textPrimary" numberOfLines={1}>{routine.name}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity
+                onPress={() => router.push('/routines/create' as any)}
+                style={[styles.routinePill, { borderColor: colors.brand, borderStyle: 'dashed' }]}
+              >
+                <Text variant="label" color="brand">+ New</Text>
+              </TouchableOpacity>
             </ScrollView>
-          </View>
-        )}
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/routines' as any)} style={styles.routinesEmptyRow}>
+              <BookOpen size={14} color={colors.textTertiary} strokeWidth={2} />
+              <Text variant="caption" color="textTertiary" style={{ marginLeft: spacing.xs }}>No routines yet — tap to create one</Text>
+              <ChevronRight size={14} color={colors.textTertiary} strokeWidth={2} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {calView ? (
@@ -449,6 +466,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.sm,
+  },
+  routinesEmptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface2,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
   },
   sectionLabel: {
     paddingHorizontal: spacing.base,

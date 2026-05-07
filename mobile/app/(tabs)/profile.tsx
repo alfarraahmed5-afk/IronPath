@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Settings, Flame, ChevronRight, Activity, Trophy, Swords } from 'lucide-react-native';
+import { Settings, Flame, ChevronRight, Activity, Trophy, Swords, BarChart2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/lib/api';
@@ -353,6 +353,24 @@ export default function ProfileScreen() {
           </View>
         </Surface>
 
+        {/* My Stats */}
+        <TouchableOpacity
+          onPress={() => router.push('/analytics' as any)}
+          style={[styles.mx, { marginBottom: spacing.base }]}
+          activeOpacity={0.8}
+        >
+          <Surface level={2} style={styles.statsNavCard}>
+            <View style={styles.statsNavIcon}>
+              <BarChart2 size={18} color={colors.brand} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyEmphasis" color="textPrimary">My Stats</Text>
+              <Text variant="caption" color="textTertiary">Volume, muscles, strength levels</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textTertiary} strokeWidth={2} />
+          </Surface>
+        </TouchableOpacity>
+
         {/* Strength Levels */}
         {strengthLevels.length > 0 && (
           <View style={{ marginBottom: spacing.base }}>
@@ -559,4 +577,18 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   mx: { marginHorizontal: spacing.base },
+  statsNavCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.base,
+    gap: spacing.md,
+  },
+  statsNavIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
