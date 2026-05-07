@@ -1,3 +1,5 @@
+import * as SecureStore from 'expo-secure-store';
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 let accessToken: string | null = null;
@@ -27,9 +29,17 @@ async function refreshAccessToken(): Promise<string | null> {
     });
     if (!res.ok) return null;
     const json = await res.json();
-    accessToken = json.data.access_token;
-    refreshToken = json.data.refresh_token;
-    return accessToken;
+    const newAccess: string = json.data.access_token;
+    const newRefresh: string = json.data.refresh_token;
+    accessToken = newAccess;
+    refreshToken = newRefresh;
+    // Persist rotated tokens so the next cold start uses the fresh pair.
+    // Supabase rotates the refresh token on every use — without this the next
+    // app restart loads a stale (already-consumed) refresh token and the user
+    // appears to lose their session overnight.
+    SecureStore.setItemAsync('access_token', newAccess).catch(() => {});
+    SecureStore.setItemAsync('refresh_token', newRefresh).catch(() => {});
+    return newAccess;
   } catch {
     return null;
   }

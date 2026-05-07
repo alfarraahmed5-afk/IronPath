@@ -1,5 +1,6 @@
 import { Tabs, router } from 'expo-router';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Newspaper, Dumbbell, Trophy, Sparkles, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -17,6 +18,12 @@ export default function TabsLayout() {
     }
   }, [isAuthenticated, isLoading]);
 
+  // On Android, gesture/button navigation bars aren't always reflected in
+  // insets.bottom. Add a safe minimum so icons are never clipped.
+  const bottomInset = Platform.OS === 'android'
+    ? Math.max(insets.bottom, 12)
+    : insets.bottom;
+
   return (
     <Tabs
       screenOptions={{
@@ -25,9 +32,9 @@ export default function TabsLayout() {
           backgroundColor: colors.surface1,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 50 + insets.bottom,
-          paddingBottom: insets.bottom + 4,
-          paddingTop: 6,
+          height: 56 + bottomInset,
+          paddingBottom: bottomInset + 4,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.textTertiary,

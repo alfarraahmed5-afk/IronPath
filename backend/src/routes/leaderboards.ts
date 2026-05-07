@@ -264,7 +264,7 @@ router.get('/lifts', async (req: Request, res: Response, next: NextFunction) => 
       }
       summaries.push({
         exercise_id:   exercise.id,
-        exercise_name: displayName,
+        exercise_name: exercise.name || displayName,  // prefer live DB name
         top_user:      rankings[0] ?? null,
         generated_at:  generatedAt,
       });

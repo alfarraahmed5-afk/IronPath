@@ -45,7 +45,13 @@ Notifications.setNotificationHandler({
 function routeFromNotificationData(data: any): string | null {
   if (!data || typeof data !== 'object') return null;
   const t = String(data.type || '');
-  if (data.workout_id && (t === 'like' || t === 'comment' || t === 'pr' || t === 'mention' || !t)) {
+  // Comments and mentions belong to the feed (comments live in a feed-tab modal,
+  // not on the workout detail screen).
+  if (data.workout_id && (t === 'comment' || t === 'mention')) {
+    return '/(tabs)/index';
+  }
+  // Likes and PRs navigate to the specific workout for context.
+  if (data.workout_id && (t === 'like' || t === 'pr' || !t)) {
     return `/workouts/${data.workout_id}`;
   }
   if (data.duel_id) return `/duels/${data.duel_id}`;

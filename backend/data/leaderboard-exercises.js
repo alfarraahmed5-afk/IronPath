@@ -1,42 +1,53 @@
-// [wger_id, display_name] — WGER IDs MUST be verified against live API at startup
-// Backend resolves these to internal UUIDs on startup and caches the mapping
+// [wger_id, display_name]
+// wger_id is used to resolve the internal exercise UUID at startup.
+// display_name is the fallback label — the route prefers the live DB name.
 module.exports = [
-  [110, 'Squat'],
-  [192, 'Bench Press (Barbell)'],
-  [241, 'Deadlift (Conventional)'],
-  [79,  'Overhead Press (Barbell)'],
+  // Compound / powerlifting
+  [110, 'Barbell Squat'],
+  [192, 'Barbell Bench Press'],
+  [241, 'Barbell Deadlift'],
+  [79,  'Overhead Press'],
   [212, 'Barbell Row'],
+  [91,  'Romanian Deadlift'],
+  [240, 'Sumo Deadlift'],
+  [111, 'Front Squat'],
+  [242, 'Trap Bar Deadlift'],
+
+  // Upper body pulls
   [31,  'Pull-Up'],
   [32,  'Chin-Up'],
-  [37,  'Dip'],
-  [91,  'Romanian Deadlift'],
-  [44,  'Leg Press'],
-  [73,  'Incline Bench Press (Barbell)'],
-  [74,  'Decline Bench Press (Barbell)'],
-  [24,  'Bench Press (Dumbbell)'],
-  [78,  'Shoulder Press (Dumbbell)'],
-  [77,  'Lateral Raise'],
-  [214, 'Cable Row (Seated)'],
   [36,  'Lat Pulldown'],
-  [82,  'Face Pull'],
-  [2,   'Bicep Curl (Barbell)'],
-  [3,   'Hammer Curl'],
-  [63,  'Tricep Pushdown (Cable)'],
-  [64,  'Skull Crusher'],
-  [116, 'Leg Curl (Machine)'],
-  [117, 'Leg Extension (Machine)'],
-  [175, 'Hip Thrust (Barbell)'],
-  [103, 'Bulgarian Split Squat'],
-  [99,  'Lunge (Barbell)'],
-  [121, 'Calf Raise (Machine)'],
-  [111, 'Front Squat'],
-  [240, 'Sumo Deadlift'],
-  [75,  'Bench Press (Close Grip)'],
-  [7,   'Preacher Curl'],
-  [10,  'Incline Curl (Dumbbell)'],
+  [214, 'Seated Cable Row'],
+
+  // Chest
+  [73,  'Incline Barbell Press'],
+  [74,  'Decline Barbell Press'],
+  [24,  'Dumbbell Bench Press'],
   [27,  'Cable Fly'],
-  [28,  'Pec Deck (Machine)'],
-  [215, 'Seated Cable Row'],
+  [28,  'Pec Deck Machine'],
+
+  // Shoulders
+  [78,  'Dumbbell Shoulder Press'],
+  [77,  'Lateral Raise'],
   [81,  'Arnold Press'],
-  [242, 'Trap Bar Deadlift'],
+  [82,  'Cable Face Pull'],
+
+  // Arms
+  [2,   'Barbell Curl'],
+  [3,   'Hammer Curl'],
+  [7,   'Barbell Preacher Curl'],
+  [10,  'Incline Curl'],
+  [63,  'Tricep Pushdown'],
+  [64,  'Skull Crusher'],
+  [75,  'Close Grip Bench Press'],
+  [37,  'Tricep Dip'],
+
+  // Legs
+  [44,  'Leg Press'],
+  [116, 'Lying Leg Curl'],
+  [117, 'Leg Extension'],
+  [175, 'Hip Thrust'],
+  [103, 'Bulgarian Split Squat'],
+  [99,  'Barbell Lunge'],
+  [121, 'Standing Calf Raise'],
 ];
