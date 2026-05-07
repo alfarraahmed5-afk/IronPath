@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Plus, Timer, Check, Search, Pause, Play, RotateCcw, Minus } from 'lucide-react-native';
+import { X, Plus, Timer, Check, Search, Pause, Play, RotateCcw, Minus, Info } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { useWorkoutStore, WorkoutSet, WorkoutExercise } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
 import { Text } from '../../src/components/Text';
@@ -237,16 +238,25 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
   const completedCount = exercise.sets.filter(s => s.is_completed).length;
   const totalCount = exercise.sets.length;
 
+  const router = useRouter();
+
   return (
     <Surface level={2} style={styles.exerciseCard}>
       {/* Header */}
       <View style={styles.exerciseHeader}>
-        <View style={{ flex: 1 }}>
-          <Text variant="title3" color="textPrimary" numberOfLines={1}>{exercise.exercise_name}</Text>
+        <Pressable
+          onPress={() => router.push(`/exercises/${exercise.exercise_id}` as any)}
+          style={{ flex: 1 }}
+          accessibilityLabel={`View ${exercise.exercise_name} details`}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Text variant="title3" color="textPrimary" numberOfLines={1} style={{ flex: 1 }}>{exercise.exercise_name}</Text>
+            <Icon icon={Info} size={14} color={colors.textTertiary} />
+          </View>
           <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>
             {completedCount}/{totalCount} sets · {exercise.rest_seconds}s rest
           </Text>
-        </View>
+        </Pressable>
         <Pressable onPress={onRemove} style={styles.removeBtn} accessibilityLabel="Remove exercise">
           <Icon icon={X} size={16} color={colors.textTertiary} />
         </Pressable>
@@ -408,6 +418,7 @@ function ExercisePickerModal({
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => {
               const selected = selectedIds.includes(item.id);
+              const initials = item.name.split(' ').slice(0, 2).map((w: string) => w.charAt(0).toUpperCase()).join('');
               return (
                 <Pressable
                   onPress={() => toggleSelect(item.id)}
@@ -417,6 +428,19 @@ function ExercisePickerModal({
                   <View style={[styles.pickerCheck, selected && { backgroundColor: colors.brand, borderColor: colors.brand }]}>
                     {selected ? <Icon icon={Check} size={12} color={colors.textPrimary} strokeWidth={3} /> : null}
                   </View>
+                  {/* Exercise thumbnail */}
+                  {item.image_url ? (
+                    <Image
+                      source={{ uri: item.image_url }}
+                      style={styles.pickerThumb}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={[styles.pickerThumb, styles.pickerThumbFallback]}>
+                      <Text variant="overline" color="textTertiary" style={{ fontSize: 10 }}>{initials}</Text>
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.name}</Text>
                     <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xxs }}>
@@ -980,6 +1004,17 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     borderWidth: 1.5,
     borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    overflow: 'hidden',
+  },
+  pickerThumbFallback: {
+    backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
   },
