@@ -214,8 +214,10 @@ export default function WorkoutsScreen() {
 
   const fetchRoutines = async () => {
     try {
-      const result = await api.get<{ data: { routines: Routine[] } }>('/routines?limit=3');
-      setRoutines((result.data?.routines ?? []).slice(0, 3));
+      const result = await api.get<{ data: { folders: Array<{ routines: Routine[] }>; ungrouped: Routine[] } }>('/routines');
+      const ungrouped = result.data?.ungrouped ?? [];
+      const fromFolders = (result.data?.folders ?? []).flatMap((f) => f.routines ?? []);
+      setRoutines([...ungrouped, ...fromFolders].slice(0, 3));
     } catch {}
   };
 
@@ -224,8 +226,33 @@ export default function WorkoutsScreen() {
     router.push('/workout/active');
   }
 
-  function handleStartRoutine(routine: Routine) {
-    startWorkout(routine.name, routine.id);
+  async function handleStartRoutine(routine: Routine) {
+    // Load routine exercises so the active workout is pre-populated
+    try {
+      const res = await api.get<{ data: { exercises: Array<{ exercise_id: string; exercise_name?: string; exercise?: { name: string; logging_type: string }; logging_type?: string; position: number; superset_group: number | null; rest_seconds: number; notes: string; sets: Array<{ position: number; set_type: string; target_weight_kg: number | null; target_reps: number | null; target_duration_seconds: number | null; target_distance_meters: number | null }> }> } }>(`/routines/${routine.id}`);
+      const exRows = res.data?.exercises ?? [];
+      const exercises = exRows.map((ex) => ({
+        exercise_id: ex.exercise_id,
+        exercise_name: ex.exercise_name ?? (ex.exercise as any)?.name ?? '',
+        logging_type: (ex.logging_type ?? (ex.exercise as any)?.logging_type ?? 'weight_reps') as any,
+        position: ex.position,
+        superset_group: ex.superset_group,
+        rest_seconds: ex.rest_seconds,
+        notes: ex.notes,
+        sets: ex.sets.length > 0
+          ? ex.sets.map(s => ({
+              position: s.position, set_type: (s.set_type || 'normal') as any,
+              weight_kg: s.target_weight_kg, reps: s.target_reps,
+              duration_seconds: s.target_duration_seconds, distance_meters: s.target_distance_meters,
+              rpe: null, is_completed: false, completed_at: null,
+            }))
+          : [{ position: 0, set_type: 'normal' as const, weight_kg: null, reps: null, duration_seconds: null, distance_meters: null, rpe: null, is_completed: false, completed_at: null }],
+      }));
+      startWorkout(routine.name, routine.id, exercises);
+    } catch {
+      // Fallback: start with empty exercises if fetch fails
+      startWorkout(routine.name, routine.id, []);
+    }
     router.push('/workout/active');
   }
 

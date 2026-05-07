@@ -437,7 +437,6 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
       .from('leaderboard_challenges')
       .insert({
         gym_id: gymId,
-        // DB column is `name`, not `title` — admin route does the same mapping
         name: body.title,
         description: body.description,
         metric: body.metric,
@@ -445,8 +444,8 @@ router.post('/challenges', async (req: Request, res: Response, next: NextFunctio
         starts_at: body.starts_at,
         ends_at: body.ends_at,
         status,
-        created_by_user_id: userId,
-        enrolled_user_ids: [userId], // creator is auto-enrolled
+        created_by: userId,
+        enrolled_user_ids: [userId],
       })
       .select()
       .single();
@@ -500,13 +499,13 @@ router.delete('/challenges/:id/leave', async (req: Request, res: Response, next:
     if (!challenge || challenge.gym_id !== gymId) throw new AppError('NOT_FOUND', 404, 'Challenge not found');
 
     const enrolled: string[] = Array.isArray(challenge.enrolled_user_ids) ? challenge.enrolled_user_ids : [];
-    const next = enrolled.filter(id => id !== userId);
-    if (next.length !== enrolled.length) {
+    const remaining = enrolled.filter(id => id !== userId);
+    if (remaining.length !== enrolled.length) {
       const { error } = await supabase.from('leaderboard_challenges')
-        .update({ enrolled_user_ids: next }).eq('id', idParsed.data);
+        .update({ enrolled_user_ids: remaining }).eq('id', idParsed.data);
       if (error) throw error;
     }
-    return res.json({ data: { is_enrolled: false, participant_count: next.length } });
+    return res.json({ data: { is_enrolled: false, participant_count: remaining.length } });
   } catch (err) {
     next(err);
   }
@@ -624,11 +623,12 @@ async function getChallengeRankings(
   const rankings = top50.map((r, i) => {
     const u = userMap.get(r.user_id);
     return {
-      rank:         i + 1,
-      user_id:      r.user_id,
-      display_name: u?.full_name ?? u?.username ?? 'Unknown',
-      avatar_url:   u?.avatar_url ?? null,
-      value:        r.value,
+      rank:      i + 1,
+      user_id:   r.user_id,
+      username:  u?.username ?? 'Unknown',
+      full_name: u?.full_name ?? null,
+      avatar_url: u?.avatar_url ?? null,
+      value:     r.value,
     };
   });
 

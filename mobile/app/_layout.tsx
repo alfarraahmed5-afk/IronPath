@@ -1,5 +1,6 @@
 import '../global.css';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import {
@@ -19,6 +20,7 @@ import * as Notifications from 'expo-notifications';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/stores/authStore';
+import { api } from '../src/lib/api';
 import { initDB } from '../src/lib/db';
 import { ToastProvider } from '../src/components/Toast';
 
@@ -52,8 +54,30 @@ function routeFromNotificationData(data: any): string | null {
   return null;
 }
 
+// Silently register push token if permission is already granted.
+// Does NOT prompt the user — that's handled in finish.tsx.
+async function registerPushTokenIfGranted() {
+  try {
+    const perms: any = await Notifications.getPermissionsAsync();
+    if (!perms.granted && perms.status !== 'granted') return;
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+      });
+    }
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    await api.post('/push-tokens', {
+      token: tokenData.data,
+      platform: Platform.OS as 'ios' | 'android',
+    });
+  } catch {
+    // Non-critical — swallow silently
+  }
+}
+
 export default function RootLayout() {
-  const { loadFromStorage } = useAuthStore();
+  const { loadFromStorage, isAuthenticated } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     BarlowCondensed_700Bold,
@@ -70,6 +94,13 @@ export default function RootLayout() {
     initDB();
     loadFromStorage();
   }, []);
+
+  // Re-register push token on every authenticated app start (token can rotate).
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerPushTokenIfGranted();
+    }
+  }, [isAuthenticated]);
 
   // Wire notification taps → deep links.
   useEffect(() => {

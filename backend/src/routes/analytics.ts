@@ -757,7 +757,7 @@ router.post('/measurements', async (req: Request, res: Response, next: NextFunct
 
     if (error) return next(new AppError('DB_ERROR', 500, error.message));
 
-    return res.status(201).json({ data: inserted });
+    return res.status(201).json({ data: { measurement: inserted } });
   } catch (err: any) {
     return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
   }

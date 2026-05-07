@@ -83,6 +83,7 @@ function RankingsList({
   myValue: number | null;
   valueLabel?: (v: number) => string;
 }) {
+  const router = useRouter();
   const label = valueLabel ?? ((v: number) => String(v));
 
   if (rankings.length === 0) {
@@ -107,30 +108,35 @@ function RankingsList({
       {rankings.map(item => {
         const isMe = myRank !== null && item.rank === myRank;
         return (
-          <Surface
+          <TouchableOpacity
             key={item.user_id}
-            level={isMe ? 3 : 2}
-            style={[styles.rankRow, isMe ? { borderColor: colors.brand, borderWidth: 1 } : undefined]}
+            activeOpacity={0.75}
+            onPress={() => router.push(`/users/${item.user_id}` as any)}
           >
-            {item.rank <= 3 ? (
-              <Crown size={16} color={rankColor(item.rank)} strokeWidth={2} />
-            ) : (
-              <Text variant="label" color="textTertiary" style={{ width: 32, textAlign: 'center' }}>
-                #{item.rank}
-              </Text>
-            )}
+            <Surface
+              level={isMe ? 3 : 2}
+              style={[styles.rankRow, isMe ? { borderColor: colors.brand, borderWidth: 1 } : undefined]}
+            >
+              {item.rank <= 3 ? (
+                <Crown size={16} color={rankColor(item.rank)} strokeWidth={2} />
+              ) : (
+                <Text variant="label" color="textTertiary" style={{ width: 32, textAlign: 'center' }}>
+                  #{item.rank}
+                </Text>
+              )}
 
-            <Avatar username={item.username} avatarUrl={item.avatar_url} size={40} />
+              <Avatar username={item.username} avatarUrl={item.avatar_url} size={40} />
 
-            <View style={{ flex: 1, marginLeft: spacing.md }}>
-              <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>
-                {item.full_name || item.username}
-              </Text>
-              <Text variant="caption" color="textTertiary">@{item.username}</Text>
-            </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>
+                  {item.full_name || item.username}
+                </Text>
+                <Text variant="caption" color="textTertiary">@{item.username}</Text>
+              </View>
 
-            <Text variant="bodyEmphasis" color={isMe ? 'brand' : 'textPrimary'}>{label(item.value)}</Text>
-          </Surface>
+              <Text variant="bodyEmphasis" color={isMe ? 'brand' : 'textPrimary'}>{label(item.value)}</Text>
+            </Surface>
+          </TouchableOpacity>
         );
       })}
     </View>

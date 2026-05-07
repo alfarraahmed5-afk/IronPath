@@ -86,7 +86,58 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .eq('user_id', req.user.id).eq('exercise_id', req.params.id)
       .order('achieved_at', { ascending: false }).limit(10);
 
-    res.json({ data: { exercise: ex, personal_records: prs || [] } });
+    // Build workout history for this exercise (last 10 sessions)
+    let history: any[] = [];
+    const { data: recentWorkouts } = await supabase
+      .from('workouts')
+      .select('id, started_at')
+      .eq('user_id', req.user.id)
+      .eq('is_completed', true)
+      .order('started_at', { ascending: false })
+      .limit(40);
+
+    const workoutIds = (recentWorkouts || []).map((w: any) => w.id);
+    if (workoutIds.length > 0) {
+      const { data: weRows } = await supabase
+        .from('workout_exercises')
+        .select('id, workout_id')
+        .eq('exercise_id', req.params.id)
+        .in('workout_id', workoutIds);
+
+      const weIds = (weRows || []).map((we: any) => we.id);
+      if (weIds.length > 0) {
+        const { data: sets } = await supabase
+          .from('workout_sets')
+          .select('workout_exercise_id, position, weight_kg, reps, set_type, is_completed')
+          .in('workout_exercise_id', weIds)
+          .order('position');
+
+        const workoutMap = new Map((recentWorkouts || []).map((w: any) => [w.id, w]));
+        const setsByWeId: Record<string, any[]> = {};
+        for (const s of sets || []) {
+          if (!setsByWeId[s.workout_exercise_id]) setsByWeId[s.workout_exercise_id] = [];
+          setsByWeId[s.workout_exercise_id].push({
+            position: s.position,
+            weight_kg: s.weight_kg,
+            reps: s.reps,
+            set_type: s.set_type,
+            is_completed: s.is_completed,
+          });
+        }
+
+        history = (weRows || [])
+          .map((we: any) => ({
+            workout_id: we.workout_id,
+            started_at: workoutMap.get(we.workout_id)?.started_at,
+            sets: setsByWeId[we.id] || [],
+          }))
+          .filter((e: any) => e.started_at)
+          .sort((a: any, b: any) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+          .slice(0, 10);
+      }
+    }
+
+    res.json({ data: { exercise: ex, personal_records: prs || [], history } });
   } catch (err) { next(err); }
 });
 

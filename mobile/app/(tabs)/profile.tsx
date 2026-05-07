@@ -61,7 +61,8 @@ interface StrengthLevel {
 
 interface RecentWorkout {
   id: string;
-  name: string;
+  name?: string;
+  workout_name?: string;
   started_at: string;
   total_volume_kg: number;
 }
@@ -69,7 +70,9 @@ interface RecentWorkout {
 interface StatsData {
   total_workouts: number;
   total_volume_kg: number;
-  current_streak_weeks: number;
+  current_streak: number;
+  current_streak_weeks?: number; // legacy alias
+  longest_streak?: number;
   strength_levels: StrengthLevel[];
   recent_workouts: RecentWorkout[];
 }
@@ -136,12 +139,12 @@ export default function ProfileScreen() {
       if (showcaseRes.status === 'fulfilled') setShowcase((showcaseRes.value as any).data?.showcase ?? []);
       if (badgesRes.status === 'fulfilled') setBadges((badgesRes.value as any).data?.badges ?? []);
       if (followersRes.status === 'fulfilled') {
-        const fd = followersRes.value as any;
+        const fd = (followersRes.value as any)?.data ?? (followersRes.value as any);
         const c = fd.followers?.length ?? 0;
         setFollowerCount(fd.next_cursor ? `${c}+` : String(c));
       }
       if (followingRes.status === 'fulfilled') {
-        const fd = followingRes.value as any;
+        const fd = (followingRes.value as any)?.data ?? (followingRes.value as any);
         const c = fd.following?.length ?? 0;
         setFollowingCount(fd.next_cursor ? `${c}+` : String(c));
       }
@@ -334,13 +337,13 @@ export default function ProfileScreen() {
           <View style={styles.streakRow}>
             <Flame
               size={22}
-              color={stats && stats.current_streak_weeks > 0 ? colors.brand : colors.textTertiary}
+              color={stats && (stats.current_streak ?? stats.current_streak_weeks ?? 0) > 0 ? colors.brand : colors.textTertiary}
               strokeWidth={2}
             />
             <View style={{ marginLeft: spacing.md }}>
               <Text variant="title3" color="textPrimary">
-                {stats && stats.current_streak_weeks > 0
-                  ? `${stats.current_streak_weeks} week streak`
+                {stats && (stats.current_streak ?? stats.current_streak_weeks ?? 0) > 0
+                  ? `${stats.current_streak ?? stats.current_streak_weeks} week streak`
                   : 'No active streak'}
               </Text>
               <Text variant="caption" color="textTertiary">
@@ -404,7 +407,7 @@ export default function ProfileScreen() {
                   ]}
                 >
                   <View style={{ flex: 1, marginRight: spacing.md }}>
-                    <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{workout.name}</Text>
+                    <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{workout.workout_name ?? workout.name}</Text>
                     <Text variant="caption" color="textTertiary" style={{ marginTop: 2 }}>
                       {formatRelativeDate(workout.started_at)}
                     </Text>

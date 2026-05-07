@@ -106,7 +106,7 @@ routinesRouter.get('/', requireActiveUser, async (req: Request, res: Response, n
     }
 
     const result = (folders || []).map((f: any) => ({ ...f, routines: folderMap[f.id] || [] }));
-    res.json({ data: { folders: result, unfoldered } });
+    res.json({ data: { folders: result, ungrouped: unfoldered } });
   } catch (err) { next(err); }
 });
 

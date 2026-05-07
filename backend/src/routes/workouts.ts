@@ -388,7 +388,7 @@ router.get('/calendar', requireActiveUser, async (req: Request, res: Response, n
       .eq('user_id', req.user.id)
       .eq('is_completed', true)
       .gte('started_at', start)
-      .lte('started_at', end);
+      .lte('started_at', end + 'T23:59:59.999Z');
     if (error) throw error;
     const byDay: Record<string, string[]> = {};
     for (const w of data || []) {

@@ -8,6 +8,7 @@
 //
 // Requires env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -25,13 +26,20 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const WGER_BASE = 'https://wger.de/api/v2';
 
+// Fetch with a hard timeout so a slow wger.de response never hangs forever.
+function fetchWithTimeout(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 async function fetchWgerExercise(wgerId) {
   // Pull both translation (for name/description/instructions) and the base
   // record (for images).
   try {
     const [transRes, baseRes] = await Promise.all([
-      fetch(`${WGER_BASE}/exercise/${wgerId}/?language=2`),
-      fetch(`${WGER_BASE}/exercise-base/${wgerId}/?language=2`),
+      fetchWithTimeout(`${WGER_BASE}/exercise/${wgerId}/?language=2`),
+      fetchWithTimeout(`${WGER_BASE}/exercise-base/${wgerId}/?language=2`),
     ]);
     const trans = transRes.ok ? await transRes.json() : null;
     const base = baseRes.ok ? await baseRes.json() : null;
@@ -103,7 +111,12 @@ async function run() {
   let withWger = 0, withoutWger = 0, refetched = 0, fallback = 0;
   const updates = [];
 
-  for (const r of rows) {
+  for (let idx = 0; idx < rows.length; idx++) {
+    const r = rows[idx];
+    // Progress every 25 exercises
+    if (idx > 0 && idx % 25 === 0) {
+      process.stdout.write(`\r[backfill] ${idx}/${rows.length} processed, ${updates.length} queued…`);
+    }
     const patch = {};
     if (r.wger_id) {
       withWger++;
@@ -116,7 +129,7 @@ async function run() {
         // Image URL: if missing, fall back to wger image proxy
         // (most exercises have at least one)
         if (!r.image_url) {
-          const imgRes = await fetch(`${WGER_BASE}/exerciseimage/?exercise_base=${r.wger_id}&is_main=true`);
+          const imgRes = await fetchWithTimeout(`${WGER_BASE}/exerciseimage/?exercise_base=${r.wger_id}&is_main=true`);
           if (imgRes.ok) {
             const imgJson = await imgRes.json();
             const main = imgJson.results?.[0];
@@ -146,6 +159,7 @@ async function run() {
     if (Object.keys(patch).length > 0) updates.push({ id: r.id, name: r.name, patch });
   }
 
+  process.stdout.write('\n');
   console.log(`[backfill] ${withWger} with wger_id, ${withoutWger} custom, ${refetched} refetched, ${fallback} got fallback instructions`);
   console.log(`[backfill] ${updates.length} rows will be updated`);
 

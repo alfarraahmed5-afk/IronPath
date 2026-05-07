@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { Trophy, Medal, Crown, Flame, Swords } from 'lucide-react-native';
+import { Trophy, Medal, Crown, Flame, Swords, Zap, Star, Moon, Sun, Target, Dumbbell } from 'lucide-react-native';
 import { Text } from './Text';
 import { Icon } from './Icon';
 import { colors, spacing, radii } from '../theme/tokens';
@@ -13,12 +13,26 @@ export interface Achievement {
 }
 
 const ICON_MAP: Record<string, any> = {
+  // Legacy leaderboard badges
   top10_lifts: Trophy,
   top10_volume: Trophy,
   top10_workouts: Crown,
   top10_streak: Flame,
   challenge_winner: Medal,
   duel_winner_streak_5: Swords,
+  // Workout milestone badges
+  first_rep: Zap,
+  ten_strong: Star,
+  half_century: Star,
+  century: Crown,
+  iron_month: Flame,
+  iron_quarter: Crown,
+  pr_machine: Trophy,
+  heavy_lifter: Dumbbell,
+  consistent: Target,
+  early_bird: Sun,
+  night_owl: Moon,
+  gym_legend: Medal,
 };
 
 type Props = {

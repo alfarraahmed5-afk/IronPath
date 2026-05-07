@@ -29,8 +29,15 @@ interface RoutineSet {
 interface RoutineExercise {
   id: string;
   exercise_id: string;
-  exercise_name: string;
-  logging_type: string;
+  exercise_name?: string; // populated in some paths
+  logging_type?: string;  // populated in some paths
+  exercise?: {            // nested object from backend getFullRoutineDetail
+    id: string;
+    name: string;
+    equipment: string | null;
+    logging_type: string;
+    image_url: string | null;
+  };
   position: number;
   superset_group: number | null;
   rest_seconds: number;
@@ -84,8 +91,9 @@ export default function RoutineDetailScreen() {
 
   useEffect(() => {
     if (!id) { goBack(); return; }
-    api.get<{ data: { routine: RoutineDetail } }>(`/routines/${id}`)
-      .then(r => setRoutine(r.data.routine))
+    // Backend returns { data: { id, name, exercises, ... } } — the routine is directly under data
+    api.get<{ data: RoutineDetail }>(`/routines/${id}`)
+      .then(r => setRoutine(r.data))
       .catch(() => {/* show 404 below */})
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,16 +116,38 @@ export default function RoutineDetailScreen() {
 
   const handleStartWorkout = () => {
     if (!routine) return;
-    const workoutExercises: WorkoutExercise[] = routine.exercises.map(ex => ({
-      exercise_id: ex.exercise_id,
-      exercise_name: ex.exercise_name,
-      logging_type: ex.logging_type as any,
-      position: ex.position,
-      superset_group: ex.superset_group,
-      rest_seconds: ex.rest_seconds,
-      notes: ex.notes,
-      sets: [],
-    }));
+    const workoutExercises: WorkoutExercise[] = routine.exercises.map(ex => {
+      // Backend returns name/logging_type under ex.exercise nested object
+      const name = ex.exercise_name ?? ex.exercise?.name ?? '';
+      const logType = (ex.logging_type ?? ex.exercise?.logging_type ?? 'weight_reps') as any;
+      return {
+        exercise_id: ex.exercise_id,
+        exercise_name: name,
+        logging_type: logType,
+        position: ex.position,
+        superset_group: ex.superset_group,
+        rest_seconds: ex.rest_seconds,
+        notes: ex.notes,
+        // Pre-populate sets from routine targets so user can jump straight to entering weights
+        sets: ex.sets.length > 0
+          ? ex.sets.map(s => ({
+              position: s.position,
+              set_type: (s.set_type || 'normal') as any,
+              weight_kg: s.target_weight_kg,
+              reps: s.target_reps,
+              duration_seconds: s.target_duration_seconds,
+              distance_meters: s.target_distance_meters,
+              rpe: null,
+              is_completed: false,
+              completed_at: null,
+            }))
+          : [{
+              position: 0, set_type: 'normal' as const,
+              weight_kg: null, reps: null, duration_seconds: null,
+              distance_meters: null, rpe: null, is_completed: false, completed_at: null,
+            }],
+      };
+    });
     startWorkout(routine.name, routine.id, workoutExercises);
     router.push('/workout/active');
   };
@@ -214,28 +244,32 @@ export default function RoutineDetailScreen() {
 
         {/* Exercises */}
         <View style={styles.exerciseList}>
-          {routine.exercises.map(exercise => (
-            <Surface key={exercise.position} level={2} style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }}>
-                  {exercise.exercise_name}
+          {routine.exercises.map(exercise => {
+            const displayName = exercise.exercise_name ?? exercise.exercise?.name ?? '—';
+            const logType = exercise.logging_type ?? exercise.exercise?.logging_type ?? 'weight_reps';
+            return (
+              <Surface key={exercise.position} level={2} style={styles.exerciseCard}>
+                <View style={styles.exerciseHeader}>
+                  <Text variant="bodyEmphasis" color="textPrimary" style={{ flex: 1 }}>
+                    {displayName}
+                  </Text>
+                  {exercise.superset_group !== null && (
+                    <View style={styles.supersetBadge}>
+                      <Text variant="overline" color="textTertiary">SS</Text>
+                    </View>
+                  )}
+                </View>
+                <Text variant="caption" color="textTertiary">
+                  {formatSetSummary(exercise.sets, logType)}
                 </Text>
-                {exercise.superset_group !== null && (
-                  <View style={styles.supersetBadge}>
-                    <Text variant="overline" color="textTertiary">SS</Text>
-                  </View>
-                )}
-              </View>
-              <Text variant="caption" color="textTertiary">
-                {formatSetSummary(exercise.sets, exercise.logging_type)}
-              </Text>
-              {exercise.notes ? (
-                <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
-                  {exercise.notes}
-                </Text>
-              ) : null}
-            </Surface>
-          ))}
+                {exercise.notes ? (
+                  <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
+                    {exercise.notes}
+                  </Text>
+                ) : null}
+              </Surface>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>

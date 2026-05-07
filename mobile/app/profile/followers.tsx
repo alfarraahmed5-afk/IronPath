@@ -14,7 +14,7 @@ import { EmptyState } from '../../src/components/EmptyState';
 import { colors, spacing } from '../../src/theme/tokens';
 
 interface FollowerRow {
-  id: string;
+  user_id: string;
   username: string;
   full_name: string | null;
   avatar_url: string | null;
@@ -46,10 +46,10 @@ export default function FollowersScreen() {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.user_id}
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => router.push(`/users/${item.id}` as any)}
+              onPress={() => router.push(`/users/${item.user_id}` as any)}
               style={styles.row}
               accessibilityLabel={item.username}
             >

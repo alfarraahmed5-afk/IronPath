@@ -53,7 +53,10 @@ async function requestPushPermission(): Promise<void> {
                   });
                 }
                 const tokenData = await Notifications.getExpoPushTokenAsync();
-                await api.post('/push-tokens', { token: tokenData.data });
+                await api.post('/push-tokens', {
+                  token: tokenData.data,
+                  platform: Platform.OS as 'ios' | 'android',
+                });
               }
               resolve();
             },

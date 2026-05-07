@@ -278,7 +278,14 @@ function WorkoutCard({
     >
       <Surface level={2} style={styles.card}>
         {/* Header */}
-        <View style={styles.cardHeader}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={e => {
+            e.stopPropagation?.();
+            router.push(`/users/${workout.user_id}` as any);
+          }}
+          style={styles.cardHeader}
+        >
           <Avatar
             username={workout.user.username}
             avatarUrl={workout.user.avatar_url}
@@ -288,7 +295,7 @@ function WorkoutCard({
             <Text variant="bodyEmphasis" color="textPrimary">{workout.user.username}</Text>
             <Text variant="caption" color="textTertiary">{formatRelative(workout.started_at)}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Workout name */}
         <Text variant="title3" color="textPrimary" style={styles.workoutName}>{workout.name}</Text>
@@ -503,6 +510,10 @@ export default function FeedScreen() {
             }
           }}
           onEndReachedThreshold={0.4}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={10}
+          removeClippedSubviews={true}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
