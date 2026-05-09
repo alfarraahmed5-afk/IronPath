@@ -1,0 +1,60 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import GymsPage from './pages/GymsPage';
+import InboxPage from './pages/InboxPage';
+import PipelinePage from './pages/PipelinePage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import Layout from './components/Layout';
+import { isAuthorized } from './lib/session';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  if (!isAuthorized()) return <Navigate to="/login" replace />;
+  return <Layout>{children}</Layout>;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/inbox"
+          element={
+            <ProtectedRoute>
+              <InboxPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pipeline"
+          element={
+            <ProtectedRoute>
+              <PipelinePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gyms"
+          element={
+            <ProtectedRoute>
+              <GymsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/" element={<Navigate to="/gyms" replace />} />
+        {/* 404 catch-all */}
+        <Route path="*" element={<Navigate to="/gyms" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

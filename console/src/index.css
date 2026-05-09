@@ -1,0 +1,33 @@
+/* Fonts — bundled via @fontsource so the console works offline / behind firewalls */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink-50 font-sans;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numerics, IDs, timestamps — JetBrains Mono per §3.3 */
+.mono,
+code,
+kbd,
+pre,
+samp,
+[data-numeric] {
+  font-family: theme('fontFamily.mono');
+}

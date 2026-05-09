@@ -1,0 +1,106 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api, { STORAGE_KEYS } from '../lib/api';
+import { ALLOWED_ROLES } from '../lib/session';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      const { access_token, refresh_token, user } = res.data.data;
+
+      if (!user || !(ALLOWED_ROLES as readonly string[]).includes(user.role)) {
+        setError('Operator access required.');
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEYS.accessToken, access_token);
+      localStorage.setItem(STORAGE_KEYS.refreshToken, refresh_token);
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+      navigate('/gyms');
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.error?.message ||
+          'Sign-in failed. Verify your credentials.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-semibold text-ink-50 tracking-tight">
+            IronPath Console
+          </h1>
+          <p className="text-ink-300 mt-1 text-sm">Operator panel</p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="bg-ink-800 border border-ink-700 rounded-lg p-7 shadow-xl"
+        >
+          <h2 className="text-base font-medium text-ink-50 mb-5">Sign in</h2>
+
+          {error && (
+            <div
+              role="alert"
+              className="bg-red-950/40 border border-red-800 text-red-300 rounded-md px-3 py-2 mb-4 text-sm"
+            >
+              {error}
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-xs text-ink-300 mb-1.5 font-medium uppercase tracking-wider">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400/40 text-sm"
+              placeholder="operator@ironpath.app"
+              autoComplete="email"
+              required
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-xs text-ink-300 mb-1.5 font-medium uppercase tracking-wider">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400/40 text-sm font-mono"
+              placeholder="••••••••"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-brand-400 hover:bg-brand-300 text-ink-900 font-medium py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {loading ? 'Signing in' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

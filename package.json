@@ -1,12 +1,14 @@
 {
   "name": "ironpath-monorepo",
   "private": true,
-  "workspaces": ["mobile", "backend", "admin", "shared"],
+  "workspaces": ["mobile", "backend", "admin", "console", "shared"],
   "scripts": {
     "dev:backend": "npm run dev --workspace=backend",
     "dev:admin": "npm run dev --workspace=admin",
+    "dev:console": "npm run dev --workspace=console",
     "build:backend": "npm run build --workspace=backend",
-    "build:admin": "npm run build --workspace=admin"
+    "build:admin": "npm run build --workspace=admin",
+    "build:console": "npm run build --workspace=console"
   },
   "overrides": {
     "react-native-worklets": "0.7.4"
