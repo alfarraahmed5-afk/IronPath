@@ -45,6 +45,11 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+// How long to wait for any request before aborting.
+// Railway (and similar platforms) can take 20-30 s on a cold start after
+// sleeping; 30 s gives it a fair chance without hanging the app forever.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export async function apiRequest<T>(
   method: string,
   path: string,
@@ -54,11 +59,25 @@ export async function apiRequest<T>(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timer);
+    if (err?.name === 'AbortError') {
+      throw { error: 'Request timed out — server may be waking up, try again.', code: 'TIMEOUT' };
+    }
+    throw err;
+  }
+  clearTimeout(timer);
 
   if (res.status === 401 && !retried && refreshToken) {
     const newToken = await refreshAccessToken();

@@ -64,15 +64,21 @@ export const useAuthStore = create<AuthState>((set) => ({
         const res = await api.get<{ data: AuthUser }>('/users/me');
         set({ user: res.data, isAuthenticated: true, isLoading: false });
       } catch (err: any) {
-        const status = err?.status ?? err?.statusCode ?? 0;
-        const isAuthError = status === 401 || err?.code === 'UNAUTHORIZED';
-        if (isAuthError) {
+        // The backend wraps errors as { error: { code, status, message } }.
+        // Fall back to flat fields so this works even if the shape changes.
+        const status = err?.error?.status ?? err?.status ?? err?.statusCode ?? 0;
+        const code   = err?.error?.code   ?? err?.code   ?? '';
+        const isAuthError = status === 401 || code === 'UNAUTHORIZED';
+        // Timeout errors mean the server is waking up — keep the session alive.
+        const isTimeout = code === 'TIMEOUT';
+        if (isAuthError && !isTimeout) {
+          // Tokens are genuinely invalid — force re-login.
           await SecureStore.deleteItemAsync('access_token');
           await SecureStore.deleteItemAsync('refresh_token');
           clearTokens();
           set({ user: null, isAuthenticated: false, isLoading: false });
         } else {
-          // Network/server error — keep tokens, stay authenticated.
+          // Network/timeout/server error — keep tokens, stay authenticated.
           // Screens will load their data when they mount.
           set({ isAuthenticated: true, isLoading: false });
         }
