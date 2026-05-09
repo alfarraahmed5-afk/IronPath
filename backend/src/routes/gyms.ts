@@ -149,7 +149,8 @@ router.patch('/:id', requireActiveUser, async (req: Request, res: Response, next
       address: z.string().max(500).optional(),
       timezone: z.string().max(100).optional(),
       units_default: z.enum(['metric', 'imperial']).optional(),
-      logo_url: z.string().url().max(2000).optional(),
+      // logo_url accepts a URL OR explicit null (callers can clear the logo).
+      logo_url: z.string().url().max(2000).nullable().optional(),
     });
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) {

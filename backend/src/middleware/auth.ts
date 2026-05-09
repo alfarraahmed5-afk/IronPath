@@ -25,7 +25,11 @@ const PUBLIC_PATHS = [
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isPublic = PUBLIC_PATHS.some(path => req.originalUrl.startsWith(path)) ||
-    (req.method === 'POST' && /^\/api\/v1\/gyms\/?$/.test(req.originalUrl));
+    (req.method === 'POST' && /^\/api\/v1\/gyms\/?$/.test(req.originalUrl)) ||
+    // Public lead capture: only POST /api/v1/leads is unauthenticated. The
+    // super_admin GET/PATCH list endpoints sit under /api/v1/super-admin/leads
+    // and are not affected by this exemption.
+    (req.method === 'POST' && /^\/api\/v1\/leads\/?(\?.*)?$/.test(req.originalUrl));
 
   if (isPublic) return next();
 

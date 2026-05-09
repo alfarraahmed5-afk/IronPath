@@ -60,6 +60,33 @@ export const refreshLimiter = rateLimit({
   })
 });
 
+// Public lead capture limiter. Two stacked limits:
+//   - leadLimiterMinute: 5/min/IP
+//   - leadLimiter: 30/hour/IP
+// Apply both as middleware in order; either can short-circuit with 429. The
+// minute limiter is the burst guard; the hourly limiter caps sustained spam.
+export const leadLimiterMinute = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({
+    error: { code: 'RATE_LIMITED', message: 'Too many requests.', status: 429 }
+  })
+});
+
+export const leadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({
+    error: { code: 'RATE_LIMITED', message: 'Too many requests.', status: 429 }
+  })
+});
+
 // Upload-URL minting limiter. Keyed by user.id (falling back to ip) so a
 // single compromised account can't spam signed URLs. 10 / min is well above
 // any realistic interactive UI flow.
