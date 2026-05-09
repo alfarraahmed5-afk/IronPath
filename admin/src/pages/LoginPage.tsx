@@ -1,6 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
+import { isAllowedRole } from '../lib/session';
+
+// Only honor a `next` redirect if it's a same-origin path. Reject empty,
+// protocol-relative (`//evil.com`), and absolute URLs to prevent open
+// redirect via `?next=`.
+function sanitizeNext(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/')) return '/dashboard';
+  if (raw.startsWith('//')) return '/dashboard';
+  return raw;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -8,6 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const reason = searchParams.get('reason');
+  const next = sanitizeNext(searchParams.get('next'));
+  const showSessionExpired = reason === 'session_expired';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,7 +33,7 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       const { access_token, refresh_token, user } = res.data.data;
 
-      if (!['gym_owner', 'super_admin'].includes(user.role)) {
+      if (!isAllowedRole(user?.role)) {
         setError('Admin access required. Use the mobile app to track workouts.');
         return;
       }
@@ -25,7 +41,7 @@ export default function LoginPage() {
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
       localStorage.setItem('user', JSON.stringify(user));
-      navigate('/dashboard');
+      navigate(next, { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error?.message || 'Login failed. Check your credentials.');
     } finally {
@@ -43,6 +59,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-8 shadow-xl">
           <h2 className="text-xl font-semibold text-white mb-6">Sign In</h2>
+
+          {showSessionExpired && !error && (
+            <div className="bg-gray-800/60 border border-gray-700 text-gray-300 rounded-lg px-4 py-3 mb-4 text-sm">
+              Your session ended. Sign in to continue.
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-900/40 border border-red-700 text-red-300 rounded-lg px-4 py-3 mb-4 text-sm">

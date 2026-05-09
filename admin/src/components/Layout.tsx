@@ -1,33 +1,34 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Link2,
+  Megaphone,
+  Trophy,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
+import { readStoredUser, signOut } from '../lib/session';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-interface StoredUser {
-  email?: string;
-  username?: string;
-  gym_name?: string;
+interface NavLinkDef {
+  to: string;
+  label: string;
+  Icon: LucideIcon;
 }
 
-const NAV_LINKS = [
-  { to: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { to: '/members', label: 'Members', icon: '👥' },
-  { to: '/invites', label: 'Invites', icon: '🔗' },
-  { to: '/announcements', label: 'Announcements', icon: '📢' },
-  { to: '/challenges', label: 'Challenges', icon: '⚡' },
+const NAV_LINKS: NavLinkDef[] = [
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/members', label: 'Members', Icon: Users },
+  { to: '/invites', label: 'Invites', Icon: Link2 },
+  { to: '/announcements', label: 'Announcements', Icon: Megaphone },
+  { to: '/challenges', label: 'Challenges', Icon: Trophy },
 ];
 
-function signOut() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
-  window.location.href = '/login';
-}
-
 export default function Layout({ children }: LayoutProps) {
-  const stored = localStorage.getItem('user');
-  const user: StoredUser = stored ? JSON.parse(stored) : {};
+  const user = readStoredUser() ?? {};
 
   return (
     <div className="flex min-h-screen bg-gray-950">
@@ -41,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_LINKS.map(({ to, label, icon }) => (
+          {NAV_LINKS.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -54,8 +55,17 @@ export default function Layout({ children }: LayoutProps) {
                 ].join(' ')
               }
             >
-              <span>{icon}</span>
-              <span>{label}</span>
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    size={18}
+                    strokeWidth={1.75}
+                    className={isActive ? 'text-orange-500' : 'text-gray-400'}
+                    aria-hidden="true"
+                  />
+                  <span>{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
