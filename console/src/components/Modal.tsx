@@ -48,7 +48,11 @@ export default function Modal({
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        event.stopPropagation();
+        // Bubbling phase + no stopPropagation: if a child <select> popup is
+        // open and the operator hits ESC, the browser closes the popup first
+        // (default behavior). The modal only closes on the next ESC. Closing
+        // both at once was wiping unsaved form state — Phase B review flagged.
+        if (event.defaultPrevented) return;
         onClose();
         return;
       }
@@ -74,11 +78,14 @@ export default function Modal({
       }
     }
 
-    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
-      lastActiveRef.current?.focus();
+      // Only restore focus to the trigger if it's still in the DOM — otherwise
+      // browsers default-focus <body> which is fine.
+      const last = lastActiveRef.current;
+      if (last && document.contains(last)) last.focus();
     };
   }, [open, onClose, initialFocusRef]);
 

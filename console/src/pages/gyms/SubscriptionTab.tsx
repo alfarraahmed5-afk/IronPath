@@ -5,6 +5,15 @@ import Pill, { statusTone, tierTone } from '../../components/Pill';
 import SubscriptionEditor from '../../components/SubscriptionEditor';
 import { useGymQuery } from '../../lib/queries';
 
+// Canonical enums — used to validate the backend's nullable string columns
+// before forwarding them to the editor. Without this, a legacy or hand-edited
+// `subscription_tier` would silently leak through the `as Tier` cast and break
+// the editor's enum guard upstream.
+const SUBSCRIPTION_TIERS = ['starter', 'growth', 'unlimited'] as const;
+const SUBSCRIPTION_STATUSES = ['trial', 'active', 'expired', 'cancelled'] as const;
+type Tier = typeof SUBSCRIPTION_TIERS[number];
+type Status = typeof SUBSCRIPTION_STATUSES[number];
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -85,16 +94,26 @@ export default function SubscriptionTab() {
         </p>
       </section>
 
+      {/*
+        `key` flips with `editorOpen` so each open re-mounts the editor from
+        scratch. Combined with TanStack Query invalidation on each editor
+        mutation, this guarantees the seeded defaults always reflect the
+        latest server state (Phase B frontend review caught the prior stale
+        seeding when re-opening the editor after a mark-paid).
+      */}
       <SubscriptionEditor
+        key={editorOpen ? 'open' : 'closed'}
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         gymId={gymId}
         gymName={gym.name}
         current={{
-          tier: (gym.subscription_tier as 'starter' | 'growth' | 'unlimited' | null) ?? null,
-          status:
-            (gym.subscription_status as 'trial' | 'active' | 'expired' | 'cancelled' | null) ??
-            null,
+          tier: (SUBSCRIPTION_TIERS as readonly string[]).includes(gym.subscription_tier ?? '')
+            ? (gym.subscription_tier as Tier)
+            : null,
+          status: (SUBSCRIPTION_STATUSES as readonly string[]).includes(gym.subscription_status ?? '')
+            ? (gym.subscription_status as Status)
+            : null,
           expires_at: gym.subscription_expires_at,
           mrr_cents: gym.mrr_cents ?? null,
         }}

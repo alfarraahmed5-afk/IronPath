@@ -70,7 +70,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400/40 text-sm"
+              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/40 text-sm"
               placeholder="operator@ironpath.app"
               autoComplete="email"
               required
@@ -85,7 +85,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400/40 text-sm font-mono"
+              className="w-full bg-ink-700 text-ink-50 rounded-md px-3 py-2 border border-ink-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/40 text-sm font-mono"
               placeholder="••••••••"
               autoComplete="current-password"
               required
@@ -95,7 +95,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-400 hover:bg-brand-300 text-ink-900 font-medium py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="w-full bg-brand-500 hover:bg-brand-600 text-ink-950 font-medium py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {loading ? 'Signing in' : 'Sign in'}
           </button>

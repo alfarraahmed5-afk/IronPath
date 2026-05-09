@@ -25,7 +25,7 @@ function ErrorFallback() {
         <p className="text-ink-300 text-sm mb-6">Refresh to try again.</p>
         <button
           onClick={() => window.location.reload()}
-          className="w-full bg-brand-400 hover:bg-brand-300 text-ink-900 font-medium py-2.5 rounded-md transition-colors text-sm"
+          className="w-full bg-brand-500 hover:bg-brand-600 text-ink-950 font-medium py-2.5 rounded-md transition-colors text-sm"
         >
           Refresh
         </button>

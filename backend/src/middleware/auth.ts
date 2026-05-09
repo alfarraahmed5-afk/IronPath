@@ -14,22 +14,27 @@ declare global {
   }
 }
 
-const PUBLIC_PATHS = [
-  '/api/v1/auth/register',
-  '/api/v1/auth/login',
-  '/api/v1/auth/forgot-password',
-  '/api/v1/auth/reset-password',
-  '/api/v1/auth/refresh',
-  '/api/v1/gyms/validate-invite',
+// Public paths are matched as anchored regexes — `startsWith` would let any
+// future route accidentally inherit anonymity (`/auth/login-bypass-foo`,
+// `/auth/refresh-anything`, etc.). Each entry must end with `/?(\?.*)?$`.
+const PUBLIC_PATH_RES: { method?: string; re: RegExp }[] = [
+  { re: /^\/api\/v1\/auth\/register\/?(\?.*)?$/ },
+  { re: /^\/api\/v1\/auth\/login\/?(\?.*)?$/ },
+  { re: /^\/api\/v1\/auth\/forgot-password\/?(\?.*)?$/ },
+  { re: /^\/api\/v1\/auth\/reset-password\/?(\?.*)?$/ },
+  { re: /^\/api\/v1\/auth\/refresh\/?(\?.*)?$/ },
+  { re: /^\/api\/v1\/gyms\/validate-invite\/?(\?.*)?$/ },
+  { method: 'POST', re: /^\/api\/v1\/gyms\/?(\?.*)?$/ },
+  // Public lead capture: only POST /api/v1/leads is unauthenticated. The
+  // super_admin GET/PATCH list endpoints sit under /api/v1/super-admin/leads
+  // and are not affected by this exemption.
+  { method: 'POST', re: /^\/api\/v1\/leads\/?(\?.*)?$/ },
 ];
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const isPublic = PUBLIC_PATHS.some(path => req.originalUrl.startsWith(path)) ||
-    (req.method === 'POST' && /^\/api\/v1\/gyms\/?$/.test(req.originalUrl)) ||
-    // Public lead capture: only POST /api/v1/leads is unauthenticated. The
-    // super_admin GET/PATCH list endpoints sit under /api/v1/super-admin/leads
-    // and are not affected by this exemption.
-    (req.method === 'POST' && /^\/api\/v1\/leads\/?(\?.*)?$/.test(req.originalUrl));
+  const isPublic = PUBLIC_PATH_RES.some(p =>
+    (!p.method || p.method === req.method) && p.re.test(req.originalUrl)
+  );
 
   if (isPublic) return next();
 

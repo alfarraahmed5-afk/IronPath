@@ -3,31 +3,26 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { requireActiveUser } from '../middleware/requireActiveUser';
+import { requireGymOwner } from '../middleware/roles';
 
 const router = Router();
 
 // ─── Auth / role guards ───────────────────────────────────────────────────────
 
 router.use(requireActiveUser);
-router.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.user!.role !== 'gym_owner' && req.user!.role !== 'super_admin') {
-    return next(new AppError('FORBIDDEN', 403, 'Admin access required'));
-  }
-  next();
-});
 
-// ─── GET /admin/me — diagnostic: exempt from gym_id requirement ───────────────
-router.get('/me', (req: Request, res: Response) => {
+// `/admin/me` is a thin diagnostic; gym_owner without a gym yet can call it to
+// see their own JWT-scoped user record. super_admin is intentionally NOT in the
+// allowlist here — they operate via /super-admin/* (plan §6.1, §8.1 #3).
+router.get('/me', (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+  if (req.user.role !== 'gym_owner') return next(new AppError('FORBIDDEN', 403, 'Gym owner required'));
   res.json({ data: { user: req.user } });
 });
 
-// All routes below require a gym to be linked to the account
-router.use((req: Request, res: Response, next: NextFunction) => {
-  if (!req.user!.gym_id) {
-    return next(new AppError('NO_GYM', 403, 'No gym associated with this account'));
-  }
-  next();
-});
+// All routes below additionally require the user to have a linked gym AND, when
+// the URL carries `:id`/`:gymId`, that it matches the JWT scope.
+router.use(requireGymOwner);
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 

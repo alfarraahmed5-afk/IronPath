@@ -5,16 +5,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Cyan accent — operator console identity (NOT orange — that's the gym admin app)
+        // Cyan accent — operator console identity (NOT orange — that's the gym admin app).
+        // 400/500/600 follow PLATFORM_PLAN §3.2 verbatim:
+        //   cyan-400 #67E8F9     cyan-500 #22D3EE (canonical primary)     cyan-600 #0EA5C4
+        // Pre-review the scale was shifted one shade lighter, so every `bg-brand-500`
+        // primary CTA was actually rendering at #06B6D4 (Tailwind's cyan-600). Phase B
+        // plan-adherence review caught this; this remap restores the canonical hex.
+        // 300 is intentionally NOT moved — `text-brand-300` is used widely for hover /
+        // active accents and #67E8F9 is the right intensity there.
         brand: {
-          DEFAULT: '#22D3EE', // cyan-400 / accent
+          DEFAULT: '#22D3EE',
           50:  '#ECFEFF',
           100: '#CFFAFE',
           200: '#A5F3FC',
           300: '#67E8F9',
-          400: '#22D3EE',
-          500: '#06B6D4',
-          600: '#0891B2',
+          400: '#67E8F9',
+          500: '#22D3EE',
+          600: '#0EA5C4',
           700: '#0E7490',
           800: '#155E75',
           900: '#164E63',

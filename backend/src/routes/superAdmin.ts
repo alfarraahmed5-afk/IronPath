@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { generateUniqueInviteCode } from '../lib/inviteCode';
@@ -28,12 +29,20 @@ function clampPage(raw: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
 }
 
+// PostgREST `.or(...)` is comma-delimited and parenthesized; an attacker passing
+// `,()` in `q` could break out of the predicate. LIKE patterns also treat `%`
+// and `_` as wildcards. Strip both before splicing user input into a filter.
+function sanitizeIlikeTerm(input: string): string {
+  return input.replace(/[,()%_]/g, '').slice(0, 80);
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // GET /super-admin/gyms — list with filters
 // ────────────────────────────────────────────────────────────────────────────
 router.get('/gyms', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const q = sanitizeIlikeTerm(rawQ);
     const status = typeof req.query.status === 'string' && (STATUS as readonly string[]).includes(req.query.status) ? req.query.status : null;
     const tier = typeof req.query.tier === 'string' && (TIER as readonly string[]).includes(req.query.tier) ? req.query.tier : null;
     const createdAfter = typeof req.query.created_after === 'string' ? req.query.created_after : null;
@@ -234,7 +243,16 @@ router.post('/gyms/:id/subscription/mark-paid', async (req: Request, res: Respon
     }).select().single();
     if (payErr || !payment) throw payErr ?? new Error('Payment insert failed');
 
-    const newExpires = gym.subscription_expires_at && gym.subscription_expires_at > period_end ? gym.subscription_expires_at : `${period_end}T23:59:59Z`;
+    // Compare existing expiry (ISO timestamp) against the new period_end normalized
+    // to end-of-day. String compare alone leaves the existing expiry winning whenever
+    // it has a `T...` suffix, even when period_end covers a later date — bug spotted
+    // in Phase B review.
+    const periodEndExpiry = `${period_end}T23:59:59Z`;
+    const newExpires =
+      gym.subscription_expires_at &&
+      new Date(gym.subscription_expires_at).getTime() > new Date(periodEndExpiry).getTime()
+        ? gym.subscription_expires_at
+        : periodEndExpiry;
     const { data: after, error: updErr } = await supabase.from('gyms').update({
       subscription_status: 'active',
       subscription_expires_at: newExpires,
@@ -424,7 +442,8 @@ router.patch('/gyms/:id', async (req: Request, res: Response, next: NextFunction
 router.get('/leads', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const status = typeof req.query.status === 'string' && (LEAD_STATUS as readonly string[]).includes(req.query.status) ? req.query.status : null;
-    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const q = sanitizeIlikeTerm(rawQ);
     const assignedTo = typeof req.query.assigned_to === 'string' ? req.query.assigned_to : null;
     const page = clampPage(req.query.page);
     const from = (page - 1) * PAGE_SIZE_DEFAULT;
@@ -500,9 +519,13 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 function randomString(len: number): string {
+  // CSPRNG. The temp password is overwritten on the user's first login via the
+  // forgot-password flow, but it briefly sits on the auth account; predictable
+  // output (Math.random) is unsafe even for that window.
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const bytes = randomBytes(len);
   let out = '';
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < len; i++) out += chars[bytes[i] % chars.length];
   return out;
 }
 

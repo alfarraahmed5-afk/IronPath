@@ -3,7 +3,7 @@
 Single source of truth for development progress on the platform plan. Read this first when resuming a session. Every meaningful checkpoint gets an entry with file paths, what changed, and what's next.
 
 - **Plan reference:** [PLATFORM_PLAN.md](PLATFORM_PLAN.md)
-- **Active branch:** `claude/clever-dhawan-f1fb26` (worktree)
+- **Active branch:** `claude/hopeful-varahamihira-a9f2cf` (worktree)
 - **Maintained by:** primary agent inline + Haiku scribe polish pass per unit
 
 ---
@@ -37,15 +37,29 @@ Single source of truth for development progress on the platform plan. Read this 
 - [ ] Re-key `refreshLimiter` off `refresh_token` hash (or user.id) instead of IP — NAT'd-office mass-logout risk.
 - [ ] Validate `logo_url` PATCH body is from `gym-assets` bucket (not arbitrary URL).
 - [ ] Allow `logo_url` PATCH to set `null` (currently only `.optional()` — can't clear logo).
-- [ ] CORS allowlist boot-time validation (no wildcards, both apex domains present).
 - [ ] Post-upload server-side MIME validation on logo blobs (Supabase signed-URL TTL is fixed at 2h).
 - [ ] De-duplicate `ONBOARDING_STEPS` between `backend/src/routes/gyms.ts` and `shared/types/index.ts` (build `@ironpath/shared` dist or use tsconfig path alias).
 - [ ] Harmonize admin/console `clearSessionAndRedirect` signatures — same name, different param meaning.
 - [ ] Widen admin `StoredUser.gym_id` to `string | null` to match console + DB reality.
 - [ ] Swap `📌` emoji in `admin/src/pages/AnnouncementsPage.tsx` for Lucide `Pin`.
-- [ ] Add `last_modified_by` to `gyms` before audit_log lands in Phase B.
+- [x] Add `last_modified_by` to `gyms` before audit_log lands in Phase B. *(migration 041)*
 
-### Phase B — Super Admin Console v1 (not started)
+### Phase B v1 review carry-over (Tier 2)
+- [ ] Manual gym creation: orphaned-auth-user reconciliation cron when `auth.admin.deleteUser` rollback fails (backend HIGH).
+- [ ] Manual gym creation: derive owner `username` from email local-part + retry on 23505 (backend HIGH).
+- [ ] `/leads` disposable-email-domain blocklist + CAPTCHA after N invalid (security MED, plan §8.5).
+- [ ] Wildcard escape (`%`/`_`) in ilike queries beyond the bare `,()` strip — currently `sanitizeIlikeTerm` strips both, but a pure `LIKE`-pattern escape helper would be cleaner (backend MED).
+- [ ] Add per-IP key to default rate limiter for super-admin writes — defense-in-depth against multi-token bypass (security MED).
+- [ ] Add per-route higher rate limit for super-admin endpoints (frequent filter changes can hit 100/min default) (backend MED).
+- [ ] Better error message in `superAdmin.ts:202` (`'Update failed'`) — include gymId + payload (backend LOW).
+- [ ] Migrate `LoginPage` to RHF + zod for consistency with the rest of the console (frontend MED).
+- [ ] `formatMoneyCents(0) === '—'` falsy guard treats $0 MRR as "unknown" (frontend LOW, `GymsPage.tsx:14-17`).
+- [ ] Listing endpoint for `subscription_payments` (currently a placeholder pane on `SubscriptionTab`).
+- [ ] Plan §5.6: coupon code apply + founding-gym lifetime-lock-in flag — Phase D scope, but `SubscriptionEditor` should be extended when the migration lands.
+- [ ] Plan §5.5: `/members` and `/activity` sub-tabs — Phase E scope (analytics + member detail).
+- [ ] Amend plan §3.7 ("gray-600 32px" → `ink-400`) and §6.4 migration table renumbering (041 = `gyms_last_modified_by`, coupons → 043+).
+
+### Phase B — Super Admin Console v1 (in flight)
 ### Phase C — Onboarding & retention (not started)
 ### Phase D — Sales acceleration (not started)
 ### Phase E — Analytics (not started)
@@ -55,6 +69,41 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-09 · Phase B v1 review pass + Tier 1 fixes
+
+**4 cross-team reviewers** ran in parallel against `dd01fe4` (frontend integration / backend integration / security+RBAC / plan adherence). All four agreed the build passes typecheck + bundles cleanly; their findings landed two CRITICAL items that block-merge, four HIGH items that should fix this round, and a handful of MEDs.
+
+**Tier 1 — applied (this commit):**
+
+*Backend (CRITICAL/HIGH):*
+- **CRITICAL** `mark-paid` expiry comparison (`backend/src/routes/superAdmin.ts:237`) was string-vs-date — `subscription_expires_at` carries `T23:59:59Z` so it lexicographically beat any `period_end` (date-only), keeping the older expiry whenever the new period covered the same day. Now compared via `new Date(...).getTime()`.
+- **CRITICAL** `super_admin_audit_log` was not append-only at the DB layer — migration 040 created the table without `REVOKE UPDATE, DELETE`. New migration `042_audit_log_append_only.sql` revokes UPDATE/DELETE from `service_role`, `authenticated`, `anon`, and `PUBLIC`. Plan §8 #1 / §12.4 #1.
+- **HIGH** CORS allowlist (`backend/src/index.ts`) was a static array, which `cors` middleware does NOT auto-decorate with `Vary: Origin`, and never matched the Vercel preview-deployment regex. Replaced with a function-based `origin` callback that checks the explicit allowlist, then `^https:\/\/(ironpath-admin|ironpath-console)-[\w-]+\.vercel\.app$`. Plan §8.4.
+- **HIGH** `PUBLIC_PATHS` (`backend/src/middleware/auth.ts`) used `originalUrl.startsWith(...)` — any future `/auth/login-bypass-foo` would inherit anonymity. Reworked to anchored regex array (`/^\/api\/v1\/.../?(\?.*)?$/`) keyed optionally by HTTP method.
+- **HIGH** `requireGymOwner` and `requireSelfOrSuperAdmin` middlewares missing — plan §6.3 spec'd, only `requireSuperAdmin` existed. Added in `backend/src/middleware/roles.ts`. `requireGymOwner` is `gym_owner` only (NOT `super_admin`) and enforces `req.params.id`/`gymId` matches `req.user.gym_id`.
+- **HIGH** `/admin` allowlist still admitted `super_admin` (plan §6.1, §8.1 #3). `routes/admin.ts` now uses `requireGymOwner` for everything past `/admin/me`; super_admin must use `/super-admin/*`.
+
+*Backend (MED):*
+- **MED** `randomString()` in `superAdmin.ts` used `Math.random()` for the manual-create temp password. Replaced with `crypto.randomBytes` (CSPRNG).
+- **MED** PostgREST `.or(...)` injection in `/super-admin/leads`: `q` was spliced raw into a comma-delimited filter expression. New `sanitizeIlikeTerm` helper strips `,()%_` and caps at 80 chars before splice. Applied to `/super-admin/gyms` ilike on name as well.
+- **LOW** `logAudit` could violate the `actor_user_id NOT NULL` constraint if ever called outside `requireSuperAdmin`. Now logs + returns instead of letting the DB raise.
+
+*Console (HIGH):*
+- **HIGH** `SubscriptionEditor` "Update plan" tab: `<option value="">— no change —</option>` + `z.enum().optional()` was rejecting empty-string submits, breaking the no-change path. Now `register('tier', { setValueAs: emptyToUndefined })` maps `""` → `undefined` at input bind time, schema stays strict.
+- **HIGH** `SubscriptionEditor` was spuriously re-sending `expires_at` on every submit because `<input type="datetime-local">` is minute-precision and the seeded ISO timestamp carries seconds — the round-trip never compared equal. Switched to RHF's `dirtyFields` so only operator-touched fields ship.
+- **HIGH** `Modal` ESC handler ran on the capturing phase with `stopPropagation()`, so pressing ESC while a `<select>` popup was open closed both the popup AND the modal — wiping unsaved form state. Moved to bubbling phase with no `stopPropagation`; respects `defaultPrevented`. Also guards `lastActiveRef.focus()` with `document.contains(...)`.
+
+*Console (MED):*
+- **MED** `SubscriptionTab` cast `gym.subscription_tier as Tier` without validating; legacy/unknown values would slip through and break the editor's enum guard. Now validates against canonical tier/status lists, returns `null` for unknown.
+- **MED** `<SubscriptionEditor key={editorOpen ? 'open' : 'closed'}>` forces a remount on each open so RHF defaults always re-seed from the latest `useGymQuery` cache.
+- **MED** Tailwind cyan scale was shifted one shade — `brand-500` mapped to `#06B6D4`, but plan §3.2 names `cyan-500 = #22D3EE` as the canonical primary. Every `bg-brand-500` button was rendering plan-cyan-600. Remapped 400/500/600 to plan hexes (`#67E8F9` / `#22D3EE` / `#0EA5C4`); `brand-300` left at `#67E8F9` so existing `text-brand-300` accents don't wash out. Migrated `LoginPage` button + `main.tsx` ErrorFallback button from `bg-brand-400 hover:bg-brand-300` to the canonical `bg-brand-500 hover:bg-brand-600` (the original was lighter-on-hover, an unintended quirk of the shifted scale).
+
+**Tier 2 — moved to "Phase B v1 review carry-over" backlog above.**
+
+**Verified:** `npx tsc -p backend/tsconfig.json --noEmit`, `npx tsc -p console/tsconfig.json --noEmit`, `npm run -w console build`, `npm run -w backend build` all clean.
+
+**Plan amendments noted (deferred):** §3.7 EmptyState icon spec ("gray-600") should read `ink-400`; §6.4 migration table needs renumbering (041 = `gyms_last_modified_by`, coupons drift to 043+).
 
 ### 2026-05-09 · Phase B v1.2 — GymDetailPage nested-route tabs
 

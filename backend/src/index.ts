@@ -36,8 +36,26 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 // rateLimiter) collapses to the proxy IP and one user can DoS everyone behind it.
 app.set('trust proxy', 1);
 
-const corsOptions = {
-  origin: (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()),
+// CORS: function-based origin so we can match the explicit allowlist plus the
+// Vercel preview-deployment regex (plan §8.4). When `origin` is a function the
+// `cors` middleware also automatically sets `Vary: Origin` on the response,
+// which a static array does not — without it, intermediate caches can serve
+// the wrong ACAO. Never `*` with credentials.
+const STATIC_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const PREVIEW_ORIGIN_RE = /^https:\/\/(ironpath-admin|ironpath-console)-[\w-]+\.vercel\.app$/;
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Same-origin / curl / server-to-server have no Origin header — allow.
+    if (!origin) return callback(null, true);
+    if (STATIC_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (PREVIEW_ORIGIN_RE.test(origin)) return callback(null, true);
+    return callback(null, false);
+  },
   credentials: true,
 };
 

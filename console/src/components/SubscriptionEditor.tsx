@@ -101,21 +101,19 @@ export default function SubscriptionEditor({
 // Update plan
 // ────────────────────────────────────────────────────────────────────────────
 
-const updateSchema = z
-  .object({
-    tier: z.enum(['starter', 'growth', 'unlimited']).optional(),
-    status: z.enum(['trial', 'active', 'expired', 'cancelled']).optional(),
-    expires_at_local: z.string().optional(),
-    mrr_dollars: z.union([z.string(), z.number()]).optional(),
-  })
-  .refine(
-    (d) =>
-      d.tier !== undefined ||
-      d.status !== undefined ||
-      (d.expires_at_local && d.expires_at_local.length > 0) ||
-      (d.mrr_dollars !== undefined && d.mrr_dollars !== ''),
-    { message: 'Change at least one field.', path: ['tier'] }
-  );
+const updateSchema = z.object({
+  tier: z.enum(['starter', 'growth', 'unlimited']).optional(),
+  status: z.enum(['trial', 'active', 'expired', 'cancelled']).optional(),
+  expires_at_local: z.string().optional(),
+  mrr_dollars: z.union([z.string(), z.number()]).optional(),
+});
+
+// `<option value="">— no change —</option>` makes the select submit `""`, which
+// `z.enum(...).optional()` rejects (it only short-circuits on undefined). RHF's
+// `setValueAs` maps the empty string back to undefined at input-bind time so
+// the schema stays strict. Phase B frontend review caught the prior breakage.
+const emptyToUndefined = (v: unknown): unknown =>
+  v === '' || v === undefined ? undefined : v;
 
 type UpdateForm = z.infer<typeof updateSchema>;
 
@@ -141,7 +139,7 @@ function UpdatePlanForm({
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isSubmitting, isDirty, dirtyFields },
   } = useForm<UpdateForm>({
     resolver: zodResolver(updateSchema),
     defaultValues: {
@@ -162,19 +160,25 @@ function UpdatePlanForm({
       mrr_cents?: number;
     } = {};
 
-    if (values.tier && values.tier !== (current.tier ?? undefined)) {
-      body.tier = values.tier;
+    // We ship only fields the operator actually touched. Without `dirtyFields`,
+    // the previous diff-against-current strategy spuriously re-sent expires_at
+    // because <input type="datetime-local"> is minute-precision and the seeded
+    // ISO timestamp carries seconds — round-tripping never compared equal.
+    if (dirtyFields.tier && values.tier) body.tier = values.tier;
+    if (dirtyFields.status && values.status) body.status = values.status;
+    if (
+      dirtyFields.expires_at_local &&
+      values.expires_at_local &&
+      values.expires_at_local.length > 0
+    ) {
+      body.expires_at = new Date(values.expires_at_local).toISOString();
     }
-    if (values.status && values.status !== (current.status ?? undefined)) {
-      body.status = values.status;
-    }
-    if (values.expires_at_local && values.expires_at_local.length > 0) {
-      const iso = new Date(values.expires_at_local).toISOString();
-      if (iso !== current.expires_at) body.expires_at = iso;
-    }
-    if (values.mrr_dollars !== undefined && values.mrr_dollars !== '') {
-      const cents = dollarsToCents(values.mrr_dollars);
-      if (cents !== current.mrr_cents) body.mrr_cents = cents;
+    if (
+      dirtyFields.mrr_dollars &&
+      values.mrr_dollars !== undefined &&
+      values.mrr_dollars !== ''
+    ) {
+      body.mrr_cents = dollarsToCents(values.mrr_dollars);
     }
 
     if (Object.keys(body).length === 0) {
@@ -195,7 +199,7 @@ function UpdatePlanForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Field label="Tier" error={errors.tier?.message}>
-        <select {...register('tier')} className={inputCx}>
+        <select {...register('tier', { setValueAs: emptyToUndefined })} className={inputCx}>
           <option value="">— no change —</option>
           <option value="starter">Starter</option>
           <option value="growth">Growth</option>
@@ -204,7 +208,7 @@ function UpdatePlanForm({
       </Field>
 
       <Field label="Status" error={errors.status?.message}>
-        <select {...register('status')} className={inputCx}>
+        <select {...register('status', { setValueAs: emptyToUndefined })} className={inputCx}>
           <option value="">— no change —</option>
           <option value="trial">Trial</option>
           <option value="active">Active</option>
