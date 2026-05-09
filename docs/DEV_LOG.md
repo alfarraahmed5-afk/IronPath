@@ -56,6 +56,22 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-09 · Phase B kickoff stalled (worktree fork-base gotcha) → recovered
+
+First Phase B kickoff failed because `Agent({ isolation: "worktree" })` forks from local `master`, not from the currently checked-out feature branch. All four B teams' worktrees forked from `79066d9` (pre-Phase-A master) — three aborted ("console/ doesn't exist"); B4 produced admin-only Sentry + polish work against the wrong base, but salvageable.
+
+**Recovery (durable):**
+1. Stopped in-flight B1 (the only still-running one on bad baseline).
+2. Merged B4's admin work as `2486520`: admin Sentry init, 📌 → Lucide `Pin` swap in `AnnouncementsPage`, `LoginPage` role-error tightened to "Admin access required.".
+3. **Fast-forwarded local refs** so future worktrees see the right base:
+   ```
+   git update-ref refs/heads/master refs/heads/claude/clever-dhawan-f1fb26
+   git update-ref refs/remotes/origin/master refs/heads/claude/clever-dhawan-f1fb26
+   ```
+4. Re-spawned the 4 Phase B teams against the corrected baseline. Each prompt now includes a base-check sanity instruction ("Run `git log --oneline -5` first; if you see only `79066d9`, STOP").
+
+**Lesson (also captured in memory):** before spawning any `isolation: "worktree"` batch that depends on uncommitted-to-master work, fast-forward local master to the current branch HEAD. Otherwise the agents see a stale base and either abort or produce mismatched work.
+
 ### 2026-05-09 · Phase A review pass + Tier 1 fixes
 
 **4 cross-team reviewers + Haiku scribe ran in parallel on the merged trunk.** All four typechecks were clean before AND after this fix pass.
