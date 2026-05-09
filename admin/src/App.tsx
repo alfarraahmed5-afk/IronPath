@@ -5,6 +5,8 @@ import MembersPage from './pages/MembersPage';
 import InvitesPage from './pages/InvitesPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import ChallengesPage from './pages/ChallengesPage';
+import SettingsPage from './pages/SettingsPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 import Layout from './components/Layout';
 import { clearSession, isAllowedRole, readStoredUser } from './lib/session';
 
@@ -49,6 +51,14 @@ export default function App() {
         <Route
           path="/challenges"
           element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><SettingsPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/subscription"
+          element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>}
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>

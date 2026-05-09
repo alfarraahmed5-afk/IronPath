@@ -414,16 +414,16 @@ requireSelfOrSuperAdmin → role === super_admin OR userId matches req.user.id
 
 | # | File | Purpose |
 |---|---|---|
-| 035 | `035_subscription_extras.sql` | `ALTER TABLE gyms ADD COLUMN mrr_cents, phone, website, address, timezone, units_default, logo_url`. Add `ON DELETE` cascades for any new FKs. |
-| 036 | `036_subscription_payments.sql` | New `subscription_payments` table (gym_id, amount_cents, period_start/end, note, recorded_by, created_at) |
-| 037 | `037_gym_onboarding_steps.sql` | New `gym_onboarding_steps` table (composite PK gym_id + step_key, completed_at, completed_by, metadata jsonb) |
-| 038 | `038_leads.sql` | New `leads` table + partial unique index on lower(email) WHERE created_at > now()-7d |
-| 039 | `039_audit_log.sql` | New `super_admin_audit_log` (actor_user_id, action, target_type, target_id, before jsonb, after jsonb, ip, user_agent, created_at) — append-only; revoke UPDATE/DELETE on the table from app role |
-| 040 | `040_coupons.sql` | New `coupons` + `coupon_redemptions` tables |
-| 041 | `041_analytics_views.sql` | `view_gym_mrr`, `view_subscription_events`, `view_trial_conversion` |
-| 042 | `042_role_coach.sql` | Add `coach` to role enum + permissions |
+| 036 | `036_subscription_extras.sql` | `ALTER TABLE gyms ADD COLUMN mrr_cents, phone, website, address, timezone, units_default, logo_url`. Add `ON DELETE` cascades for any new FKs. |
+| 037 | `037_subscription_payments.sql` | New `subscription_payments` table (gym_id, amount_cents, period_start/end, note, recorded_by, created_at) |
+| 038 | `038_gym_onboarding_steps.sql` | New `gym_onboarding_steps` table (composite PK gym_id + step_key, completed_at, completed_by, metadata jsonb) |
+| 039 | `039_leads.sql` | New `leads` table + partial unique index on lower(email) WHERE created_at > now()-7d |
+| 040 | `040_audit_log.sql` | New `super_admin_audit_log` (actor_user_id, action, target_type, target_id, before jsonb, after jsonb, ip, user_agent, created_at) — append-only; revoke UPDATE/DELETE on the table from app role |
+| 041 | `041_coupons.sql` | New `coupons` + `coupon_redemptions` tables |
+| 042 | `042_analytics_views.sql` | `view_gym_mrr`, `view_subscription_events`, `view_trial_conversion` |
+| 043 | `043_role_coach.sql` | Add `coach` to role enum + permissions |
 
-> **Critical:** `034_auth_hook.sql` must remain the **last** migration — the JWT custom-claims hook references `public.users` and runs on every token issue. Renumber if needed but never reorder past 034.
+> **Auth hook ordering rule (revised 2026-05-09):** the JWT custom-claims hook in `034_auth_hook.sql` references `public.users` and runs on every token issue. Any migration that mutates `public.users` schema or the hook itself must be sequenced **after 034**. Pure ALTER TABLE on other tables is fine — `035_invite_options.sql` already lives there safely.
 
 ### 6.5 Audit log helper
 
@@ -712,7 +712,7 @@ red    if owner hasn't logged in 7+ days mid-trial
 ### Phase A — Foundation (1 sprint, ~1 week)
 **Goal:** Owners can configure their gym + see their subscription.
 
-- [ ] Migration 035 (gyms columns) + 036 (subscription_payments) + 037 (gym_onboarding_steps)
+- [ ] Migration 036 (gyms columns) + 037 (subscription_payments) + 038 (gym_onboarding_steps)
 - [ ] Backend: extend `PATCH /gyms/:id`; new `GET /gyms/:id/subscription`, `GET/POST /gyms/:id/onboarding/*`, `POST /gyms/:id/logo/upload-url`
 - [ ] Owner panel: Gym Settings page, Subscription page (read-only), refresh-token in-flight guard fix in `admin/src/lib/api.ts`, role-aware ProtectedRoute
 - [ ] Migrate Dashboard CSS-bar → recharts; install Lucide; replace emoji nav
@@ -722,7 +722,7 @@ red    if owner hasn't logged in 7+ days mid-trial
 **Goal:** Founder can run sales from the console.
 
 - [ ] Add `console/` to workspaces; copy admin scaffolding
-- [ ] Migration 039 (audit_log) + 038 (leads)
+- [ ] Migration 040 (audit_log) + 039 (leads)
 - [ ] New `requireSuperAdmin` middleware; new `superAdmin` router
 - [ ] Backend: `GET /super-admin/gyms`, `GET /super-admin/gyms/:id`, `PATCH /super-admin/gyms/:id/subscription`, `POST .../mark-paid`, `POST .../extend-trial`
 - [ ] Backend: `POST /leads` (public), `GET /super-admin/leads`
@@ -752,7 +752,7 @@ red    if owner hasn't logged in 7+ days mid-trial
 - [ ] Impersonation (full flow + banner + audit)
 - [ ] Broadcast email
 - [ ] Coupons engine
-- [ ] Migration 040 (coupons), 041 (analytics views)
+- [ ] Migration 041 (coupons), 042 (analytics views)
 - [ ] **Ship gate:** founder runs a complete demo using a spawned demo gym + impersonation.
 
 ### Phase E — Analytics & insight (1 sprint)
@@ -792,7 +792,7 @@ red    if owner hasn't logged in 7+ days mid-trial
 12. **Personal record detection is bulk + dedup** (`backend/src/routes/workouts.ts:31-135`). Fetches existing PRs, filters locally, bulk-inserts only NEW. Don't insert without dedup or you'll get duplicate PR rows.
 13. **Leaderboard snapshots use partial unique indexes** (`supabase/migrations/025_leaderboard_snapshots.sql:17-23`). UNIQUE on `(gym_id, category, period, COALESCE(period_start))` WITH `WHERE exercise_id IS NULL`. ON CONFLICT DO UPDATE for upserts.
 14. **Body measurements in cm; weights in kg.** All circumference columns are `_cm`-suffixed `DECIMAL(5,1)` (`supabase/migrations/012_body_measurements.sql:8-18`). Mobile converts inches/lbs at the boundary. Backend never stores imperial.
-15. **`034_auth_hook.sql` MUST stay last.** The custom_access_token_hook references `public.users` and runs on every token issue. Renumber additions, never reorder past 034.
+15. **`034_auth_hook.sql` ordering.** The custom_access_token_hook references `public.users` and runs on every token issue. Any migration that mutates `public.users` schema or the hook must be sequenced **after** 034. Pure ALTER TABLE on other tables (e.g. `035_invite_options.sql`) is fine after 034. Don't blindly insist on 034 being last; insist on the dependency rule.
 16. **Supabase Storage has no native move and no auto-cleanup.** Pattern: signed upload URL → client PUT → server records old URL and explicitly deletes after success. Folder structure must match `supabase/migrations/033_storage_policies.sql:14` (`gym_id` as first segment).
 17. **`PUBLIC_PATHS` in `backend/src/middleware/auth.ts:17`** — add new public paths there OR they get blocked by auth middleware. `POST /leads` will need this entry.
 18. **Service-role Supabase client bypasses RLS.** Gym isolation lives in app-layer WHERE clauses. Audit every super-admin write with before/after JSON snapshots; don't rely on DB constraints to catch cross-gym leaks.
@@ -845,7 +845,7 @@ Before opening a PR in this plan:
 - [ ] New endpoint registered in the right router with the right middleware chain.
 - [ ] Static paths declared before parameterized paths in the same router.
 - [ ] Zod schema for every body; errors mapped to `fields[]`.
-- [ ] Migration filename incremented; nothing reordered past `034_auth_hook.sql`.
+- [ ] Migration filename incremented; if it mutates `public.users` or the auth hook, sequenced after 034. Otherwise just append.
 - [ ] If a super_admin write: `logAudit(...)` is called with before/after.
 - [ ] Frontend role gate in addition to API gate (UX, not security).
 - [ ] No `console.log`; pino logger in backend, Sentry breadcrumbs in frontend.
@@ -887,7 +887,7 @@ Before opening a PR in this plan:
 - `shared/types/index.ts` — add `ONBOARDING_STEPS`, role enum extension
 - `package.json` — add `"console"` to workspaces
 - `supabase/migrations/033_storage_policies.sql` — gym_id folder convention
-- `supabase/migrations/034_auth_hook.sql` — must stay last
+- `supabase/migrations/034_auth_hook.sql` — must stay ahead of any migration that mutates `public.users` or the hook
 
 ### New files this plan creates
 - `console/` — full new Vite app
@@ -895,14 +895,14 @@ Before opening a PR in this plan:
 - `backend/src/routes/leads.ts` — public lead capture
 - `backend/src/middleware/roles.ts` — `requireGymOwner`, `requireSuperAdmin`, `requireSelfOrSuperAdmin`
 - `backend/src/lib/audit.ts` — `logAudit` helper
-- `supabase/migrations/035_subscription_extras.sql`
-- `supabase/migrations/036_subscription_payments.sql`
-- `supabase/migrations/037_gym_onboarding_steps.sql`
-- `supabase/migrations/038_leads.sql`
-- `supabase/migrations/039_audit_log.sql`
-- `supabase/migrations/040_coupons.sql`
-- `supabase/migrations/041_analytics_views.sql`
-- `supabase/migrations/042_role_coach.sql`
+- `supabase/migrations/036_subscription_extras.sql`
+- `supabase/migrations/037_subscription_payments.sql`
+- `supabase/migrations/038_gym_onboarding_steps.sql`
+- `supabase/migrations/039_leads.sql`
+- `supabase/migrations/040_audit_log.sql`
+- `supabase/migrations/041_coupons.sql`
+- `supabase/migrations/042_analytics_views.sql`
+- `supabase/migrations/043_role_coach.sql`
 
 ---
 

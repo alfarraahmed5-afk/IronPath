@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FileText } from 'lucide-react';
 import api from '../lib/api';
 import { extractError, getStoredGymId } from '../lib/forms';
 
@@ -254,7 +255,7 @@ function InvoicesCard() {
   return (
     <Card title="Invoices">
       <div className="text-center py-8">
-        <div className="text-3xl text-gray-600 mb-2" aria-hidden>•••</div>
+        <FileText size={32} strokeWidth={1.5} className="mx-auto text-gray-600 mb-2" aria-hidden="true" />
         <p className="text-gray-300 text-sm font-medium">No invoices yet</p>
         <p className="text-gray-500 text-xs mt-1">
           Phase C will surface payment history here.

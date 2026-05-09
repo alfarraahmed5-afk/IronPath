@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { KeyRound, UserPlus } from 'lucide-react';
 import api from '../lib/api';
 import {
   accentColorSchema,
@@ -652,7 +653,7 @@ function InviteCodeCard() {
         <InlineError message={error} />
       ) : !invite ? (
         <div className="text-center py-6">
-          <div className="text-3xl text-gray-600 mb-2" aria-hidden>•••</div>
+          <KeyRound size={32} strokeWidth={1.5} className="mx-auto text-gray-600 mb-2" aria-hidden="true" />
           <p className="text-gray-300 text-sm font-medium">No active invite code</p>
           <p className="text-gray-500 text-xs mt-1">Create one on the Invites page.</p>
           <a
@@ -711,7 +712,7 @@ function CoachRosterCard() {
   return (
     <Card title="Coach roster" subtitle="Add staff and assign roles.">
       <div className="text-center py-8">
-        <div className="text-3xl text-gray-600 mb-2" aria-hidden>•••</div>
+        <UserPlus size={32} strokeWidth={1.5} className="mx-auto text-gray-600 mb-2" aria-hidden="true" />
         <p className="text-gray-300 text-sm font-medium">Coach role launches in Phase F</p>
         <p className="text-gray-500 text-xs mt-1">
           Today every admin sees everything. Per-coach permissions arrive next.

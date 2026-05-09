@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import {
+  CreditCard,
   LayoutDashboard,
   Link2,
   Megaphone,
+  Settings as SettingsIcon,
   Trophy,
   Users,
   type LucideIcon,
@@ -25,6 +27,8 @@ const NAV_LINKS: NavLinkDef[] = [
   { to: '/invites', label: 'Invites', Icon: Link2 },
   { to: '/announcements', label: 'Announcements', Icon: Megaphone },
   { to: '/challenges', label: 'Challenges', Icon: Trophy },
+  { to: '/settings', label: 'Settings', Icon: SettingsIcon },
+  { to: '/subscription', label: 'Subscription', Icon: CreditCard },
 ];
 
 export default function Layout({ children }: LayoutProps) {
