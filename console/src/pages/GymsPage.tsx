@@ -11,8 +11,8 @@ import { useGymsQuery, type GymRow } from '../lib/queries';
 const STATUS_OPTIONS = ['all', 'trial', 'active', 'expired', 'cancelled'] as const;
 const TIER_OPTIONS = ['all', 'starter', 'growth', 'unlimited'] as const;
 
-function formatMoneyCents(c: number): string {
-  if (!c) return '—';
+function formatMoneyCents(c: number | null | undefined): string {
+  if (c == null) return '—';
   return `$${(c / 100).toFixed(2)}`;
 }
 

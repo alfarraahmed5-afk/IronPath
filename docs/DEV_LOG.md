@@ -12,7 +12,7 @@ Single source of truth for development progress on the platform plan. Read this 
 
 - **Phase:** B — Super Admin Console v1 (4 teams in flight)
 - **Active unit:** B1 backend / B2 All Gyms + Gym Detail / B3 Subscription editor + Lead Inbox / B4 Manual creation + Sentry
-- **Last updated:** 2026-05-09
+- **Last updated:** 2026-05-09 (Phase B v1 + Tier 2 polish, pre-PR)
 
 ---
 
@@ -45,6 +45,7 @@ Single source of truth for development progress on the platform plan. Read this 
 - [x] Add `last_modified_by` to `gyms` before audit_log lands in Phase B. *(migration 041)*
 
 ### Phase B v1 review carry-over (Tier 2)
+- [ ] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *blocks prod ship per security council vote; staging-only until merged.*
 - [ ] Manual gym creation: orphaned-auth-user reconciliation cron when `auth.admin.deleteUser` rollback fails (backend HIGH).
 - [ ] Manual gym creation: derive owner `username` from email local-part + retry on 23505 (backend HIGH).
 - [ ] `/leads` disposable-email-domain blocklist + CAPTCHA after N invalid (security MED, plan §8.5).
@@ -53,11 +54,11 @@ Single source of truth for development progress on the platform plan. Read this 
 - [ ] Add per-route higher rate limit for super-admin endpoints (frequent filter changes can hit 100/min default) (backend MED).
 - [ ] Better error message in `superAdmin.ts:202` (`'Update failed'`) — include gymId + payload (backend LOW).
 - [ ] Migrate `LoginPage` to RHF + zod for consistency with the rest of the console (frontend MED).
-- [ ] `formatMoneyCents(0) === '—'` falsy guard treats $0 MRR as "unknown" (frontend LOW, `GymsPage.tsx:14-17`).
+- [x] `formatMoneyCents(0) === '—'` falsy guard treats $0 MRR as "unknown" (frontend LOW). *(Phase B Tier 2 polish — `GymsPage.tsx`, `OverviewTab.tsx`, `SubscriptionTab.tsx`)*
 - [ ] Listing endpoint for `subscription_payments` (currently a placeholder pane on `SubscriptionTab`).
 - [ ] Plan §5.6: coupon code apply + founding-gym lifetime-lock-in flag — Phase D scope, but `SubscriptionEditor` should be extended when the migration lands.
 - [ ] Plan §5.5: `/members` and `/activity` sub-tabs — Phase E scope (analytics + member detail).
-- [ ] Amend plan §3.7 ("gray-600 32px" → `ink-400`) and §6.4 migration table renumbering (041 = `gyms_last_modified_by`, coupons → 043+).
+- [x] Amend plan §3.7 ("gray-600 32px" → `ink-400`) and §6.4 migration table renumbering (041 = `gyms_last_modified_by`, coupons → 043+). *(Phase B Tier 2 polish)*
 
 ### Phase B — Super Admin Console v1 (in flight)
 ### Phase C — Onboarding & retention (not started)
@@ -69,6 +70,30 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-09 · 4-agent council vote + Tier 2 polish (pre-PR)
+
+User asked for a council vote before deciding the next move from Phase B v1 ship state. Spawned **4 expert agents in parallel** (read-only, no worktrees) to vote across {SHIP, BURN-DOWN-TIER-2, START-PHASE-C}.
+
+**Tally:**
+- *Product/GTM* → **3 (Phase C)** — founder has zero customers; QR poster (§17) + onboarding wizard drive user acquisition — the demand-side work that populates the console with trial gyms.
+- *Engineering* → **2 (Tier 2)** — backlog is 21 items spanning two phases; three are real liabilities (orphan reconciliation, formatMoneyCents zero-bug, plan §6.4 drift). Diff is already large; don't stack Phase C onto it.
+- *Security/RBAC* → **2 (Tier 2)** — Tier 1 closed the bleeding (append-only audit, anchored PUBLIC_PATHS, function-based CORS, requireGymOwner / requireSelfOrSuperAdmin), but **2FA for super_admin (§8.1 #1) is not done** — flagged as a hard prod-ship blocker. Staging is fine; prod is not.
+- *Plan adherence* → **1 (Ship)** — Phase B ship gate ("founder closes a deal end-to-end inside the console") is *literally untestable without a deploy*. §9.8 launch checklist blocked at step 3. Plan drift items (§3.7, §6.4) are bookkeeping, deferred fine.
+
+**Reconciled outcome:** apply the cheap Tier 2 items inline (Engineering's high-leverage list intersect Plan adherence's "fine-to-amend-in-PR" list) → ship to **staging via PR**, hold prod until 2FA lands. Phase C deferred until Phase B has at least staging exposure. 2FA + manual-create orphan reconciliation graduate to a "Phase B.5 prod-ship blockers" sub-backlog.
+
+**Tier 2 polish applied (this commit):**
+- `console/src/pages/GymsPage.tsx` `formatMoneyCents` — widened signature to `number | null | undefined`, replaced `if (!c)` with `if (c == null)` so $0 MRR renders as `$0.00` instead of the unknown-marker `—`. `gyms.mrr_cents` is `NOT NULL DEFAULT 0` per migration 036, so 0 is a real value, not "unknown".
+- `console/src/pages/gyms/OverviewTab.tsx` MRR field — same falsy-guard pattern (`gym.mrr_cents ? ... : '—'`); same fix. Always renders `$X.XX/mo`.
+- `console/src/pages/gyms/SubscriptionTab.tsx` MRR stat — same falsy-guard pattern on both `value` and `suffix`; collapsed to unconditional formatting. Always renders `$X.XX` with `/mo` suffix.
+- `docs/PLATFORM_PLAN.md` §3.7 — empty-state icon spec amended `gray-600` → `ink-400` to match the console's actual neutrals token.
+- `docs/PLATFORM_PLAN.md` §6.4 — migration table reconciled with disk: 041 now `gyms_last_modified_by`, 042 now `audit_log_append_only`, coupons drift from 041 → 043, analytics_views 042 → 044, role_coach 043 → 045. Added a "Status" column tagging shipped vs planned. §16 references updated to match.
+- `docs/DEV_LOG.md` Tier 2 carry-over backlog — checked off `formatMoneyCents` + plan amendment items; added 2FA at the top of the list as a prod-ship blocker.
+
+**Verified:** `npx tsc -p console/tsconfig.json --noEmit` clean, `npm run -w console build` clean. Backend untouched.
+
+**Next:** Haiku scribe polish on this entry, commit, push to origin, open PR `claude/hopeful-varahamihira-a9f2cf` → `master` for staging deploy.
 
 ### 2026-05-09 · Phase B v1 review pass + Tier 1 fixes
 

@@ -66,7 +66,7 @@ export default function OverviewTab() {
         />
         <Field
           label="MRR"
-          value={gym.mrr_cents ? `$${(gym.mrr_cents / 100).toFixed(2)}/mo` : '—'}
+          value={`$${(gym.mrr_cents / 100).toFixed(2)}/mo`}
           mono
         />
         <Field label="Trial started" value={formatDate(gym.trial_started_at)} mono />

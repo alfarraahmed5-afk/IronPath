@@ -72,8 +72,8 @@ export default function SubscriptionTab() {
           <Stat label="Members" value={`${gym.member_count}${gym.member_cap !== null ? ` / ${gym.member_cap}` : ''}`} />
           <Stat
             label="MRR"
-            value={gym.mrr_cents ? `$${(gym.mrr_cents / 100).toFixed(2)}` : '—'}
-            suffix={gym.mrr_cents ? '/mo' : undefined}
+            value={`$${(gym.mrr_cents / 100).toFixed(2)}`}
+            suffix="/mo"
           />
           <Stat label="Trial started" value={formatDate(gym.trial_started_at)} />
           <Stat
