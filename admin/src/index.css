@@ -2,6 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-950 text-gray-100;
+@layer base {
+  body {
+    @apply bg-ink-900 text-ink-50 font-sans antialiased;
+  }
+
+  /* JetBrains Mono numerics deserve tabular figures + the SS01 stylistic
+     set (Bloomberg-grade KPIs per the visual designer council brief).
+     Apply to anything tagged with the data-numeric attribute or the
+     .font-mono utility. */
+  [data-numeric],
+  .font-mono {
+    font-feature-settings: 'tnum', 'ss01';
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* "Forged dark" surface ladder per the visual designer council brief.
+     Three explicit elevations, each with its own role. The ember-gradient
+     overlay on .surface-card and .surface-feature is the brand's signature
+     surface treatment — replace flat bg-ink-900 cards opportunistically
+     across the 8 admin pages (PR2+ does the bulk migration). */
+  .surface-shell {
+    @apply bg-ink-950;
+  }
+
+  .surface-card {
+    background-color: #111114;
+    background-image: radial-gradient(120% 80% at 0% 0%, rgba(255, 107, 53, 0.04) 0%, transparent 50%);
+    @apply border border-ink-800 rounded-xl;
+  }
+
+  .surface-feature {
+    background-color: #17171B;
+    background-image: radial-gradient(140% 90% at 0% 0%, rgba(255, 107, 53, 0.06) 0%, transparent 55%);
+    @apply border border-ink-800 rounded-xl;
+    box-shadow: inset 0 0 0 1px rgba(255, 107, 53, 0.08);
+  }
+
+  /* Skeleton shimmer — pure CSS, no JS. Used by <Skeleton/>. The 20%-width
+     gradient sweeps left→right across a darker base; the parent's
+     overflow-hidden + relative positioning is set on the primitive. */
+  .skeleton-shimmer {
+    @apply bg-ink-850 relative overflow-hidden;
+  }
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(255, 255, 255, 0.04) 20%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.04) 80%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: shimmer 1.5s linear infinite;
+  }
+
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
 }

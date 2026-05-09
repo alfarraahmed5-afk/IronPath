@@ -7,6 +7,7 @@ import {
   XAxis,
 } from 'recharts';
 import api from '../lib/api';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface WorkoutByDay {
   date: string;
@@ -83,9 +84,20 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
+    // Skeleton scaffold mirrors the live layout (header + 4 stat cards + chart)
+    // so the page doesn't shift when data arrives. Plan §3.7.
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-400 text-sm">Loading…</p>
+      <div>
+        <div className="mb-8">
+          <Skeleton className="h-7 w-32 mb-2" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-72 rounded-xl" />
       </div>
     );
   }

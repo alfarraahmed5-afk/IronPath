@@ -92,6 +92,53 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Admin design overhaul PR1 — substrate (5-agent council outcome)
+
+User asked the 5-agent council (Visual designer, Motion designer, Frontend impl engineer, UX/IA strategist, Creative director) for a redesign of the admin panel after calling the current design "basic and bland." Each agent returned a focused critique; convergent recommendations: shadcn substrate + cn() helper, framer-motion via LazyMotion, Linear-style sliding nav pill, "forged dark" surface ladder, JetBrains Mono numerics, Whoop+Linear inspiration, Dashboard / Members / Announcements as the three highest-leverage pages, /grow leave structurally + elevate visually. Reconciled into a 4-PR sequence (PR1 foundation → PR2 Dashboard hero → PR3 Grow rebuild → PR4+ per-page polish). User approved PR1 scope and authorized sourcing photography from the web (PR2 work). **This commit ships PR1 — no visual revolution yet, just the substrate everything else compounds on.**
+
+**New deps (admin only):**
+- `clsx` + `tailwind-merge` (~3 kB gz combined) — required for the `cn()` helper that every shadcn-style primitive expects.
+- `rollup-plugin-visualizer` (devDependency, ESM-only) — every subsequent admin build emits `dist/stats.html` (treemap + gzip + brotli sizes) so each PR has a kB receipt. Forced rename of `admin/vite.config.ts → admin/vite.config.mts` because the plugin is ESM-only and Vite's CJS config loader couldn't `require()` it.
+
+**Substrate (shadcn-pattern, no shadcn CLI executed yet — config only):**
+- `admin/components.json` — shadcn config pinned to `style: 'default'`, `baseColor: 'neutral'`, `cssVariables: false`, `iconLibrary: 'lucide'`, with `@/*` alias map. Future `npx shadcn add <component>` calls will land into `src/components/ui/`.
+- `admin/src/lib/utils.ts` — `cn(...inputs) => twMerge(clsx(inputs))`. The standard shadcn helper.
+- `admin/tsconfig.json` + `admin/vite.config.mts` — added `@/*` → `src/*` path alias.
+
+**Tailwind theme — plan §3.2 alignment:**
+- New `ink-*` color scale (50/200/400/600/700/800/850/900/950) at the warmer plan §3.2 ink hexes, replacing the cool-blue Tailwind `gray-*` defaults *additively* (Tailwind defaults still resolve, so existing pages using `bg-gray-900` keep working — page migrations are PR2+ work).
+- `brand` extended into 400/500/600 (was a flat string before) — matches plan §3.2 ember scale.
+- `font-sans` → Inter, `font-mono` → JetBrains Mono — wired so future code can write `className="font-mono"` instead of `style={{ fontFamily: 'JetBrains Mono, monospace' }}` (the anti-pattern in `DashboardPage.tsx`'s tooltip).
+- New `shimmer` keyframe + `animate-shimmer` utility.
+
+**Surface ladder (visual designer council, north-star recommendation):**
+- `admin/src/index.css` adds three component classes — `.surface-shell` (#0A0A0B, the chrome rail), `.surface-card` (#111114 + 1px ink-800 border + subtle 4% top-left radial ember), `.surface-feature` (#17171B + 6% radial ember + inset 8% orange ring). Three explicit elevations replace the previous "every card looks the same" putty.
+- Body `bg-gray-950 text-gray-100` swapped to `bg-ink-900 text-ink-50` — warmer base.
+- `[data-numeric]` and `.font-mono` get `font-feature-settings: 'tnum', 'ss01'` + `font-variant-numeric: tabular-nums` automatically — Bloomberg-grade number rendering as a default.
+
+**New primitives:**
+- `admin/src/components/ui/Skeleton.tsx` — pure-CSS shimmer block. Closes the §3.7 "loading state" violation flagged by the motion designer (DashboardPage and GrowPage shipped with `<p>Loading…</p>` text).
+- `admin/src/components/Logomark.tsx` — inline SVG monogram. Forged "I" with a horizontal orange collar block evoking a barbell collar, two "notch" details on each side. 28px default; `monochrome` prop for disabled contexts.
+
+**Layout retrofit (visual designer council brief #2):**
+- Sidebar moved to `surface-shell` (#0A0A0B) — one elevation darker than the main column (`bg-ink-900` #111114). Reads as architectural chrome, not just another card.
+- Brand block in sidebar header shows the new `<Logomark />` + wordmark + `Admin` micro-tag.
+- Active nav item — the previous full-pill (`bg-gray-800 text-orange-500`) replaced with a Linear-style 2px left ember bar + 8% brand-tinted background. Inactive items hover to `bg-ink-850/60`.
+- Lucide icons get `transition-colors` so the orange tint resolves smoothly on hover/active flip.
+- Topbar `h-16` → `h-14` (tighter), background flat `bg-ink-900` matches the column.
+
+**Loading-state migration (this PR — Dashboard + Grow only; rest in PR2+):**
+- `DashboardPage.tsx` loading branch swapped from `<p>Loading…</p>` to a layout-mirror Skeleton scaffold (header + 4 stat cards + chart panel) so the page doesn't shift on data arrival.
+- `GrowPage.tsx` invite-code loading swapped from text to inline `<Skeleton className="h-5 w-32" />`.
+
+**Bundle delta:** 743 kB → 771 kB pre-gzip (+28 kB), 217 kB → 226 kB gzipped (+9 kB). Slightly over the engineer's +5 kB target; within tolerance. `dist/stats.html` is now generated on every build for ongoing accountability.
+
+**Verified:** `npm run -w admin build` clean. No backend or console changes in this PR.
+
+**Phase C remains in flight separately — this is parallel design work, not part of Phase C scope.**
+
+**Next:** PR2 — Dashboard hero overhaul. framer-motion (LazyMotion), sliding nav pill (shared `layoutId`), B&W hero photography band (sourced from Unsplash per user authorization), JetBrains Mono numeral spotlight on stats, stat-card stagger on mount, and the **live workout pulse** ("lifting now · N" with pulsing orange dot) — the creative director's "stop the scroll" element.
+
 ### 2026-05-10 · Phase C.1 — QR poster PDF + /grow page (4-agent council outcome)
 
 User asked the 4-agent council (Product/GTM, Engineering, Customer Success/UX, Plan-adherence) to vote on Phase C approach. Tally B=2 (Product, Plan-adherence: ship QR poster first standalone) + D=2 (Engineering, UX: ship wizard first with text invite). Reconciled: both camps agree both pieces ship — disagreement is just order. Engineering's react-pdf risk concern + Plan's §17 emphasis on the QR poster as the load-bearing artifact both point to a sequenced two-PR approach: ship the QR generator first (de-risks PDF tech in isolation; ships the activation artifact this week), then build the wizard around the proven generator. **This commit ships PR1 (Phase C.1).**

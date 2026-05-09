@@ -11,6 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import api from '../lib/api';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface InviteResp {
   data: {
@@ -118,7 +119,7 @@ export default function GrowPage() {
         <div className="bg-gray-950 border border-gray-800 rounded-md px-4 py-3 mb-5 flex items-center gap-3">
           <div className="text-xs text-gray-500 uppercase tracking-wider font-medium">Invite code</div>
           {loadingInvite ? (
-            <div className="text-gray-400 text-sm">Loading…</div>
+            <Skeleton className="h-5 w-32 flex-1" />
           ) : inviteCode ? (
             <>
               <div className="font-mono text-base text-white tracking-wider flex-1">{inviteCode}</div>

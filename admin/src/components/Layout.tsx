@@ -3,6 +3,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Link2,
+  LogOut,
   Megaphone,
   QrCode,
   Settings as SettingsIcon,
@@ -10,7 +11,9 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import { Logomark } from './Logomark';
 import { readStoredUser, signOut } from '../lib/session';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -37,39 +40,59 @@ export default function Layout({ children }: LayoutProps) {
   const user = readStoredUser() ?? {};
 
   return (
-    <div className="flex min-h-screen bg-gray-950">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-10">
-        {/* Logo */}
-        <div className="px-6 py-5 border-b border-gray-800">
-          <span className="text-orange-500 font-bold text-xl">IronPath</span>
-          <span className="ml-2 text-gray-500 text-xs font-medium uppercase tracking-wider">Admin</span>
+    <div className="flex min-h-screen surface-shell">
+      {/* Sidebar — chrome rail. surface-shell (#0A0A0B) sits one notch darker
+          than the main column, so the rail reads like architectural chrome
+          rather than another card. Visual designer council brief #2. */}
+      <aside className="fixed left-0 top-0 h-full w-64 surface-shell border-r border-ink-800 flex flex-col z-10">
+        {/* Brand block */}
+        <div className="px-5 py-4 border-b border-ink-800 flex items-center gap-2.5">
+          <Logomark size={26} />
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-ink-50 font-semibold text-base tracking-tight">IronPath</span>
+            <span className="text-ink-400 text-[10px] font-medium uppercase tracking-[0.14em]">
+              Admin
+            </span>
+          </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Nav — Linear-style 2px left active-bar instead of a full pill.
+            More architectural feel; still legible. Visual designer brief #2. */}
+        <nav className="flex-1 px-2 py-4 space-y-0.5">
           {NAV_LINKS.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
-                [
-                  'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
+                cn(
+                  'group relative flex items-center gap-3 pl-4 pr-3 py-2 rounded-md text-sm transition-colors',
                   isActive
-                    ? 'bg-gray-800 text-orange-500'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800',
-                ].join(' ')
+                    ? 'text-ink-50 bg-brand-500/[0.08]'
+                    : 'text-ink-400 hover:text-ink-50 hover:bg-ink-850/60'
+                )
               }
             >
               {({ isActive }) => (
                 <>
+                  {/* The 2px active bar. Sits flush against the rounded-md edge so
+                      it reads as an indicator, not a stuck divider. */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-sm transition-opacity',
+                      isActive ? 'bg-brand-500 opacity-100' : 'opacity-0'
+                    )}
+                  />
                   <Icon
-                    size={18}
+                    size={16}
                     strokeWidth={1.75}
-                    className={isActive ? 'text-orange-500' : 'text-gray-400'}
+                    className={cn(
+                      'shrink-0 transition-colors',
+                      isActive ? 'text-brand-500' : 'text-ink-400 group-hover:text-ink-200'
+                    )}
                     aria-hidden="true"
                   />
-                  <span>{label}</span>
+                  <span className="font-medium">{label}</span>
                 </>
               )}
             </NavLink>
@@ -77,38 +100,39 @@ export default function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* Bottom user info */}
-        <div className="px-4 py-4 border-t border-gray-800">
+        <div className="px-3 py-3 border-t border-ink-800">
           {user.email && (
-            <p className="text-gray-500 text-xs truncate mb-3">{user.email}</p>
+            <p className="text-ink-400 text-xs truncate mb-2 font-mono" data-numeric>
+              {user.email}
+            </p>
           )}
           <button
+            type="button"
             onClick={signOut}
-            className="w-full text-left text-sm text-gray-400 hover:text-white transition-colors"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-ink-400 hover:text-ink-50 hover:bg-ink-850 transition-colors"
           >
-            Sign out
+            <LogOut size={14} strokeWidth={1.75} />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main area */}
-      <div className="ml-64 flex-1 flex flex-col min-h-screen">
+      {/* Main column. bg-ink-900 (#111114) — one elevation up from the rail. */}
+      <div className="ml-64 flex-1 flex flex-col min-h-screen bg-ink-900">
         {/* Topbar */}
-        <header className="bg-gray-900 border-b border-gray-800 h-16 flex items-center justify-end px-6 gap-4">
-          <span className="text-gray-400 text-sm">
-            {user.gym_name ?? user.email ?? ''}
-          </span>
+        <header className="h-14 flex items-center justify-end px-6 gap-4 border-b border-ink-800 bg-ink-900">
+          <span className="text-ink-400 text-sm">{user.gym_name ?? user.email ?? ''}</span>
           <button
+            type="button"
             onClick={signOut}
-            className="text-sm text-gray-400 hover:text-white transition-colors"
+            className="text-sm text-ink-400 hover:text-ink-50 transition-colors"
           >
             Sign out
           </button>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 bg-gray-950 p-8">
-          {children}
-        </main>
+        <main className="flex-1 p-8">{children}</main>
       </div>
     </div>
   );
