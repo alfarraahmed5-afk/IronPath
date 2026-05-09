@@ -72,15 +72,15 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ### 2026-05-09 · Phase B v1 review pass + Tier 1 fixes
 
-**4 cross-team reviewers** ran in parallel against `dd01fe4` (frontend integration / backend integration / security+RBAC / plan adherence). All four agreed the build passes typecheck + bundles cleanly; their findings landed two CRITICAL items that block-merge, four HIGH items that should fix this round, and a handful of MEDs.
+**4 cross-team reviewers** ran in parallel against `dd01fe4` (frontend integration / backend integration / security+RBAC / plan adherence). Build passes typecheck + bundles cleanly. Findings: two CRITICAL block-merge items, four HIGH fixes for this round, handful of MEDs.
 
 **Tier 1 — applied (this commit):**
 
 *Backend (CRITICAL/HIGH):*
-- **CRITICAL** `mark-paid` expiry comparison (`backend/src/routes/superAdmin.ts:237`) was string-vs-date — `subscription_expires_at` carries `T23:59:59Z` so it lexicographically beat any `period_end` (date-only), keeping the older expiry whenever the new period covered the same day. Now compared via `new Date(...).getTime()`.
+- **CRITICAL** `mark-paid` expiry comparison (`backend/src/routes/superAdmin.ts:252-253`) was string-vs-date — `subscription_expires_at` carries `T23:59:59Z` so lexicographically beat `period_end` (date-only), skipping newer periods on the same day. Now compared via `new Date(...).getTime()`.
 - **CRITICAL** `super_admin_audit_log` was not append-only at the DB layer — migration 040 created the table without `REVOKE UPDATE, DELETE`. New migration `042_audit_log_append_only.sql` revokes UPDATE/DELETE from `service_role`, `authenticated`, `anon`, and `PUBLIC`. Plan §8 #1 / §12.4 #1.
-- **HIGH** CORS allowlist (`backend/src/index.ts`) was a static array, which `cors` middleware does NOT auto-decorate with `Vary: Origin`, and never matched the Vercel preview-deployment regex. Replaced with a function-based `origin` callback that checks the explicit allowlist, then `^https:\/\/(ironpath-admin|ironpath-console)-[\w-]+\.vercel\.app$`. Plan §8.4.
-- **HIGH** `PUBLIC_PATHS` (`backend/src/middleware/auth.ts`) used `originalUrl.startsWith(...)` — any future `/auth/login-bypass-foo` would inherit anonymity. Reworked to anchored regex array (`/^\/api\/v1\/.../?(\?.*)?$/`) keyed optionally by HTTP method.
+- **HIGH** CORS allowlist (`backend/src/index.ts`) was a static array, which `cors` middleware doesn't auto-decorate with `Vary: Origin` and didn't match the Vercel preview-deployment regex. Replaced with function-based `origin` callback that checks explicit allowlist, then `^https:\/\/(ironpath-admin|ironpath-console)-[\w-]+\.vercel\.app$`. Plan §8.4.
+- **HIGH** `PUBLIC_PATHS` (`backend/src/middleware/auth.ts`) used `originalUrl.startsWith(...)` — any future `/auth/login-bypass-foo` would inherit anonymity. Reworked to anchored regex array keyed optionally by HTTP method.
 - **HIGH** `requireGymOwner` and `requireSelfOrSuperAdmin` middlewares missing — plan §6.3 spec'd, only `requireSuperAdmin` existed. Added in `backend/src/middleware/roles.ts`. `requireGymOwner` is `gym_owner` only (NOT `super_admin`) and enforces `req.params.id`/`gymId` matches `req.user.gym_id`.
 - **HIGH** `/admin` allowlist still admitted `super_admin` (plan §6.1, §8.1 #3). `routes/admin.ts` now uses `requireGymOwner` for everything past `/admin/me`; super_admin must use `/super-admin/*`.
 
