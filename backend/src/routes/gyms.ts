@@ -1,13 +1,39 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { generateUniqueInviteCode } from '../lib/inviteCode';
 import { sendWelcomeEmail, sendInviteEmail } from '../lib/email';
 import { AppError } from '../middleware/errorHandler';
-import { gymRegistrationLimiter, inviteLimiter } from '../middleware/rateLimit';
+import { gymRegistrationLimiter, inviteLimiter, uploadLimiter } from '../middleware/rateLimit';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 
 const router = Router();
+
+// Shared accent_color regex — used by both POST and PATCH /:id schemas so
+// the rules can never drift. Mirrors VARCHAR(7) constraint on gyms.accent_color.
+const ACCENT_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
+// Mirrors shared/types ONBOARDING_STEPS. Defined inline here because the
+// backend does not currently import @ironpath/shared at runtime (no build step
+// for the shared package). Keep these two lists in sync.
+const ONBOARDING_STEPS = [
+  'profile',
+  'logo',
+  'first_invite',
+  'first_member',
+  'first_announcement',
+  'subscription_chosen',
+] as const;
+type OnboardingStepKey = typeof ONBOARDING_STEPS[number];
+const ONBOARDING_STEP_SET = new Set<string>(ONBOARDING_STEPS);
+
+// Mirrors shared/types TIER_MEMBER_CAPS. null = unlimited (no cap returned).
+const TIER_MEMBER_CAPS: Record<string, number | null> = {
+  starter: 50,
+  growth: 200,
+  unlimited: null,
+};
 
 const gymRegisterSchema = z.object({
   name: z.string().min(1).max(255),
@@ -15,7 +41,7 @@ const gymRegisterSchema = z.object({
   description: z.string().max(2000).optional(),
   email: z.string().email(),
   password: z.string().min(8),
-  accent_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  accent_color: z.string().regex(ACCENT_COLOR_REGEX).optional(),
 });
 
 // GET /gyms/validate-invite/:code
@@ -117,7 +143,13 @@ router.patch('/:id', requireActiveUser, async (req: Request, res: Response, next
       name: z.string().min(1).max(255).optional(),
       location: z.string().max(500).optional(),
       description: z.string().max(2000).optional(),
-      accent_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+      accent_color: z.string().regex(ACCENT_COLOR_REGEX).optional(),
+      phone: z.string().max(50).optional(),
+      website: z.string().url().max(2000).optional(),
+      address: z.string().max(500).optional(),
+      timezone: z.string().max(100).optional(),
+      units_default: z.enum(['metric', 'imperial']).optional(),
+      logo_url: z.string().url().max(2000).optional(),
     });
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -127,6 +159,166 @@ router.patch('/:id', requireActiveUser, async (req: Request, res: Response, next
     const { data: gym, error } = await supabase.from('gyms').update(parsed.data).eq('id', req.params.id).select().single();
     if (error || !gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
     res.json({ data: gym });
+  } catch (err) { next(err); }
+});
+
+// GET /gyms/:id/subscription — current plan + usage snapshot
+router.get('/:id/subscription', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const gymId = req.params.id;
+    if (req.user.role !== 'super_admin' && !(req.user.role === 'gym_owner' && req.user.gym_id === gymId)) {
+      return next(new AppError('FORBIDDEN', 403, 'Access denied'));
+    }
+    const { data: gym, error } = await supabase
+      .from('gyms')
+      .select('subscription_tier, subscription_status, subscription_expires_at, trial_started_at, mrr_cents')
+      .eq('id', gymId)
+      .single();
+    if (error || !gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+
+    // Active member count: role=member, is_active=true, not soft-deleted.
+    const { count: memberCount } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .eq('role', 'member')
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    const tier = gym.subscription_tier as string | null;
+    // Cap is null for unlimited tier (or for no tier set yet — treat as no cap surfaced).
+    const memberCap = tier && tier in TIER_MEMBER_CAPS ? TIER_MEMBER_CAPS[tier] : null;
+
+    res.json({
+      data: {
+        tier: gym.subscription_tier,
+        status: gym.subscription_status,
+        expires_at: gym.subscription_expires_at,
+        trial_started_at: gym.trial_started_at,
+        mrr_cents: gym.mrr_cents ?? 0,
+        member_count: memberCount ?? 0,
+        member_cap: memberCap,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /gyms/:id/onboarding — checklist state, merging canonical steps with DB rows
+router.get('/:id/onboarding', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const gymId = req.params.id;
+    if (req.user.role !== 'super_admin' && !(req.user.role === 'gym_owner' && req.user.gym_id === gymId)) {
+      return next(new AppError('FORBIDDEN', 403, 'Access denied'));
+    }
+    const { data: rows, error } = await supabase
+      .from('gym_onboarding_steps')
+      .select('step_key, completed_at, completed_by, metadata')
+      .eq('gym_id', gymId);
+    if (error) throw error;
+
+    const byKey = new Map<string, { completed_at: string; completed_by: string | null; metadata: any }>(
+      (rows ?? []).map(r => [r.step_key as string, {
+        completed_at: r.completed_at as string,
+        completed_by: (r.completed_by as string | null) ?? null,
+        metadata: r.metadata ?? null,
+      }])
+    );
+    const steps = ONBOARDING_STEPS.map(key => {
+      const row = byKey.get(key);
+      return {
+        key,
+        completed_at: row?.completed_at ?? null,
+        completed_by: row?.completed_by ?? null,
+        metadata: row?.metadata ?? null,
+      };
+    });
+    res.json({ data: { steps } });
+  } catch (err) { next(err); }
+});
+
+// POST /gyms/:id/onboarding/:stepKey/complete — idempotent UPSERT
+router.post('/:id/onboarding/:stepKey/complete', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const gymId = req.params.id;
+    if (req.user.role !== 'super_admin' && !(req.user.role === 'gym_owner' && req.user.gym_id === gymId)) {
+      return next(new AppError('FORBIDDEN', 403, 'Access denied'));
+    }
+    const stepKey = req.params.stepKey;
+    if (!ONBOARDING_STEP_SET.has(stepKey)) {
+      return next(new AppError('VALIDATION_ERROR', 422, 'Unknown onboarding step', [
+        { field: 'stepKey', message: `Must be one of: ${ONBOARDING_STEPS.join(', ')}` },
+      ]));
+    }
+    const bodySchema = z.object({ metadata: z.record(z.any()).optional() });
+    const parsed = bodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const fields = parsed.error.errors.map(e => ({ field: String(e.path.join('.')), message: e.message }));
+      return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
+    }
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('gym_onboarding_steps')
+      .upsert(
+        {
+          gym_id: gymId,
+          step_key: stepKey as OnboardingStepKey,
+          completed_at: nowIso,
+          completed_by: req.user.id,
+          metadata: parsed.data.metadata ?? null,
+        },
+        { onConflict: 'gym_id,step_key' }
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ data });
+  } catch (err) { next(err); }
+});
+
+// POST /gyms/:id/logo/upload-url — mint a signed upload URL for the gym-assets bucket.
+// Cleanup of the previous logo_url is deferred to Phase A4 (we currently leave
+// orphaned objects in the bucket; the bucket is public-read, single small file
+// per gym, so storage cost is negligible until then).
+router.post('/:id/logo/upload-url', requireActiveUser, uploadLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const gymId = req.params.id;
+    if (req.user.role !== 'super_admin' && !(req.user.role === 'gym_owner' && req.user.gym_id === gymId)) {
+      return next(new AppError('FORBIDDEN', 403, 'Access denied'));
+    }
+    const bodySchema = z.object({
+      content_type: z.string().regex(/^image\/(png|jpeg|webp)$/),
+      size: z.number().int().positive().max(2 * 1024 * 1024),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      const fields = parsed.error.errors.map(e => ({ field: String(e.path.join('.')), message: e.message }));
+      return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
+    }
+    // png → png, jpeg → jpg, webp → webp
+    const subtype = parsed.data.content_type.split('/')[1];
+    const ext = subtype === 'jpeg' ? 'jpg' : subtype;
+    // Folder structure must start with gym_id (see 033_storage_policies.sql).
+    const path = `${gymId}/logo-${randomUUID()}.${ext}`;
+
+    const { data: signed, error: signErr } = await supabase
+      .storage
+      .from('gym-assets')
+      .createSignedUploadUrl(path);
+    if (signErr || !signed) {
+      return next(new AppError('INTERNAL_ERROR', 500, 'Failed to mint upload URL'));
+    }
+    const { data: pub } = supabase.storage.from('gym-assets').getPublicUrl(path);
+    res.json({
+      data: {
+        upload_url: signed.signedUrl,
+        public_url: pub.publicUrl,
+        path,
+      },
+    });
   } catch (err) { next(err); }
 });
 

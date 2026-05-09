@@ -24,6 +24,36 @@ export const SUBSCRIPTION_LIMITS: Record<string, number> = {
   unlimited: Infinity,
 };
 
+// Canonical subscription tier list. Use SubscriptionTier in code; keep
+// SUBSCRIPTION_LIMITS above for legacy callers that already index by string.
+export const SUBSCRIPTION_TIERS = ['starter', 'growth', 'unlimited'] as const;
+export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number];
+
+// Per-tier hard cap on members. `null` means unlimited (no cap enforced).
+export const TIER_MEMBER_CAPS: Record<SubscriptionTier, number | null> = {
+  starter: 50,
+  growth: 200,
+  unlimited: null,
+};
+
+// Canonical onboarding checklist step keys for new gyms. Order is meaningful —
+// the dashboard renders steps in this order. Keep in sync with the DB-stored
+// step_key values in gym_onboarding_steps.
+export const ONBOARDING_STEPS = [
+  'profile',
+  'logo',
+  'first_invite',
+  'first_member',
+  'first_announcement',
+  'subscription_chosen',
+] as const;
+export type OnboardingStepKey = typeof ONBOARDING_STEPS[number];
+
+// Canonical user roles. `coach` will be added in Phase F — do NOT add it here
+// until the role exists end-to-end (RLS, JWT hook, mobile UI).
+export const USER_ROLES = ['member', 'gym_owner', 'super_admin'] as const;
+export type UserRole = typeof USER_ROLES[number];
+
 // Media limits
 export const MAX_PHOTOS_PER_WORKOUT = 2;
 export const MAX_VIDEOS_PER_WORKOUT = 1;
