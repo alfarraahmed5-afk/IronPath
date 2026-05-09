@@ -1,4 +1,11 @@
 import { useEffect, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from 'recharts';
 import api from '../lib/api';
 
 interface WorkoutByDay {
@@ -19,6 +26,12 @@ interface StatCardProps {
   value: string | number;
 }
 
+interface ChartDatum {
+  date: string;
+  label: string;
+  count: number;
+}
+
 function StatCard({ label, value }: StatCardProps) {
   return (
     <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
@@ -31,6 +44,25 @@ function StatCard({ label, value }: StatCardProps) {
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDatum }>;
+}
+
+function ChartTooltip({ active, payload }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const datum = payload[0].payload;
+  return (
+    <div
+      className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 shadow-xl"
+      style={{ fontFamily: 'JetBrains Mono, monospace' }}
+    >
+      <p className="text-gray-500 text-xs">{datum.label}</p>
+      <p className="text-white text-sm">{datum.count}</p>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -66,8 +98,11 @@ export default function DashboardPage() {
     );
   }
 
-  const last14 = stats.workouts_by_day.slice(-14);
-  const maxCount = Math.max(...last14.map((d) => d.count), 1);
+  const last14: ChartDatum[] = stats.workouts_by_day.slice(-14).map((d) => ({
+    date: d.date,
+    label: formatDate(d.date),
+    count: d.count,
+  }));
 
   return (
     <div>
@@ -95,27 +130,22 @@ export default function DashboardPage() {
         {last14.length === 0 ? (
           <p className="text-gray-500 text-sm">No workout data available.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <div className="flex items-end gap-3 min-w-max pb-2" style={{ height: '100px' }}>
-              {last14.map((day) => {
-                const barHeightPct = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
-                return (
-                  <div key={day.date} className="flex flex-col items-center gap-1">
-                    <span className="text-gray-500 text-xs">{day.count}</span>
-                    <div
-                      className="bg-orange-500 rounded-t"
-                      style={{
-                        width: '32px',
-                        height: `${Math.max(barHeightPct * 0.56, 2)}px`, // scale to ~56px max
-                      }}
-                    />
-                    <span className="text-gray-500 text-xs whitespace-nowrap">
-                      {formatDate(day.date)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          <div style={{ width: '100%', height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={last14} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <XAxis
+                  dataKey="label"
+                  axisLine={{ stroke: '#2A2A31' }}
+                  tickLine={false}
+                  tick={{ fill: '#6B7280', fontSize: 11 }}
+                />
+                <Tooltip
+                  cursor={{ fill: 'rgba(249, 115, 22, 0.08)' }}
+                  content={<ChartTooltip />}
+                />
+                <Bar dataKey="count" fill="#F97316" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         )}
       </div>

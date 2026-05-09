@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import MembersPage from './pages/MembersPage';
@@ -6,10 +6,22 @@ import InvitesPage from './pages/InvitesPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import ChallengesPage from './pages/ChallengesPage';
 import Layout from './components/Layout';
+import { clearSession, isAllowedRole, readStoredUser } from './lib/session';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
   const token = localStorage.getItem('access_token');
   if (!token) return <Navigate to="/login" replace />;
+
+  const user = readStoredUser();
+  if (!isAllowedRole(user?.role)) {
+    // Stale or wrong-role session — wipe and bounce, capturing where we
+    // were so a successful re-login lands the user back here.
+    clearSession();
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?reason=session_expired&next=${next}`} replace />;
+  }
+
   return <Layout>{children}</Layout>;
 }
 
