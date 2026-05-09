@@ -130,7 +130,7 @@ Visual language: filled area for trends (gradient fade to transparent, single ac
 
 ### 3.7 States
 
-- **Empty:** centered Lucide icon (gray-600, 32px) + one-line headline + one-line subtext + single primary CTA. No illustrations.
+- **Empty:** centered Lucide icon (ink-400, 32px) + one-line headline + one-line subtext + single primary CTA. No illustrations.
 - **Loading:** skeleton blocks (gray-850, subtle shimmer 1.5s). Spinners only inline in buttons.
 - **Error:** inline red-tinted card with retry. Toasts only for transient failures.
 - **Success:** toast 3s, top-right, success-tinted, auto-dismiss.
@@ -412,16 +412,18 @@ requireSelfOrSuperAdmin → role === super_admin OR userId matches req.user.id
 
 ### 6.4 New migrations
 
-| # | File | Purpose |
-|---|---|---|
-| 036 | `036_subscription_extras.sql` | `ALTER TABLE gyms ADD COLUMN mrr_cents, phone, website, address, timezone, units_default, logo_url`. Add `ON DELETE` cascades for any new FKs. |
-| 037 | `037_subscription_payments.sql` | New `subscription_payments` table (gym_id, amount_cents, period_start/end, note, recorded_by, created_at) |
-| 038 | `038_gym_onboarding_steps.sql` | New `gym_onboarding_steps` table (composite PK gym_id + step_key, completed_at, completed_by, metadata jsonb) |
-| 039 | `039_leads.sql` | New `leads` table + partial unique index on lower(email) WHERE created_at > now()-7d |
-| 040 | `040_audit_log.sql` | New `super_admin_audit_log` (actor_user_id, action, target_type, target_id, before jsonb, after jsonb, ip, user_agent, created_at) — append-only; revoke UPDATE/DELETE on the table from app role |
-| 041 | `041_coupons.sql` | New `coupons` + `coupon_redemptions` tables |
-| 042 | `042_analytics_views.sql` | `view_gym_mrr`, `view_subscription_events`, `view_trial_conversion` |
-| 043 | `043_role_coach.sql` | Add `coach` to role enum + permissions |
+| # | File | Purpose | Status |
+|---|---|---|---|
+| 036 | `036_subscription_extras.sql` | `ALTER TABLE gyms ADD COLUMN mrr_cents, phone, website, address, timezone, units_default, logo_url`. Add `ON DELETE` cascades for any new FKs. | Shipped (Phase A) |
+| 037 | `037_subscription_payments.sql` | New `subscription_payments` table (gym_id, amount_cents, period_start/end, note, recorded_by, created_at) | Shipped (Phase A) |
+| 038 | `038_gym_onboarding_steps.sql` | New `gym_onboarding_steps` table (composite PK gym_id + step_key, completed_at, completed_by, metadata jsonb) | Shipped (Phase A) |
+| 039 | `039_leads.sql` | New `leads` table + partial unique index on lower(email) WHERE created_at > now()-7d | Shipped (Phase B) |
+| 040 | `040_audit_log.sql` | New `super_admin_audit_log` (actor_user_id, action, target_type, target_id, before jsonb, after jsonb, ip, user_agent, created_at) | Shipped (Phase B) |
+| 041 | `041_gyms_last_modified_by.sql` | `ALTER TABLE gyms ADD COLUMN last_modified_by uuid REFERENCES users(id)` for audit-trail attribution on every super_admin write. | Shipped (Phase B) |
+| 042 | `042_audit_log_append_only.sql` | `REVOKE UPDATE, DELETE ON super_admin_audit_log FROM service_role, authenticated, anon, PUBLIC` — enforces append-only at the DB layer (plan §8 #1, §12.4 #1). | Shipped (Phase B Tier 1) |
+| 043 | `043_coupons.sql` | New `coupons` + `coupon_redemptions` tables | Planned (Phase D) |
+| 044 | `044_analytics_views.sql` | `view_gym_mrr`, `view_subscription_events`, `view_trial_conversion` | Planned (Phase D) |
+| 045 | `045_role_coach.sql` | Add `coach` to role enum + permissions | Planned (Phase F) |
 
 > **Auth hook ordering rule (revised 2026-05-09):** the JWT custom-claims hook in `034_auth_hook.sql` references `public.users` and runs on every token issue. Any migration that mutates `public.users` schema or the hook itself must be sequenced **after 034**. Pure ALTER TABLE on other tables is fine — `035_invite_options.sql` already lives there safely.
 
@@ -900,9 +902,11 @@ Before opening a PR in this plan:
 - `supabase/migrations/038_gym_onboarding_steps.sql`
 - `supabase/migrations/039_leads.sql`
 - `supabase/migrations/040_audit_log.sql`
-- `supabase/migrations/041_coupons.sql`
-- `supabase/migrations/042_analytics_views.sql`
-- `supabase/migrations/043_role_coach.sql`
+- `supabase/migrations/041_gyms_last_modified_by.sql`
+- `supabase/migrations/042_audit_log_append_only.sql`
+- `supabase/migrations/043_coupons.sql` *(planned)*
+- `supabase/migrations/044_analytics_views.sql` *(planned)*
+- `supabase/migrations/045_role_coach.sql` *(planned)*
 
 ---
 
