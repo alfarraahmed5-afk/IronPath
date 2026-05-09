@@ -47,9 +47,12 @@ authTwoFactorRouter.post('/verify', authLimiter, async (req: Request, res: Respo
       .eq('challenge_token_hash', tokenHash)
       .maybeSingle();
 
+    // .maybeSingle() above means chErr is always a real DB error (not "no rows"),
+    // so we surface it as 500 instead of masking it as a 401 — same anti-pattern
+    // we just split out of superAdmin.ts after the 036–042 schema-drift incident.
     if (chErr) {
       logger.error({ err: chErr }, '2FA challenge lookup failed');
-      return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired challenge'));
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
     }
     if (!challenge) return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired challenge'));
     if (challenge.consumed_at) return next(new AppError('UNAUTHORIZED', 401, 'Challenge already used'));
@@ -111,16 +114,31 @@ authTwoFactorRouter.post('/verify', authLimiter, async (req: Request, res: Respo
       return next(new AppError('UNAUTHORIZED', 401, 'Challenge already used'));
     }
 
-    await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', user.id);
+    // The challenge has already been consumed atomically above. From here the
+    // operator is logged in regardless of whether bookkeeping writes succeed —
+    // failing the response after consuming a single-use token would leave
+    // them unable to retry without re-entering their password. We log
+    // failures but never block the session.
+    const { error: lastActiveErr } = await supabase
+      .from('users')
+      .update({ last_active_at: new Date().toISOString() })
+      .eq('id', user.id);
+    if (lastActiveErr) {
+      logger.warn({ err: lastActiveErr, user_id: user.id }, 'last_active_at update failed (non-fatal)');
+    }
 
-    await supabase.from('super_admin_audit_log').insert({
+    const auditAction = usedRecovery ? '2fa.login_recovery_code' : '2fa.login';
+    const { error: auditErr } = await supabase.from('super_admin_audit_log').insert({
       actor_user_id: user.id,
-      action: usedRecovery ? '2fa.login_recovery_code' : '2fa.login',
+      action: auditAction,
       target_type: 'user',
       target_id: user.id,
       ip: req.ip ?? null,
       user_agent: req.headers['user-agent'] ?? null,
     });
+    if (auditErr) {
+      logger.error({ err: auditErr, user_id: user.id, action: auditAction }, 'Audit insert failed (non-fatal)');
+    }
 
     res.json({
       data: {

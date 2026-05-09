@@ -515,6 +515,74 @@ export function startJobs(): void {
     } catch (err) { logger.error({ err }, 'Challenge update job failed'); }
   }, { timezone: 'UTC' });
 
+  // Orphaned auth-user reconciliation — Daily 03:30
+  // The manual gym creation flow in superAdmin.ts creates an auth user, then
+  // inserts a public.users row, then rolls both back if anything downstream
+  // fails. The auth.admin.deleteUser rollback is wrapped in a swallowed
+  // try/catch (best-effort), so when it fails we leak an auth.users row
+  // with no public.users peer. This cron detects those orphans and deletes
+  // them. Phase B.5 #3.
+  cron.schedule('30 3 * * *', async () => {
+    try {
+      logger.info('Orphan auth-user reconciliation started');
+
+      // Build the set of public.users IDs once. For our scale (single-digit
+      // gyms, low-thousands users) one full read is cheap. Filter is intentionally
+      // wide — soft-deleted public.users rows still count as "matched" because
+      // they keep the auth.users peer alive (soft delete is reversible).
+      const { data: publicUsers, error: publicErr } = await supabase
+        .from('users')
+        .select('id');
+      if (publicErr) throw publicErr;
+      const publicIds = new Set((publicUsers ?? []).map(u => u.id));
+
+      // Page through auth.users. perPage defaults to 50; bump to 200 to cut
+      // round-trips. The hard cap of 100 deletions per run is intentional —
+      // a runaway condition (e.g. cleared public.users by mistake) should
+      // surface as a recurring log, not a single catastrophic purge.
+      const SAFETY_AGE_MS = 10 * 60 * 1000; // 10-min in-flight registration window
+      const MAX_DELETES_PER_RUN = 100;
+      const MAX_PAGES = 50;
+      const PER_PAGE = 200;
+
+      let page = 1;
+      let scanned = 0;
+      let deleted = 0;
+      const cutoff = Date.now() - SAFETY_AGE_MS;
+
+      while (page <= MAX_PAGES && deleted < MAX_DELETES_PER_RUN) {
+        const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: PER_PAGE });
+        if (error) throw error;
+        const batch = data?.users ?? [];
+        if (batch.length === 0) break;
+        scanned += batch.length;
+
+        for (const authUser of batch) {
+          if (deleted >= MAX_DELETES_PER_RUN) break;
+          if (publicIds.has(authUser.id)) continue;
+          const created = authUser.created_at ? new Date(authUser.created_at).getTime() : 0;
+          if (created > cutoff) continue;
+          try {
+            const { error: delErr } = await supabase.auth.admin.deleteUser(authUser.id);
+            if (delErr) {
+              logger.warn({ err: delErr, auth_user_id: authUser.id, email: authUser.email }, 'Orphan auth-user delete failed');
+              continue;
+            }
+            logger.info({ auth_user_id: authUser.id, email: authUser.email, created_at: authUser.created_at }, 'Orphan auth-user deleted');
+            deleted++;
+          } catch (err) {
+            logger.warn({ err, auth_user_id: authUser.id }, 'Orphan auth-user delete threw');
+          }
+        }
+
+        if (batch.length < PER_PAGE) break;
+        page++;
+      }
+
+      logger.info({ scanned, deleted, capped: deleted >= MAX_DELETES_PER_RUN }, 'Orphan auth-user reconciliation complete');
+    } catch (err) { logger.error({ err }, 'Orphan auth-user reconciliation failed'); }
+  }, { timezone: 'UTC' });
+
   // Pending media cleanup — Daily 05:00
   cron.schedule('0 5 * * *', async () => {
     try {

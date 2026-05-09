@@ -46,10 +46,10 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ### Phase B.5 — prod-ship blockers (NEW, before any real customer touches prod)
 - [x] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *landed 2026-05-10. Migration 043 + backend twoFactor router + console enroll page + login state machine.*
-- [ ] **Rotate Supabase legacy JWT secret** (anon + service_role) — service_role was leaked in client bundle for 15 days (2026-04-24 → 2026-05-09); user opted to defer rotation since console URL was never shared. Rotate before first paying customer.
-- [ ] **Manual gym creation: orphaned-auth-user reconciliation cron** — when `auth.admin.deleteUser` rollback fails, an `auth.users` row leaks with no `public.users` peer. Spotted as a real failure mode during deploy debug.
-- [ ] **Pre-deploy schema-drift check** — production was missing migrations 036–042 despite the code shipping months ago. CI (or a `predeploy` hook) should diff `information_schema.columns` against the migrations directory and fail loudly if drift exists.
-- [ ] **PATCH `/super-admin/gyms/:id/subscription` error message** — the SELECT-fails-or-no-rows branch at `superAdmin.ts:202` collapses both into "Gym not found", which masks real DB errors. Split into "Gym not found" (404) vs "Database error" (500); log the underlying `readErr` either way.
+- [ ] **Rotate Supabase legacy JWT secret** (anon + service_role) — service_role was leaked in client bundle for 15 days (2026-04-24 → 2026-05-09); user opted to defer rotation indefinitely (2026-05-10 reaffirmation — staging-grade, no observed traffic against the leaked URL, will rotate in a quiet ops window before first paying customer).
+- [x] **Manual gym creation: orphaned-auth-user reconciliation cron** — *landed 2026-05-10 in `backend/src/jobs/index.ts` (daily 03:30 UTC). 10-min in-flight grace, 100-deletion safety cap per run.*
+- [x] **Pre-deploy schema-drift check** — *landed 2026-05-10 as `backend/src/lib/schemaProbes.ts` (boot-time gate; production refuses to start if any probe fails) + `npm run -w backend check:schema` for ad-hoc verification against any environment.*
+- [x] **PATCH `/super-admin/gyms/:id/subscription` error message** — *landed 2026-05-10. `lib/dbErrors.ts` helper + applied to all 5 `readErr || !x` collapse sites in `superAdmin.ts` AND the same anti-pattern in `twoFactor.ts` flagged by the security council.*
 
 ### Phase B.5 follow-ups (Tier 2 — not blockers, file alongside the others)
 - [ ] **TOTP secret encryption-at-rest** — migration 043 stores `users.totp_secret` as plaintext base32. The DB is service-role-gated, but pgcrypto/Supabase Vault encryption is the right destination. Bundle with the JWT-secret rotation work.
@@ -84,6 +84,39 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-10 · Phase B.5 #3/#4/#5 + 2FA security-review fixes (4-agent council outcome)
+
+User asked the council to vote between (A) bundling B.5 #3+#4+#5 cleanup, (B) JWT secret rotation alone, (C) starting Phase C, or (D) Tier 2 polish. Spawned 4 expert agents in parallel (Product/GTM, Engineering, Security/RBAC, Plan-adherence). Tally A=2, B=1, C=1; Security agent flagged real concrete defects in the just-shipped 2FA code that nobody else caught. User opted to defer JWT rotation indefinitely (reaffirmation of the 2026-05-09 deferral — staging-grade, no observed traffic against the leaked URL); reconciled outcome is **A-expanded**: ship the three cleanup blockers PLUS the security-flagged 2FA fixes in one PR.
+
+**B.5 #5 — error-message split (`superAdmin.ts:202` and 4 siblings):**
+- New `backend/src/lib/dbErrors.ts` exports `isNotFoundError(e)` keyed on PostgREST's `PGRST116` ("no rows" on `.single()`).
+- Applied to all 5 `readErr || !x` collapse sites in `superAdmin.ts` (lines 202, 239, 292, 428, 481 — subscription patch, mark-paid, extend-trial, gym override, lead update). Each now: `if (readErr && !isNotFoundError(readErr)) → log + 500 INTERNAL_ERROR`; `if (!x) → 404 NOT_FOUND`. The 036–042 schema-drift incident manifested as "Gym not found" because every read error collapsed into the not-found branch — that class of mask is now closed.
+
+**Security-flagged 2FA fixes (folded into the same PR):**
+- `twoFactor.ts:44-58` had the SAME anti-pattern (chErr + !challenge → identical 401 "Invalid or expired challenge"). Split: chErr → 500 + log; !challenge → 401. The user lookup `userErr || !user` at :68 still collapses both — kept intentionally because at that point we hold a valid challenge so a user-row miss is genuinely an account-state anomaly, not a missing-table error; both legitimately read as 401.
+- `twoFactor.ts:114` (post-consume bookkeeping) — captured `last_active_at` and audit-log insert errors instead of silently dropping them. The challenge has already been atomically consumed at this point, so we never block the response on these failures (would otherwise burn the operator's single-use token + force a full re-login). `last_active_at` failures log at warn; audit insert failures log at error.
+
+**B.5 #3 — orphaned-auth-user reconciliation cron:**
+- New cron in `backend/src/jobs/index.ts`, daily 03:30 UTC. Builds the set of all `public.users.id`, pages through `auth.admin.listUsers` (200/page, 50-page cap), deletes any `auth.users` row older than 10 minutes that has no `public.users` peer.
+- Hard-capped at 100 deletions per run — a runaway condition (e.g. accidental `public.users` truncate) surfaces as a recurring log entry rather than a single catastrophic purge.
+- 10-min grace protects in-flight `superAdmin.ts` manual-create flows, which create the auth user before inserting `public.users` and roll both back if downstream fails.
+
+**B.5 #4 — pre-deploy schema-drift check:**
+- New `backend/src/lib/schemaProbes.ts` — 13 lightweight `SELECT col FROM table LIMIT 1` probes covering every column/table introduced by migrations 036–043. Each probe distinguishes "no rows" (PGRST116, OK) from "column/table missing" (anything else, fail).
+- New `assertSchemaReady({ failHard })` runs the probes and, in production (`NODE_ENV=production`), `process.exit(1)` if any fail — Railway will surface the failed deploy instead of letting new code serve traffic against a stale DB. Dev mode logs warnings only so local hacking against an intentionally-behind dev DB isn't blocked.
+- Wired into `backend/src/index.ts` boot sequence: `assertSchemaReady → initJobs → startJobs → app.listen`. Adds ~13 round-trips of latency to cold start (parallelized; ~50ms total on Railway).
+- Also exposed as `npm run -w backend check:schema` (chains `tsc && node scripts/check-schema.js`) for ad-hoc verification against any environment via the `.env` file.
+
+**Phase B.5 status after this commit:** 4 of 5 blockers closed. Only JWT secret rotation remains, deferred by user.
+
+**Verified:** `npm run -w backend build` clean. No console changes in this PR.
+
+**Deploy notes:**
+- The schema-drift check probes against migration 043, which is already applied in prod (verified by user during 2FA enablement). The boot-time gate will pass on first deploy.
+- The orphan reconciliation cron starts firing nightly 03:30 UTC; first run will scan whatever's in `auth.users` against `public.users`. Worth tailing logs for the first run to confirm zero unexpected deletions.
+
+**Next:** Phase C (onboarding wizard + QR poster generator + trial-expiry email sequence + cancellation save flow) is now the recommended next move. JWT rotation is queued for a quiet ops window before first paying customer.
 
 ### 2026-05-10 · Phase B.5 #1 — TOTP 2FA for super_admin login
 

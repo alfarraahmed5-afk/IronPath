@@ -9,6 +9,7 @@ import { requireActiveUser } from '../middleware/requireActiveUser';
 import { requireSuperAdmin } from '../middleware/roles';
 import { logAudit } from '../lib/audit';
 import { logger } from '../lib/logger';
+import { isNotFoundError } from '../lib/dbErrors';
 
 const router = Router();
 
@@ -199,7 +200,11 @@ router.patch('/gyms/:id/subscription', async (req: Request, res: Response, next:
       return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
     }
     const { data: before, error: readErr } = await supabase.from('gyms').select('subscription_tier, subscription_status, subscription_expires_at, mrr_cents').eq('id', gymId).single();
-    if (readErr || !before) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, gymId }, 'subscription read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!before) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
 
     const update: Record<string, unknown> = { last_modified_by: req.user!.id, last_modified_at: new Date().toISOString() };
     if (parsed.data.tier !== undefined) update.subscription_tier = parsed.data.tier;
@@ -236,7 +241,11 @@ router.post('/gyms/:id/subscription/mark-paid', async (req: Request, res: Respon
     const { amount_cents, period_start, period_end, note } = parsed.data;
 
     const { data: gym, error: readErr } = await supabase.from('gyms').select('subscription_status, subscription_expires_at').eq('id', gymId).single();
-    if (readErr || !gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, gymId }, 'mark-paid gym read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
 
     const { data: payment, error: payErr } = await supabase.from('subscription_payments').insert({
       gym_id: gymId, amount_cents, period_start, period_end, note: note ?? null, recorded_by: req.user!.id,
@@ -289,7 +298,11 @@ router.post('/gyms/:id/subscription/extend-trial', async (req: Request, res: Res
     const { days, reason } = parsed.data;
 
     const { data: gym, error: readErr } = await supabase.from('gyms').select('subscription_status, subscription_expires_at, trial_started_at').eq('id', gymId).single();
-    if (readErr || !gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, gymId }, 'extend-trial gym read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
 
     const base = gym.subscription_expires_at && new Date(gym.subscription_expires_at) > new Date() ? new Date(gym.subscription_expires_at) : new Date();
     base.setUTCDate(base.getUTCDate() + days);
@@ -425,7 +438,11 @@ router.patch('/gyms/:id', async (req: Request, res: Response, next: NextFunction
       return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
     }
     const { data: before, error: readErr } = await supabase.from('gyms').select('*').eq('id', gymId).single();
-    if (readErr || !before) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, gymId }, 'gym override read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!before) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
 
     const update: Record<string, unknown> = { ...parsed.data, last_modified_by: req.user!.id, last_modified_at: new Date().toISOString() };
     const { data: after, error: updErr } = await supabase.from('gyms').update(update).eq('id', gymId).select().single();
@@ -478,7 +495,11 @@ router.patch('/leads/:id', async (req: Request, res: Response, next: NextFunctio
       return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
     }
     const { data: before, error: readErr } = await supabase.from('leads').select('*').eq('id', leadId).single();
-    if (readErr || !before) return next(new AppError('NOT_FOUND', 404, 'Lead not found'));
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, leadId }, 'lead read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!before) return next(new AppError('NOT_FOUND', 404, 'Lead not found'));
 
     const { data: after, error: updErr } = await supabase.from('leads').update({
       ...parsed.data,

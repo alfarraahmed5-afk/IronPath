@@ -9,6 +9,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "seed:admin": "node scripts/seed-super-admin.js",
+    "check:schema": "tsc && node scripts/check-schema.js",
     "seed:wger": "node scripts/import-wger.js",
     "seed:routines": "node scripts/seed-prebuilt-routines.js",
     "recategorize": "node scripts/recategorize-exercises.js",

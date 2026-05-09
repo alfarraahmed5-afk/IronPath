@@ -27,6 +27,7 @@ import superAdminRouter from './routes/superAdmin';
 import { authTwoFactorRouter, superAdminTwoFactorRouter } from './routes/twoFactor';
 import leadsRouter from './routes/leads';
 import { startJobs, initJobs } from './jobs/index';
+import { assertSchemaReady } from './lib/schemaProbes';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -97,14 +98,24 @@ app.use('/api/v1/duels', duelsRouter);
 
 app.use(errorHandler);
 
-initJobs().then(() => {
-  startJobs();
-  app.listen(PORT, () => {
-    logger.info('IronPath backend running on port ' + PORT + ' [' + (process.env.NODE_ENV || 'development') + ']');
+// Boot sequence: schema probes → jobs init → start. Schema check runs first
+// so a backend deploy against a stale DB fails immediately instead of silently
+// serving 500s. In production we hard-exit on failure (Railway surfaces it as
+// a failed deploy); in dev we just warn so local hacking isn't blocked when
+// the dev DB is intentionally behind.
+const SCHEMA_FAIL_HARD = process.env.NODE_ENV === 'production';
+
+assertSchemaReady({ failHard: SCHEMA_FAIL_HARD })
+  .then(() => initJobs())
+  .then(() => {
+    startJobs();
+    app.listen(PORT, () => {
+      logger.info('IronPath backend running on port ' + PORT + ' [' + (process.env.NODE_ENV || 'development') + ']');
+    });
+  })
+  .catch(err => {
+    logger.error({ err }, 'Failed to initialize jobs');
+    process.exit(1);
   });
-}).catch(err => {
-  logger.error({ err }, 'Failed to initialize jobs');
-  process.exit(1);
-});
 
 export default app;
