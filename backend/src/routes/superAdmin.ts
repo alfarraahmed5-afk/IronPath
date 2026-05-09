@@ -393,12 +393,38 @@ router.post('/gyms', async (req: Request, res: Response, next: NextFunction) => 
         supabase.from('streaks').insert({ user_id: authUserId, gym_id: gym.id }),
       ]);
 
+      // Magic-link-on-create (Q1 council vote 4-0). Mint a Supabase recovery
+      // link that lands at the admin /reset-password page; the owner clicks
+      // through, sets their own password, lands in the dashboard. No more
+      // un-returnable temp passwords — plan §5.7 alignment, closes the gap
+      // founder hit on 2026-05-10. Best-effort: if generateLink fails for
+      // any reason, the gym is still created and the operator can ask for
+      // a recovery link later via the standard /forgot-password flow.
+      const adminBaseUrl = process.env.ADMIN_URL || 'https://iron-path-admin.vercel.app';
+      let setupUrl: string | undefined;
+      try {
+        const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+          type: 'recovery',
+          email: owner_email,
+          options: { redirectTo: `${adminBaseUrl}/reset-password` },
+        });
+        if (linkErr) {
+          logger.warn({ err: linkErr, owner_email }, 'Recovery link mint failed; owner will need /forgot-password');
+        } else {
+          setupUrl = linkData?.properties?.action_link;
+        }
+      } catch (err) {
+        logger.warn({ err, owner_email }, 'Recovery link mint threw');
+      }
+
       // Best-effort welcome — don't block on email
       sendWelcomeEmail({
         to: owner_email,
         gymName: name,
         inviteCode,
         appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.app/download',
+        setupUrl,
+        posterTeaserUrl: setupUrl ? `${adminBaseUrl}/grow` : undefined,
       }).catch((err: unknown) => logger.warn({ err }, 'Welcome email failed'));
 
       await logAudit(req, {

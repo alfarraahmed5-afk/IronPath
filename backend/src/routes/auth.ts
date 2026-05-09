@@ -6,6 +6,7 @@ import { authLimiter, refreshLimiter } from '../middleware/rateLimit';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 import { CHALLENGE_TTL_SECONDS, generateChallengeToken, hashChallengeToken } from '../lib/twoFactor';
 import { logger } from '../lib/logger';
+import { supabaseAuth } from '../lib/supabase';
 
 const router = Router();
 
@@ -215,6 +216,71 @@ router.post('/reset-password', authLimiter, async (req: Request, res: Response, 
     const { error: updateError } = await userClient.auth.updateUser({ password: new_password });
     if (updateError) return next(new AppError('UNAUTHORIZED', 401, 'Failed to reset password'));
     res.json({ data: { message: 'Password reset successfully' } });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/set-password — final leg of the magic-link-on-create flow
+// (Phase C onboarding, Q1 council vote 4-0). Owner clicks the recovery link
+// in their welcome email → Supabase redirects them to admin /reset-password
+// with `#access_token=...&refresh_token=...&type=recovery` in the URL hash
+// → admin posts here with `{access_token, new_password}` → backend validates
+// the access_token, sets the new password via the admin API, returns the
+// public.users record so the SPA can store + navigate to /dashboard.
+//
+// Distinct from /reset-password (PKCE/code-exchange flow used elsewhere) —
+// this one is purpose-built for the recovery-hash path.
+const setPasswordSchema = z.object({
+  access_token: z.string().min(20),
+  new_password: z.string().min(8),
+});
+
+router.post('/set-password', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = setPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const fields = parsed.error.errors.map(e => ({ field: String(e.path.join('.')), message: e.message }));
+      return next(new AppError('VALIDATION_ERROR', 422, 'Request validation failed.', fields));
+    }
+    const { access_token, new_password } = parsed.data;
+
+    const { data: { user: authUser }, error: tokenErr } = await supabaseAuth.auth.getUser(access_token);
+    if (tokenErr || !authUser) {
+      return next(new AppError('UNAUTHORIZED', 401, 'Invalid or expired recovery link'));
+    }
+
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(authUser.id, {
+      password: new_password,
+    });
+    if (updateErr) {
+      logger.error({ err: updateErr, user_id: authUser.id }, 'Password update failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Could not update password'));
+    }
+
+    const { data: user, error: userErr } = await supabase
+      .from('users')
+      .select('id, email, username, full_name, avatar_url, role, gym_id, is_active, deleted_at')
+      .eq('id', authUser.id)
+      .single();
+    if (userErr || !user) return next(new AppError('UNAUTHORIZED', 401, 'User account not found'));
+    if (user.deleted_at) return next(new AppError('FORBIDDEN', 403, 'Account removed'));
+    if (!user.is_active) return next(new AppError('FORBIDDEN', 403, 'Account suspended'));
+
+    await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', user.id);
+
+    res.json({
+      data: {
+        access_token,
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          full_name: user.full_name,
+          avatar_url: user.avatar_url,
+          role: user.role,
+          gym_id: user.gym_id,
+        },
+      },
+    });
   } catch (err) { next(err); }
 });
 

@@ -27,6 +27,9 @@ const PUBLIC_PATH_RES: { method?: string; re: RegExp }[] = [
   // POST /auth/2fa/verify is public — the super_admin enroll/confirm/disable
   // endpoints sit under /super-admin/2fa and require an active session.
   { method: 'POST', re: /^\/api\/v1\/auth\/2fa\/verify\/?(\?.*)?$/ },
+  // Phase C onboarding magic-link-on-create: the recovery-hash flow lands
+  // unauthenticated owners here to complete password setup.
+  { method: 'POST', re: /^\/api\/v1\/auth\/set-password\/?(\?.*)?$/ },
   { re: /^\/api\/v1\/gyms\/validate-invite\/?(\?.*)?$/ },
   { method: 'POST', re: /^\/api\/v1\/gyms\/?(\?.*)?$/ },
   // Public lead capture: only POST /api/v1/leads is unauthenticated. The

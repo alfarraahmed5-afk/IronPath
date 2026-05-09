@@ -92,6 +92,28 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · PR-Q1 — magic-link-on-create + admin /reset-password page (4-agent council outcome)
+
+User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote on two related onboarding/auth questions. **Q1 unanimous (4-0): magic-link-on-create.** Plan §5.7 already specified this; current code drifted to a never-returned `Tmp_${csprng}` password that left owners with no way to log in (the gap founder hit on 2026-05-10). Plaintext-in-email (B), hand-off URL (C), and console-show-once (D) were all rejected on threat-model grounds (plaintext leaks, operator-as-bearer-channel, no audit trail). This commit closes the gap.
+
+**Backend changes:**
+- `backend/src/lib/email.ts` `sendWelcomeEmail` — extended with optional `setupUrl` and `posterTeaserUrl` params. When `setupUrl` is present, the email leads with a primary "Set your password" CTA (orange button, brand-tinted) followed by a 1-hour-expiry note. When `posterTeaserUrl` is present, a step-2 block points at /grow per the UX agent's "fold the QR-poster activation event into the very first email" recommendation. Existing callers (no-arg) keep the original tone.
+- `backend/src/routes/superAdmin.ts` manual-create handler — between gym creation and welcome-email send, calls `supabase.auth.admin.generateLink({type: 'recovery', email, options: {redirectTo: '${ADMIN_URL}/reset-password'}})` and threads `properties.action_link` into `sendWelcomeEmail`. Best-effort: `linkErr` and thrown errors are logged-and-continued so a Supabase generateLink hiccup doesn't block gym creation — operator can fall back to the standard `/forgot-password` flow.
+- `backend/src/routes/auth.ts` — new `POST /auth/set-password` endpoint. Schema `{access_token, new_password ≥ 8 chars}`. Validates the access_token via `supabaseAuth.auth.getUser`, updates the password via `supabase.auth.admin.updateUserById`, fetches the public.users row (rejects deleted/suspended), updates `last_active_at`, returns `{access_token, user}` so the SPA can store + navigate to /dashboard. Uses `authLimiter` (5/15min/IP).
+- `backend/src/middleware/auth.ts` — `POST /api/v1/auth/set-password` added to `PUBLIC_PATHS` (the recovery-hash flow runs before any normal session exists).
+
+**Admin changes:**
+- New `admin/src/pages/ResetPasswordPage.tsx` — three-stage UI: `loading` (parsing the URL hash), `form` (new + confirm password fields, submits to backend), `expired` (handles `error_code=otp_expired` from the URL hash + missing token), `success` (brief confirmation, auto-navigate to /dashboard). Hash is cleared via `history.replaceState` after success so a refresh doesn't re-enter the recovery flow. Uses the new design tokens from PR1: `surface-card`, `Logomark`, `bg-ink-900`, brand-tinted CTAs.
+- `admin/src/App.tsx` — `/reset-password` route added (public, alongside `/login`). Sits outside `<ProtectedRoute>` because the user has no normal session yet.
+
+**Critical deploy step (must do before next push):** add the redirect URL to Supabase's allowlist. Supabase Dashboard → Authentication → URL Configuration → add `https://iron-path-admin.vercel.app/reset-password` to **Redirect URLs**. Without this, `generateLink` will mint URLs that fail when clicked. Local dev: also add `http://localhost:5173/reset-password`.
+
+**Optional env var:** `ADMIN_URL` on Railway, defaults to `https://iron-path-admin.vercel.app`. Override for staging or branch previews if needed.
+
+**Verified:** `npm run -w backend build` clean. `npm run -w admin build` clean. Bundle 771 kB → 776 kB pre-gzip / 226 kB → 227 kB gzipped (+5 kB pre-gzip / +1 kB gz for the new ResetPasswordPage).
+
+**Phase B Tier 2 backlog item (manual-create response should return temp password) — superseded.** The temp-password-display problem is moot now: the temp password is generated only as Supabase's create-user requirement, immediately invalidated on first password set, and never communicated to anyone.
+
 ### 2026-05-10 · PR-fix — admin LoginPage 2FA-shape regression + drop super_admin from ALLOWED_ROLES
 
 Hot-fix for a regression I introduced with yesterday's TOTP 2FA work. When a super_admin with 2FA enrolled hits `POST /auth/login`, the backend returns `{requires_2fa: true, challenge_token, expires_in}` — no `user` object. The console LoginPage was updated to handle that shape; the **admin LoginPage was not**, so it destructured `{ access_token, refresh_token, user }` to all undefined, then `isAllowedRole(undefined)` returned false and surfaced the wrong-reason "Admin access required." error. Founder hit this when trying to log into admin with their super_admin account today.
