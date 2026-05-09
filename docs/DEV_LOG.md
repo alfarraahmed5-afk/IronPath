@@ -76,10 +76,10 @@ Single source of truth for development progress on the platform plan. Read this 
 User asked for a council vote before deciding the next move from Phase B v1 ship state. Spawned **4 expert agents in parallel** (read-only, no worktrees) to vote across {SHIP, BURN-DOWN-TIER-2, START-PHASE-C}.
 
 **Tally:**
-- *Product/GTM* → **3 (Phase C)** — founder has zero customers; QR poster (§17) + onboarding wizard are the demand-side work that creates trials to fill the console with.
-- *Engineering* → **2 (Tier 2)** — backlog is 21 items spanning two phases; three are real liabilities (orphan reconciliation, formatMoneyCents zero-bug, plan §6.4 drift). Diff is already large, don't stack Phase C onto it.
+- *Product/GTM* → **3 (Phase C)** — founder has zero customers; QR poster (§17) + onboarding wizard drive user acquisition — the demand-side work that populates the console with trial gyms.
+- *Engineering* → **2 (Tier 2)** — backlog is 21 items spanning two phases; three are real liabilities (orphan reconciliation, formatMoneyCents zero-bug, plan §6.4 drift). Diff is already large; don't stack Phase C onto it.
 - *Security/RBAC* → **2 (Tier 2)** — Tier 1 closed the bleeding (append-only audit, anchored PUBLIC_PATHS, function-based CORS, requireGymOwner / requireSelfOrSuperAdmin), but **2FA for super_admin (§8.1 #1) is not done** — flagged as a hard prod-ship blocker. Staging is fine; prod is not.
-- *Plan adherence* → **1 (Ship)** — Phase B ship gate ("founder closes a deal end-to-end inside the console") is *literally untestable without a deploy*. §9.8 launch checklist blocked at step 3. Plan drift items (§3.7, §6.4) are bookkeeping, fine-as-deferred.
+- *Plan adherence* → **1 (Ship)** — Phase B ship gate ("founder closes a deal end-to-end inside the console") is *literally untestable without a deploy*. §9.8 launch checklist blocked at step 3. Plan drift items (§3.7, §6.4) are bookkeeping, deferred fine.
 
 **Reconciled outcome:** apply the cheap Tier 2 items inline (Engineering's high-leverage list intersect Plan adherence's "fine-to-amend-in-PR" list) → ship to **staging via PR**, hold prod until 2FA lands. Phase C deferred until Phase B has at least staging exposure. 2FA + manual-create orphan reconciliation graduate to a "Phase B.5 prod-ship blockers" sub-backlog.
 
