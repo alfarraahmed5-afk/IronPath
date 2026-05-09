@@ -94,14 +94,14 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ### 2026-05-10 · Admin design overhaul PR1 — substrate (5-agent council outcome)
 
-User asked the 5-agent council (Visual designer, Motion designer, Frontend impl engineer, UX/IA strategist, Creative director) for a redesign of the admin panel after calling the current design "basic and bland." Each agent returned a focused critique; convergent recommendations: shadcn substrate + cn() helper, framer-motion via LazyMotion, Linear-style sliding nav pill, "forged dark" surface ladder, JetBrains Mono numerics, Whoop+Linear inspiration, Dashboard / Members / Announcements as the three highest-leverage pages, /grow leave structurally + elevate visually. Reconciled into a 4-PR sequence (PR1 foundation → PR2 Dashboard hero → PR3 Grow rebuild → PR4+ per-page polish). User approved PR1 scope and authorized sourcing photography from the web (PR2 work). **This commit ships PR1 — no visual revolution yet, just the substrate everything else compounds on.**
+User asked the 5-agent council (Visual designer, Motion designer, Frontend impl engineer, UX/IA strategist, Creative director) for a redesign of the admin panel after calling the current design "basic and bland." Convergent recommendations across all agents: shadcn substrate + cn() helper, framer-motion via LazyMotion, Linear-style sliding nav pill, "forged dark" surface ladder, JetBrains Mono numerics, Whoop+Linear inspiration, Dashboard / Members / Announcements as the three highest-leverage pages, /grow left structurally + elevated visually. Reconciled into a 4-PR sequence (PR1 foundation → PR2 Dashboard hero → PR3 Grow rebuild → PR4+ per-page polish). User approved PR1 scope and authorized sourcing photography from the web (PR2 work). **This commit ships PR1 — no visual revolution yet, just the substrate everything else compounds on.**
 
 **New deps (admin only):**
 - `clsx` + `tailwind-merge` (~3 kB gz combined) — required for the `cn()` helper that every shadcn-style primitive expects.
-- `rollup-plugin-visualizer` (devDependency, ESM-only) — every subsequent admin build emits `dist/stats.html` (treemap + gzip + brotli sizes) so each PR has a kB receipt. Forced rename of `admin/vite.config.ts → admin/vite.config.mts` because the plugin is ESM-only and Vite's CJS config loader couldn't `require()` it.
+- `rollup-plugin-visualizer` (devDependency, ESM-only) — every subsequent admin build emits `dist/stats.html` (treemap + gzip + brotli sizes) for kB accountability. Required rename: `admin/vite.config.ts → admin/vite.config.mts` (ESM plugin incompatible with CJS Vite config loader).
 
 **Substrate (shadcn-pattern, no shadcn CLI executed yet — config only):**
-- `admin/components.json` — shadcn config pinned to `style: 'default'`, `baseColor: 'neutral'`, `cssVariables: false`, `iconLibrary: 'lucide'`, with `@/*` alias map. Future `npx shadcn add <component>` calls will land into `src/components/ui/`.
+- `admin/components.json` — shadcn config: style 'default', baseColor 'neutral', cssVariables false, iconLibrary 'lucide', with `@/*` alias map. Future `npx shadcn add <component>` calls land into `src/components/ui/`.
 - `admin/src/lib/utils.ts` — `cn(...inputs) => twMerge(clsx(inputs))`. The standard shadcn helper.
 - `admin/tsconfig.json` + `admin/vite.config.mts` — added `@/*` → `src/*` path alias.
 
@@ -112,7 +112,7 @@ User asked the 5-agent council (Visual designer, Motion designer, Frontend impl 
 - New `shimmer` keyframe + `animate-shimmer` utility.
 
 **Surface ladder (visual designer council, north-star recommendation):**
-- `admin/src/index.css` adds three component classes — `.surface-shell` (#0A0A0B, the chrome rail), `.surface-card` (#111114 + 1px ink-800 border + subtle 4% top-left radial ember), `.surface-feature` (#17171B + 6% radial ember + inset 8% orange ring). Three explicit elevations replace the previous "every card looks the same" putty.
+- `admin/src/index.css` adds three component classes — `.surface-shell` (#0A0A0B, the chrome rail), `.surface-card` (#111114 + 1px ink-800 border + subtle 4% top-left radial ember), `.surface-feature` (#17171B + 6% radial ember + inset 8% orange ring). Three explicit elevations replace the flat, undifferentiated card aesthetic.
 - Body `bg-gray-950 text-gray-100` swapped to `bg-ink-900 text-ink-50` — warmer base.
 - `[data-numeric]` and `.font-mono` get `font-feature-settings: 'tnum', 'ss01'` + `font-variant-numeric: tabular-nums` automatically — Bloomberg-grade number rendering as a default.
 
