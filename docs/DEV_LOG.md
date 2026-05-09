@@ -10,8 +10,8 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Current state
 
-- **Phase:** A — Foundation **complete** (merged + reviewed + Tier 1 fixes applied)
-- **Active unit:** Phase A ship gate met. Phase B (Super Admin Console v1) is next.
+- **Phase:** B — Super Admin Console v1 (4 teams in flight)
+- **Active unit:** B1 backend / B2 All Gyms + Gym Detail / B3 Subscription editor + Lead Inbox / B4 Manual creation + Sentry
 - **Last updated:** 2026-05-09
 
 ---
