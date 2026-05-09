@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Pin } from 'lucide-react';
 import api from '../lib/api';
 
 interface Announcement {
@@ -187,7 +188,11 @@ export default function AnnouncementsPage() {
             <div key={item.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  {item.is_pinned && <span title="Pinned">📌</span>}
+                  {item.is_pinned && (
+                    <span title="Pinned" className="inline-flex items-center">
+                      <Pin size={14} className="text-orange-400" />
+                    </span>
+                  )}
                   <h3 className="text-white font-semibold">{item.title}</h3>
                 </div>
                 <span className="text-gray-500 text-xs shrink-0 ml-4">{formatDate(item.created_at)}</span>
