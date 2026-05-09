@@ -56,6 +56,34 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-09 · Phase B v1.2 — GymDetailPage nested-route tabs
+
+Splits the flat profile/owner/subscription/onboarding/audit cards into routed tabs per plan §5.5.
+
+**New files (`console/src/pages/gyms/`):**
+- `OverviewTab.tsx` — three summary cards (profile / owner / subscription). The subscription card now shows onboarding completion as a counter, not a full checklist.
+- `SubscriptionTab.tsx` — dedicated deep-dive: tier+status pills, members / MRR / trial start / expires (with `daysUntil` suffix), prominent Edit subscription button. Payment-history pane is a placeholder (`subscription_payments` LIST endpoint deferred to later in Phase B).
+- `AuditTab.tsx` — full paginated audit log (uses `useGymAuditQuery` + `Pagination`). Each row expands to render before/after JSON diff in side-by-side panes. IP shown right-aligned in mono.
+- `OnboardingTab.tsx` — full checklist with human-readable labels (`STEP_LABELS` map) plus the canonical key in mono. Empty-state when no rows.
+
+**`GymDetailPage.tsx` is now the shell:** back link, gym name + tier/status pills + ID + created-date header, NavLink tab strip, `<Outlet />`. The previous flat-card body and the inline `<SubscriptionEditor>` mount move into the per-tab files. Each tab calls `useGymQuery(gymId)` directly — TanStack Query's cache makes the duplicate hooks free.
+
+**`App.tsx` routes:**
+```
+/gyms/:gymId          → GymDetailPage shell
+  index               → Navigate to overview
+  /overview           → OverviewTab
+  /subscription       → SubscriptionTab
+  /audit              → AuditTab
+  /onboarding         → OnboardingTab
+```
+
+**Verified:** `npx tsc -p console/tsconfig.json --noEmit` clean, `npm run -w console build` clean (446 kB JS / 50 kB CSS pre-gzip — +6 kB JS for the four new tabs).
+
+**Note for review:** `hasDiff` in `AuditTab.tsx` had to be `Boolean(...)`-wrapped because `entry.before / entry.after` are typed as `unknown` (audit JSON is opaque on the wire); without the coercion `Boolean && Object.keys(unknown)` leaks `unknown` into JSX.
+
+**Next:** cross-team review pass on Phase B v1 + v1.1 + v1.2. 4 reviewers in worktrees per the Phase A pattern.
+
 ### 2026-05-09 · Phase B v1.1 — subscription editor modal
 
 Inline implementation (skipped worktree-isolated agents to dodge the stall pattern that hit the last two Phase B batches).
