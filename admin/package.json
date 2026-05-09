@@ -9,6 +9,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
     "@ironpath/shared": "*",
+    "@sentry/react": "^8.0.0",
     "axios": "^1.6.0",
     "lucide-react": "^0.468.0",
     "luxon": "^3.0.0",

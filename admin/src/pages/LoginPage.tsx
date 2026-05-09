@@ -36,7 +36,7 @@ export default function LoginPage() {
       const { access_token, refresh_token, user } = res.data.data;
 
       if (!isAllowedRole(user?.role)) {
-        setError('Admin access required. Use the mobile app to track workouts.');
+        setError('Admin access required.');
         return;
       }
 
