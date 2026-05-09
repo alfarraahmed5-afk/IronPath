@@ -9,7 +9,8 @@ type Tier = 'starter' | 'growth' | 'unlimited';
 type Status = 'trial' | 'active' | 'expired' | 'cancelled';
 
 interface Subscription {
-  tier: Tier;
+  // Trial gyms can land before sales picks a tier — backend may return null.
+  tier: Tier | null;
   status: Status;
   expires_at: string;
   trial_started_at: string | null;
@@ -33,8 +34,11 @@ const TIERS: TierDef[] = [
 
 // ---------- helpers ----------
 
-function tierLabel(t: Tier): string {
-  return t === 'starter' ? 'Starter' : t === 'growth' ? 'Growth' : 'Unlimited';
+function tierLabel(t: Tier | null): string {
+  if (t === 'starter') return 'Starter';
+  if (t === 'growth') return 'Growth';
+  if (t === 'unlimited') return 'Unlimited';
+  return 'No plan yet';
 }
 
 function statusLabel(s: Status): string {
@@ -123,7 +127,14 @@ function CurrentPlanCard({ sub }: { sub: Subscription }) {
   return (
     <Card title="Current plan">
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold uppercase tracking-wider bg-orange-500/10 text-orange-400 border border-orange-500/40">
+        <span
+          className={[
+            'inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold uppercase tracking-wider border',
+            sub.tier
+              ? 'bg-orange-500/10 text-orange-400 border-orange-500/40'
+              : 'bg-gray-800 text-gray-300 border-gray-700',
+          ].join(' ')}
+        >
           {tierLabel(sub.tier)}
         </span>
         <span

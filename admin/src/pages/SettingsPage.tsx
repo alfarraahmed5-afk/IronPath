@@ -181,7 +181,7 @@ function ProfileCard({
       name: gym.name ?? '',
       location: gym.location ?? '',
       description: gym.description ?? '',
-      accent_color: gym.accent_color ?? '#FF6A00',
+      accent_color: gym.accent_color ?? '#FF6B35',
     },
   });
 
@@ -191,7 +191,7 @@ function ProfileCard({
       name: gym.name ?? '',
       location: gym.location ?? '',
       description: gym.description ?? '',
-      accent_color: gym.accent_color ?? '#FF6A00',
+      accent_color: gym.accent_color ?? '#FF6B35',
     });
   }, [gym.name, gym.location, gym.description, gym.accent_color, reset]);
 
@@ -554,7 +554,7 @@ function ContactCard({
             />
             <FieldError message={errors.timezone?.message} />
             <p className="text-xs text-gray-500 mt-1">
-              Phase 2 will replace this with a picker.
+              Phase C will replace this with a picker.
             </p>
           </div>
           <div>

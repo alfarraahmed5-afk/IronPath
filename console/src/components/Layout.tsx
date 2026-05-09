@@ -4,8 +4,6 @@ import {
   Kanban,
   Building2,
   LineChart,
-  History,
-  Settings,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -15,14 +13,14 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+// Audit + Settings nav entries land with their routes in Phase B/F. Linking to
+// them now silently bounces operators to /gyms via the catch-all, so they stay
+// out of the sidebar until the routes exist.
 const NAV_LINKS: { to: string; label: string; Icon: LucideIcon }[] = [
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/pipeline', label: 'Pipeline', Icon: Kanban },
   { to: '/gyms', label: 'Gyms', Icon: Building2 },
   { to: '/analytics', label: 'Analytics', Icon: LineChart },
-  // Routes below not wired yet — placeholders per scope.
-  { to: '/audit', label: 'Audit', Icon: History },
-  { to: '/settings', label: 'Settings', Icon: Settings },
 ];
 
 function StatusBar() {
@@ -85,7 +83,7 @@ export default function Layout({ children }: LayoutProps) {
                 ].join(' ')
               }
             >
-              <Icon size={16} className="shrink-0" />
+              <Icon size={16} strokeWidth={1.75} className="shrink-0" />
               <span>{label}</span>
             </NavLink>
           ))}

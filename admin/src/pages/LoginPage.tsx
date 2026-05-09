@@ -4,12 +4,14 @@ import api from '../lib/api';
 import { isAllowedRole } from '../lib/session';
 
 // Only honor a `next` redirect if it's a same-origin path. Reject empty,
-// protocol-relative (`//evil.com`), and absolute URLs to prevent open
-// redirect via `?next=`.
+// protocol-relative (`//evil.com`), absolute URLs, and anything containing a
+// backslash (some browsers normalize `\` → `/` in Location, opening a redirect
+// hole if a future contributor swaps `navigate(next)` for `window.location.href`).
 function sanitizeNext(raw: string | null): string {
   if (!raw) return '/dashboard';
   if (!raw.startsWith('/')) return '/dashboard';
   if (raw.startsWith('//')) return '/dashboard';
+  if (raw.includes('\\')) return '/dashboard';
   return raw;
 }
 
@@ -101,7 +103,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Signing in' : 'Sign in'}
           </button>
         </form>
       </div>

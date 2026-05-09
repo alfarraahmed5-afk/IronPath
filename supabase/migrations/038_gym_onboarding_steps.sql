@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS gym_onboarding_steps (
   gym_id        UUID         NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
   step_key      TEXT         NOT NULL,
   completed_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  completed_by  UUID         REFERENCES users(id),
+  completed_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
   metadata      JSONB,
   PRIMARY KEY (gym_id, step_key)
 );

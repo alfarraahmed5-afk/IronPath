@@ -10,8 +10,8 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Current state
 
-- **Phase:** A — Foundation (merged)
-- **Active unit:** Cross-team review pass next; Phase B kicks off after.
+- **Phase:** A — Foundation **complete** (merged + reviewed + Tier 1 fixes applied)
+- **Active unit:** Phase A ship gate met. Phase B (Super Admin Console v1) is next.
 - **Last updated:** 2026-05-09
 
 ---
@@ -25,10 +25,25 @@ Single source of truth for development progress on the platform plan. Read this 
 - [x] **Team 4 — Owner Settings + Subscription Pages** *(commit `2c45fe1`)*
 - [x] **Reconciliation** — routes wired, Lucide swap, PLATFORM_PLAN renumbered.
 
-### Phase A — remaining (orchestrator follow-up)
-- [ ] Build verification across admin / console / backend / shared
-- [ ] Cross-team review pass on the merged trunk
-- [ ] Haiku scribe polish pass on this log
+### Phase A — review pass results
+- [x] Build verification: backend, shared, admin, console all typecheck clean.
+- [x] Cross-team review: 4 reviewers (frontend integration, backend integration, security/RBAC, plan adherence).
+- [x] Haiku scribe polish pass.
+- [x] Tier 1 review fixes applied (see entry below).
+
+### Phase B carry-over backlog (Tier 2 — defer)
+- [ ] Rename admin localStorage keys to `ip_owner_*` per plan §7.4 (or amend plan).
+- [ ] Implement old-logo deletion on `PATCH /gyms/:id` per plan §6.6.
+- [ ] Re-key `refreshLimiter` off `refresh_token` hash (or user.id) instead of IP — NAT'd-office mass-logout risk.
+- [ ] Validate `logo_url` PATCH body is from `gym-assets` bucket (not arbitrary URL).
+- [ ] Allow `logo_url` PATCH to set `null` (currently only `.optional()` — can't clear logo).
+- [ ] CORS allowlist boot-time validation (no wildcards, both apex domains present).
+- [ ] Post-upload server-side MIME validation on logo blobs (Supabase signed-URL TTL is fixed at 2h).
+- [ ] De-duplicate `ONBOARDING_STEPS` between `backend/src/routes/gyms.ts` and `shared/types/index.ts` (build `@ironpath/shared` dist or use tsconfig path alias).
+- [ ] Harmonize admin/console `clearSessionAndRedirect` signatures — same name, different param meaning.
+- [ ] Widen admin `StoredUser.gym_id` to `string | null` to match console + DB reality.
+- [ ] Swap `📌` emoji in `admin/src/pages/AnnouncementsPage.tsx` for Lucide `Pin`.
+- [ ] Add `last_modified_by` to `gyms` before audit_log lands in Phase B.
 
 ### Phase B — Super Admin Console v1 (not started)
 ### Phase C — Onboarding & retention (not started)
@@ -41,35 +56,77 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-09 · Phase A review pass + Tier 1 fixes
+
+**4 cross-team reviewers + Haiku scribe ran in parallel on the merged trunk.** All four typechecks were clean before AND after this fix pass.
+
+**Tier 1 — applied (this commit):**
+- **CRITICAL** — Added `requireActiveUser` to `GET /gyms/:id` (`backend/src/routes/gyms.ts:123`). Suspended/deleted users were able to read gym profile until token expired.
+- **HIGH** — `app.set('trust proxy', 1)` in `backend/src/index.ts`. Without this, every IP-keyed limiter (refresh, auth, registration, default) collapses to the proxy IP behind Railway/Vercel — single user could DoS the team.
+- **HIGH** — Removed `/audit` and `/settings` from console NAV_LINKS (`console/src/components/Layout.tsx`). Routes don't exist; they were silently bouncing operators to `/gyms`.
+- **HIGH** — `Subscription.tier` widened to `Tier | null`; `tierLabel(null)` returns "No plan yet"; tier badge styles down when null. Backend may legitimately return null for trial gyms before sales picks a tier — this would have crashed the page.
+- **HIGH** — Backslash now rejected in `?next=` sanitizer (`admin/src/pages/LoginPage.tsx`). Benign today via react-router; defensive against future swaps to `window.location.href`.
+- **MED** — `SettingsPage` accent default + `forms.ts` example hex corrected from `#FF6A00` to brand `#FF6B35` (plan §3.2). Would have silently rebranded gyms with NULL accent on first save.
+- **MED** — Added `ON DELETE SET NULL` to FKs on `subscription_payments.recorded_by` and `gym_onboarding_steps.completed_by`. Inline comments said "nullable in case the user is deleted" but FKs defaulted to `NO ACTION` and would have blocked the delete.
+- **NIT** — Console nav icons now have `strokeWidth={1.75}` matching admin.
+- **NIT** — Admin LoginPage button copy: "Signing in..." / "Sign In" → "Signing in" / "Sign in" (plan §3.8: no ellipsis on progress text; sentence case).
+- **LOW** — `SettingsPage` timezone hint: "Phase 2" → "Phase C" (matches plan phase labels).
+
+**Tier 2 — moved to Phase B carry-over backlog above.** Read it before Phase B kickoff.
+
+**Plan amendment to §12.1 #15:** the "034_auth_hook must stay last" folklore is replaced by the rule "any migration mutating `public.users` or the auth hook must be sequenced after 034". Pure ALTERs on other tables (like `035_invite_options.sql`) are safe.
+
 ### 2026-05-09 · Phase A merged (4 team branches → trunk)
 
 **Merge order:** docs (`ee74b2a`) → Team 2 (`1cad3eb`) → Team 3 (`199a369`) → Team 1 (`b701b97`) → Team 4 (`19cedc0`).
 
-**Conflict resolutions:**
-- `docs/DEV_LOG.md` — kept HEAD across all three add/add conflicts (Teams 1, 3, 4 each created their own version because `docs/` was uncommitted in main when they forked). This unified entry replaces them.
-- `package-lock.json` — kept HEAD; regenerating root lockfile via `npm install`.
-- `admin/package.json` — git's ort strategy auto-merged Team 1's `lucide-react` and Team 4's `react-hook-form` + `zod` + `@hookform/resolvers` cleanly.
+**Conflicts resolved:**
+- `docs/DEV_LOG.md`: Kept HEAD across three add/add conflicts (Teams 1, 3, 4 each forked before `docs/` was committed). Unified here.
+- `package-lock.json`: Kept HEAD; regenerating via `npm install`.
+- `admin/package.json`: ort strategy auto-merged Team 1 (`lucide-react`) + Team 4 (`react-hook-form`, `zod`, `@hookform/resolvers`).
 
-**Team 1 (frontend safety + polish):** new `admin/src/lib/session.ts` (`StoredUser`, `readStoredUser`, `isAllowedRole`, `clearSession`, `clearSessionAndRedirect`, `signOut`) — single source for localStorage user reads. `api.ts` refactored: module-level `refreshPromise` coalesces concurrent 401s onto one `/auth/refresh`; `.finally()` clears cache post-settle; removed dead manual `Authorization` header on retry. `App.tsx` role-aware `ProtectedRoute` w/ `useLocation`-driven `?next=` capture and `clearSession()` on stale role. `Layout.tsx` Lucide nav (`LayoutDashboard`, `Users`, `Link2`, `Megaphone`, `Trophy`). `LoginPage.tsx` honors `?reason=session_expired` (neutral pill) and sanitized `?next=`. `DashboardPage.tsx` recharts `BarChart` (h=240, orange-500, gridless, dark-card tooltip with mono numbers). Added `lucide-react@^0.468.0`.
+**Team 1 — Frontend safety + polish:**
+- New `admin/src/lib/session.ts`: `StoredUser`, `readStoredUser`, `isAllowedRole`, `clearSession`, `clearSessionAndRedirect`, `signOut` (single source for localStorage user reads).
+- `api.ts`: Module-level `refreshPromise` coalesces concurrent 401s onto one `/auth/refresh`; `.finally()` clears cache; removed dead `Authorization` header on retry.
+- `App.tsx`: Role-aware `ProtectedRoute` with `useLocation`-driven `?next=` capture; `clearSession()` on stale role.
+- `Layout.tsx`: Lucide nav icons (`LayoutDashboard`, `Users`, `Link2`, `Megaphone`, `Trophy`).
+- `LoginPage.tsx`: Honors `?reason=session_expired` pill and sanitized `?next=`.
+- `DashboardPage.tsx`: recharts `BarChart` (height 240, orange-500, gridless, dark-card tooltip).
+- Added `lucide-react@^0.468.0`.
 
-**Team 2 (backend foundation):** migrations
-- `036_subscription_extras.sql` — `mrr_cents`, `phone`, `website`, `address`, `timezone`, `units_default`, `logo_url` on `gyms`. (`logo_url` was already on gyms from 001 — `IF NOT EXISTS` makes the add a no-op.)
-- `037_subscription_payments.sql` — payment ledger, FK to gyms (CASCADE) and users (no cascade), index `(gym_id, created_at DESC)`, CHECK `period_end >= period_start`.
-- `038_gym_onboarding_steps.sql` — composite PK `(gym_id, step_key)`, FKs, idx on gym_id.
+**Team 2 — Backend foundation:**
+- Migrations: `036_subscription_extras.sql` (gym extras: mrr_cents, phone, website, address, timezone, units_default, logo_url), `037_subscription_payments.sql` (payment ledger + indices), `038_gym_onboarding_steps.sql` (gym/step composite PK).
+- `rateLimit.ts`: `refreshLimiter` (30/15min IP) + `uploadLimiter` (10/min user/IP); applied to `/auth/refresh`.
+- `gyms.ts`: Extracts `ACCENT_COLOR_REGEX`; new routes `/subscription`, `/onboarding`, `/:stepKey/complete`, `/logo/upload-url` (uploadLimiter, 2MB PNG/JPEG/WebP).
+- `shared/types/index.ts`: Added `SUBSCRIPTION_TIERS`, `TIER_MEMBER_CAPS`, `ONBOARDING_STEPS`, `USER_ROLES`.
+- Authz: `super_admin` always; `gym_owner` only when `req.user.gym_id === req.params.id`; gym_id never from body.
+- Note: Backend re-declares shared constants (no `@ironpath/shared` dist build yet).
 
-`backend/src/middleware/rateLimit.ts` — `refreshLimiter` (30/15min IP-keyed, `Retry-After: 900`) + `uploadLimiter` (10/min, user.id || ip). `auth.ts` applies refreshLimiter to `POST /refresh`. `gyms.ts` extracts `ACCENT_COLOR_REGEX`; extends `PATCH /:id` schema; new `GET /:id/subscription`, `GET /:id/onboarding`, `POST /:id/onboarding/:stepKey/complete` (idempotent UPSERT), `POST /:id/logo/upload-url` (uploadLimiter, 2MB, png/jpeg/webp). `shared/types/index.ts` adds `SUBSCRIPTION_TIERS`, `TIER_MEMBER_CAPS`, `ONBOARDING_STEPS`, `USER_ROLES`. Authz model uniform: super_admin always; gym_owner only when `req.user.gym_id === req.params.id`; gym_id never from body. Backend re-declares shared constants inline because `@ironpath/shared` has no `dist/` build (TODO).
+**Team 3 — Console scaffold:**
+- New `console/` workspace (port 5174): `package.json`, `vite.config.ts` (/api proxy), `tsconfig*.json`, `tailwind.config.js` (cyan `#22D3EE`, canvas `#0A0A0B`, dark mode), `postcss.config.js`, `.env.example`, `vercel.json`.
+- `main.tsx`: Wires `QueryClientProvider`.
+- `lib/api.ts`: Mirrors admin pattern with `ip_console_*` storage and stub `impersonationApi`.
+- `lib/session.ts`: Enforces `super_admin`-only.
+- `Layout.tsx`: Cyan sidebar with Lucide nav (`Inbox`, `Kanban`, `Building2`, `LineChart`, `History`, `Settings`); top status bar.
+- Routes: `/login`, `/inbox`, `/pipeline`, `/gyms`, `/analytics`; default `/` → `/gyms`.
+- `LoginPage.tsx`: "Operator access required"; placeholder pages with Lucide empty states.
+- Root `package.json`: Added `console` to workspaces + `dev:console`/`build:console` scripts.
+- **shadcn/ui note:** Hand-rolled Tailwind v1; CLI deferred to Phase B.
+- Build: 244 kB JS / 42 kB CSS pre-gzip.
 
-**Team 3 (console scaffold):** new `console/` workspace at port 5174 — `package.json` (Node 20 pinned), `vite.config.ts` (/api proxy), `tsconfig*.json`, `tailwind.config.js` (cyan brand `#22D3EE`, `canvas` `#0A0A0B`, `ink-*` neutrals, Inter + JetBrains Mono, `darkMode: 'class'`), `postcss.config.js`, `index.html`, `.env.example`, `.gitignore`, `vercel.json`. `main.tsx` wires `QueryClientProvider`. `lib/api.ts` mirrors admin pattern with `ip_console_*` namespaced storage and stub `impersonationApi` for Phase D. `lib/session.ts` enforces `super_admin`-only. `Layout.tsx` cyan-active sidebar with Lucide nav (`Inbox`, `Kanban`, `Building2`, `LineChart`, `History`, `Settings`) and top status bar. Routes `/login`, `/inbox`, `/pipeline`, `/gyms`, `/analytics`, `/` → `/gyms`. Operator `LoginPage.tsx` ("Operator access required"). Placeholder pages with Lucide empty states. Root `package.json` adds `console` to workspaces + `dev:console`/`build:console` scripts. **shadcn/ui decision:** hand-rolled Tailwind primitives for v1; CLI integration deferred to Phase B alongside the Gyms data table. `npm run build --workspace=console` produces clean dist (244 kB JS / 42 kB CSS pre-gzip).
+**Team 4 — Settings + Subscription pages:**
+- New `SettingsPage.tsx`: Six cards — Profile (RHF + zod, fading "Saved"), Branding (3-step upload: sign → PUT → PATCH), Contact, Invite code (copy-to-clipboard), Coach roster, Danger zone (all placeholders).
+- New `SubscriptionPage.tsx`: Five cards — Current plan (tier, status, usage/unlimited, countdown), MRR, Upgrade tiers, Invoices, Data export (placeholders).
+- New `lib/forms.ts`: `zodResolver`/`z` re-exports, `extractError`, `getStoredGymId`, `accentColorSchema`, `optionalUrl`.
+- Added `react-hook-form`, `zod`, `@hookform/resolvers`.
 
-**Team 4 (Settings + Subscription pages):** new `SettingsPage.tsx` — six cards: Profile (RHF + zod, fading "Saved"), Branding (3-step upload: sign → PUT signed URL via fetch → PATCH `logo_url`), Contact (phone/website/address/timezone/units), Invite code (loads from `GET /admin/invites`, copy-to-clipboard), Coach roster + Danger zone placeholders. New `SubscriptionPage.tsx` — five cards: Current plan (tier badge, status pill, member usage bar or "Unlimited", trial countdown), MRR (mono `$XX.XX/mo`), Upgrade (three tiers, current ringed in orange, mailto:sales placeholder), Invoices empty, Data export placeholder. New `lib/forms.ts` — `zodResolver`/`z` re-exports, `extractError`, `getStoredGymId`, `accentColorSchema`, `optionalUrl`. Added `react-hook-form`, `zod`, `@hookform/resolvers`.
-
-**Reconciliation (orchestrator inline after merge):**
-- Wired `/settings` and `/subscription` routes in `admin/src/App.tsx` — Team 1's brief omitted this (my drafting error; Team 4's brief mentioned it, Team 1's didn't).
-- Added Settings (`SettingsIcon`) and Subscription (`CreditCard`) nav links to `admin/src/components/Layout.tsx`.
-- Swapped Team 4's three `•••` placeholders for Lucide icons: `KeyRound` (no-invite empty state in SettingsPage), `UserPlus` (coach roster placeholder), `FileText` (no-invoices empty state in SubscriptionPage). Team 4 couldn't install lucide-react (out of scope); Team 1 did, so the swap was trivial post-merge.
-- Renumbered planned migrations across `PLATFORM_PLAN.md` §6.4 / §11 / §16: 035→036, 036→037, …, 042→043. `035_invite_options.sql` already lives in the repo.
-- Revised gotcha #15 in §12.1: rule is **not** "034 must be last" — it's "any migration mutating `public.users` or the auth hook must be sequenced after 034". Pure ALTER on other tables is fine.
-- `gym_id-in-localStorage` worry from Team 4 was a false alarm: `/auth/login` returns `gym_id` in the user object (`backend/src/routes/auth.ts:123`), and `LoginPage` already stores the whole user via `JSON.stringify(user)`. No fix needed.
+**Reconciliation (orchestrator post-merge):**
+- Wired `/settings` and `/subscription` routes in `admin/src/App.tsx` (Team 1 brief omitted; Team 4 mentioned).
+- Added nav links: Settings (`SettingsIcon`) and Subscription (`CreditCard`) in `admin/src/components/Layout.tsx`.
+- Swapped Team 4's `•••` placeholders for Lucide: `KeyRound` (invite empty), `UserPlus` (coach roster), `FileText` (invoices).
+- Renumbered migrations in `PLATFORM_PLAN.md` §6.4/§11/§16: 035→036, 036→037, …, 042→043. `035_invite_options.sql` already in repo.
+- Revised PLATFORM_PLAN.md §12.1 gotcha #15: Rule is "any migration mutating `public.users` or auth hook must sequence after 034", not "034 must be last". Pure ALTERs on other tables are safe.
+- Verified `gym_id` in localStorage: `/auth/login` returns it; `LoginPage` stores full user object. No fix needed.
 
 ### 2026-05-09 · Pivot to 4 parallel teams
 - User clarified intent: 4 teams = 4 features built in parallel (each team = multi-specialist unit on its own feature),

@@ -120,7 +120,7 @@ router.post('/', gymRegistrationLimiter, async (req: Request, res: Response, nex
 });
 
 // GET /gyms/:id
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
     const gymId = req.params.id;

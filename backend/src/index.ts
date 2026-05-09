@@ -28,6 +28,12 @@ import { startJobs, initJobs } from './jobs/index';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// Trust the first hop proxy (Railway / Vercel-style edge) so req.ip resolves to the
+// real client address instead of the proxy. Without this, every IP-keyed limiter
+// (authLimiter, refreshLimiter, gymRegistrationLimiter, inviteLimiter, default
+// rateLimiter) collapses to the proxy IP and one user can DoS everyone behind it.
+app.set('trust proxy', 1);
+
 const corsOptions = {
   origin: (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim()),
   credentials: true,

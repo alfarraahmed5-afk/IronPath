@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS subscription_payments (
   period_start  DATE         NOT NULL,
   period_end    DATE         NOT NULL,
   note          TEXT,
-  recorded_by   UUID         REFERENCES users(id),
+  recorded_by   UUID         REFERENCES users(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT subscription_payments_period_valid CHECK (period_end >= period_start)
 );
