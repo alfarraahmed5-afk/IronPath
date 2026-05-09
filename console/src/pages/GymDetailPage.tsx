@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, FileText, ListChecks } from 'lucide-react';
+import { ArrowLeft, FileText, ListChecks, Pencil } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
 import Pill, { statusTone, tierTone } from '../components/Pill';
+import SubscriptionEditor from '../components/SubscriptionEditor';
 import { useGymQuery, useGymAuditQuery } from '../lib/queries';
 import { ONBOARDING_STEP_KEYS } from '../lib/constants';
 
@@ -19,6 +21,7 @@ export default function GymDetailPage() {
   const { gymId } = useParams<{ gymId: string }>();
   const { data, isLoading, isError } = useGymQuery(gymId);
   const { data: auditPage } = useGymAuditQuery(gymId);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   if (isLoading) {
     return <div className="space-y-3"><div className="h-8 w-1/3 bg-ink-800 rounded animate-pulse" /><div className="h-32 bg-ink-800 rounded animate-pulse" /></div>;
@@ -80,9 +83,31 @@ export default function GymDetailPage() {
           <Field label="MRR" value={gym.mrr_cents ? `$${(gym.mrr_cents / 100).toFixed(2)}/mo` : '—'} mono />
           <Field label="Trial started" value={formatDate(gym.trial_started_at)} mono />
           <Field label="Expires" value={formatDate(gym.subscription_expires_at)} mono />
-          <p className="mt-3 text-[11px] text-ink-400">Edit modal lands in the next iteration. PATCH the API directly via curl in the meantime.</p>
+          <button
+            type="button"
+            onClick={() => setEditorOpen(true)}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-500 hover:bg-brand-600 text-ink-950 text-xs font-medium transition-colors"
+          >
+            <Pencil size={12} strokeWidth={1.75} />
+            Edit subscription
+          </button>
         </Card>
       </div>
+
+      {gymId && (
+        <SubscriptionEditor
+          open={editorOpen}
+          onClose={() => setEditorOpen(false)}
+          gymId={gymId}
+          gymName={gym.name}
+          current={{
+            tier: (gym.subscription_tier as 'starter' | 'growth' | 'unlimited' | null) ?? null,
+            status: (gym.subscription_status as 'trial' | 'active' | 'expired' | 'cancelled' | null) ?? null,
+            expires_at: gym.subscription_expires_at,
+            mrr_cents: gym.mrr_cents ?? null,
+          }}
+        />
+      )}
 
       <Card title={`Onboarding (${completedCount} / ${ONBOARDING_STEP_KEYS.length})`} icon={ListChecks}>
         <ul className="space-y-1.5 text-sm">

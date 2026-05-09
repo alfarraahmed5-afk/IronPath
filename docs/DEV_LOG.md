@@ -56,6 +56,25 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-09 · Phase B v1.1 — subscription editor modal
+
+Inline implementation (skipped worktree-isolated agents to dodge the stall pattern that hit the last two Phase B batches).
+
+**New files:**
+- `console/src/components/Modal.tsx` — portal-mounted dialog. Backdrop click closes; ESC closes (capturing, so it can't be eaten by inputs); focus trap cycles through focusables on Tab/Shift+Tab; locks body scroll; restores focus to the trigger on unmount. Optional `initialFocusRef` for explicit first-focus (e.g. tab list); `size: 'md' | 'lg'`.
+- `console/src/components/SubscriptionEditor.tsx` — three-tab editor (`Update plan` / `Mark paid` / `Extend trial`). Each tab is its own RHF + zod form so state resets cleanly when switching tabs.
+  - **Update plan** — tier, status, expires_at (datetime-local, converted to ISO on submit), MRR (USD dollars input → `dollarsToCents`). Diffs against current values; sends only changed fields. Refuses no-op submits.
+  - **Mark paid** — amount (USD), period_start, period_end (date inputs, YYYY-MM-DD wire format). End-≥-start refine. Note optional, max 500.
+  - **Extend trial** — quick-pick chips (+7 / +14 / +30) plus numeric override 1–90. Reason required, 3–500 chars.
+  - All three forms close the modal on success; mutations already invalidate `['gym', gymId]` + `['gyms']`.
+
+**Wiring:**
+- `console/src/pages/GymDetailPage.tsx` — replaced the "Edit modal lands in the next iteration" footnote with a Lucide `Pencil` button that opens `<SubscriptionEditor>`. Seeds `current` from the live `useGymQuery` payload.
+
+**Verified:** `npx tsc -p console/tsconfig.json --noEmit` clean, `npm run -w console build` clean (440 kB JS / 50 kB CSS pre-gzip).
+
+**Next:** convert `GymDetailPage` flat cards to nested-route tabs (Overview / Subscription / Audit / Onboarding) per plan §5.5, then run cross-team review on Phase B v1 + v1.1.
+
 ### 2026-05-09 · Phase B kickoff stalled (worktree fork-base gotcha) → recovered
 
 First Phase B kickoff failed because `Agent({ isolation: "worktree" })` forks from local `master`, not from the currently checked-out feature branch. All four B teams' worktrees forked from `79066d9` (pre-Phase-A master) — three aborted ("console/ doesn't exist"); B4 produced admin-only Sentry + polish work against the wrong base, but salvageable.
