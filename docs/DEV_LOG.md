@@ -77,6 +77,43 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-09 · Root folder cleanup (4-agent triage)
+
+Spawned 4 parallel agents (read-only) to audit the repo root: stale docs, build artifacts, gitignore + secrets, top-level structure. Findings synthesized and approved by user.
+
+**Deleted (fully superseded):**
+- `GymApp_Technical_Specification.md` (v1)
+- `GymApp_Technical_Specification_v2.md`
+- `GymApp_Technical_Specification_v3.md`
+- `test_out.txt` (was already gitignored, just stray on disk)
+- `backend/migrations/Documents - Shortcut.lnk` (untracked Windows shortcut)
+- `backend/migrations/` empty folder removed after move
+
+**Moved (preserve content, declutter root):**
+- `GymApp_Technical_Specification_v4.md` → `docs/archive/`
+- `GymApp_Technical_Specification_v5.md` → `docs/archive/` *(still authoritative for mobile-app Phases 1–7)*
+- `PROGRESS.md` → `docs/archive/` *(frozen at 2026-04-24 "All 10 Phases Done"; superseded by this DEV_LOG)*
+- `DEPLOY_GUIDE.md` → `docs/`
+- `Screenshots-claude/` → `docs/screenshots/` *(mobile UI design reference, indexed in `docs/screenshots/README.md`)*
+- `backend/migrations/{challenge-enrollment,profile-features,routine-sharing}.sql` → `docs/archive/historical-migrations/` *(already applied to production manually; kept for fresh-bootstrap reference, indexed in `docs/archive/README.md`)*
+
+**`.gitignore` hardened:** added defensive patterns to prevent future accidents — `.env.production`, `.env.staging`, `.env.development`, `.env.*.local`, `.env.backup`, `.env.bak`, `*.key`, `*.lnk`, `serviceAccount*.json`, `firebase-adminsdk-*.json`, `.aws/`, `aws-credentials*`. Closes the gap the secrets-audit agent flagged.
+
+**Audit notes (no action taken):**
+- `mobile/eas.json` contains the production Supabase URL + anon JWT in plaintext across all build profiles. The anon key is designed to be public (RLS-gated), so this is low-severity URL fingerprinting only — not a leak. Migrating to EAS secrets is a future hardening item, not a fix.
+- `specs/` is gitignored (local-only, 15 phase-spec files) — left alone.
+- `.idea/` is gitignored — left alone.
+
+**Ideal root layout achieved (matches structure-auditor's recommendation):**
+```
+admin/  backend/  console/  mobile/  shared/
+docs/        # DEV_LOG, PLATFORM_PLAN, DEPLOY_GUIDE, archive/, screenshots/
+supabase/    # single source of truth for migrations
+.claude/  .gitignore  package.json  package-lock.json
+```
+
+**Next:** Phase B.5 work (2FA for super_admin login is the highest-value pickup).
+
 ### 2026-05-09 · Phase B v1 shipped to staging (console + admin live)
 
 PR #1 merged to master (`39be22d`). Walked the founder through end-to-end deploy: Vercel admin redeploy, new Vercel `iron-path-console` project, Railway CORS update, Supabase migration application. Console live at https://iron-path-console.vercel.app, admin at https://iron-path-admin.vercel.app, backend at https://backend-production-f43b.up.railway.app/api/v1.

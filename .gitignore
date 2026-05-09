@@ -12,10 +12,24 @@ build/
 # Environment variables — NEVER commit real secrets
 .env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.staging
+.env.production
 .env.production.local
+.env.*.local
+.env.backup
+.env.bak
 *.local
+
+# Service account keys / private keys
+*.key
+serviceAccount*.json
+firebase-adminsdk-*.json
+.aws/
+aws-credentials*
 
 # Apple / iOS credentials
 *.p8
@@ -39,6 +53,7 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+*.lnk
 
 # Editor
 .vscode/
