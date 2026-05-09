@@ -16,6 +16,10 @@ export interface StoredUser {
   role?: string;
   gym_id?: string | null;
   gym_name?: string | null;
+  // Phase B.5 — TOTP enrollment state for super_admin. Stored after login (or
+  // /2fa/confirm) so the route guard can decide whether to push the operator
+  // to the enrollment wizard before they can see anything else.
+  totp_enabled?: boolean;
 }
 
 export function readStoredUser(): StoredUser | null {
@@ -38,6 +42,17 @@ export function isAuthorized(): boolean {
   const user = readStoredUser();
   if (!user?.role) return false;
   return (ALLOWED_ROLES as readonly string[]).includes(user.role);
+}
+
+/**
+ * `needsTotpEnrollment` — true when the operator is signed in but has not yet
+ * completed TOTP enrollment. The /2fa/setup route is the only authenticated
+ * destination they can reach until they finish.
+ */
+export function needsTotpEnrollment(): boolean {
+  const user = readStoredUser();
+  if (!user) return false;
+  return user.totp_enabled !== true;
 }
 
 export function clearSession(): void {

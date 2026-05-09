@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { authLimiter, refreshLimiter } from '../middleware/rateLimit';
 import { requireActiveUser } from '../middleware/requireActiveUser';
+import { CHALLENGE_TTL_SECONDS, generateChallengeToken, hashChallengeToken } from '../lib/twoFactor';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -110,17 +112,54 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return next(new AppError('UNAUTHORIZED', 401, 'Invalid email or password'));
     const { data: user } = await supabase.from('users')
-      .select('id, email, username, full_name, avatar_url, role, gym_id, is_active, deleted_at')
+      .select('id, email, username, full_name, avatar_url, role, gym_id, is_active, deleted_at, totp_enabled_at')
       .eq('id', data.user.id).single();
     if (!user) return next(new AppError('UNAUTHORIZED', 401, 'User account not found'));
     if (user.deleted_at) return next(new AppError('FORBIDDEN', 403, 'Account removed'));
     if (!user.is_active) return next(new AppError('FORBIDDEN', 403, 'Account suspended'));
+
+    const totpEnabled = Boolean(user.totp_enabled_at);
+
+    // Phase B.5: super_admins with 2FA enrolled must clear a TOTP challenge
+    // before the Supabase session is returned. We stash the freshly-minted
+    // tokens in super_admin_2fa_challenges with a 5-min TTL; /auth/2fa/verify
+    // looks them up by hashed challenge_token, validates the TOTP/recovery
+    // code, then vends them. Plan §8.1 #1, §12.4 #4.
+    if (user.role === 'super_admin' && totpEnabled) {
+      const challengeToken = generateChallengeToken();
+      const expiresAt = new Date(Date.now() + CHALLENGE_TTL_SECONDS * 1000).toISOString();
+      const { error: chErr } = await supabase.from('super_admin_2fa_challenges').insert({
+        user_id: user.id,
+        challenge_token_hash: hashChallengeToken(challengeToken),
+        access_token: data.session!.access_token,
+        refresh_token: data.session!.refresh_token,
+        ip: req.ip ?? null,
+        user_agent: req.headers['user-agent'] ?? null,
+        expires_at: expiresAt,
+      });
+      if (chErr) {
+        logger.error({ err: chErr, user_id: user.id }, '2FA challenge insert failed');
+        return next(new AppError('INTERNAL', 500, 'Could not initiate 2FA challenge'));
+      }
+      return res.json({
+        data: {
+          requires_2fa: true,
+          challenge_token: challengeToken,
+          expires_in: CHALLENGE_TTL_SECONDS,
+        },
+      });
+    }
+
     await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', user.id);
     res.json({
       data: {
         access_token: data.session!.access_token,
         refresh_token: data.session!.refresh_token,
-        user: { id: user.id, email: user.email, username: user.username, full_name: user.full_name, avatar_url: user.avatar_url, role: user.role, gym_id: user.gym_id },
+        user: {
+          id: user.id, email: user.email, username: user.username, full_name: user.full_name,
+          avatar_url: user.avatar_url, role: user.role, gym_id: user.gym_id,
+          totp_enabled: totpEnabled,
+        },
       },
     });
   } catch (err) { next(err); }

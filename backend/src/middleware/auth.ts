@@ -23,6 +23,10 @@ const PUBLIC_PATH_RES: { method?: string; re: RegExp }[] = [
   { re: /^\/api\/v1\/auth\/forgot-password\/?(\?.*)?$/ },
   { re: /^\/api\/v1\/auth\/reset-password\/?(\?.*)?$/ },
   { re: /^\/api\/v1\/auth\/refresh\/?(\?.*)?$/ },
+  // Phase B.5: TOTP challenge exchange runs before any session exists. Only
+  // POST /auth/2fa/verify is public — the super_admin enroll/confirm/disable
+  // endpoints sit under /super-admin/2fa and require an active session.
+  { method: 'POST', re: /^\/api\/v1\/auth\/2fa\/verify\/?(\?.*)?$/ },
   { re: /^\/api\/v1\/gyms\/validate-invite\/?(\?.*)?$/ },
   { method: 'POST', re: /^\/api\/v1\/gyms\/?(\?.*)?$/ },
   // Public lead capture: only POST /api/v1/leads is unauthenticated. The

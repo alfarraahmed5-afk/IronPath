@@ -45,11 +45,19 @@ Single source of truth for development progress on the platform plan. Read this 
 - [x] Add `last_modified_by` to `gyms` before audit_log lands in Phase B. *(migration 041)*
 
 ### Phase B.5 — prod-ship blockers (NEW, before any real customer touches prod)
-- [ ] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *security council vote flagged this; staging-only until merged.*
+- [x] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *landed 2026-05-10. Migration 043 + backend twoFactor router + console enroll page + login state machine.*
 - [ ] **Rotate Supabase legacy JWT secret** (anon + service_role) — service_role was leaked in client bundle for 15 days (2026-04-24 → 2026-05-09); user opted to defer rotation since console URL was never shared. Rotate before first paying customer.
 - [ ] **Manual gym creation: orphaned-auth-user reconciliation cron** — when `auth.admin.deleteUser` rollback fails, an `auth.users` row leaks with no `public.users` peer. Spotted as a real failure mode during deploy debug.
 - [ ] **Pre-deploy schema-drift check** — production was missing migrations 036–042 despite the code shipping months ago. CI (or a `predeploy` hook) should diff `information_schema.columns` against the migrations directory and fail loudly if drift exists.
 - [ ] **PATCH `/super-admin/gyms/:id/subscription` error message** — the SELECT-fails-or-no-rows branch at `superAdmin.ts:202` collapses both into "Gym not found", which masks real DB errors. Split into "Gym not found" (404) vs "Database error" (500); log the underlying `readErr` either way.
+
+### Phase B.5 follow-ups (Tier 2 — not blockers, file alongside the others)
+- [ ] **TOTP secret encryption-at-rest** — migration 043 stores `users.totp_secret` as plaintext base32. The DB is service-role-gated, but pgcrypto/Supabase Vault encryption is the right destination. Bundle with the JWT-secret rotation work.
+- [ ] **Stale-challenge cleanup cron** — `super_admin_2fa_challenges` rows accumulate forever past their 5-min TTL. A nightly `DELETE WHERE expires_at < now() - interval '1 day'` keeps the table bounded.
+- [ ] **Per-route 2FA-verify limiter** — `/auth/2fa/verify` currently shares `authLimiter` (5/15min/IP) with /login. A user who fat-fingers 4 codes then logs out can hit the limit. A dedicated 10/15min/IP limiter would be friendlier without weakening brute-force protection meaningfully.
+- [ ] **Login-event email alerts** (plan §8.2) — email the operator on every super_admin login (time, IP, device). Pairs naturally with the audit-log entries we already write on 2fa.login.
+- [ ] **IP allowlist for super_admin** (plan §8.2, §8.1 #1) — second factor against credential theft; defer until multi-operator workflow exists.
+- [ ] **Shorter session timeout for super_admin** (plan §8.2: 15–30 min vs 24h owners) — the access token TTL is set by Supabase auth config, not the backend; a follow-up might mint a separate short-lived JWT chain for super_admin.
 
 ### Phase B v1 review carry-over (Tier 2)
 - [ ] Manual gym creation: orphaned-auth-user reconciliation cron when `auth.admin.deleteUser` rollback fails (backend HIGH).
@@ -76,6 +84,44 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-10 · Phase B.5 #1 — TOTP 2FA for super_admin login
+
+Closes the highest-value Phase B.5 prod-ship blocker (plan §8.1 #1, §8.2,
+§12.4 #4). One compromised super_admin credential previously exposed every
+gym; from this commit, super_admin login requires a TOTP code or a one-time
+recovery code in addition to the password.
+
+**Migration 043 (`043_super_admin_2fa.sql`):**
+- `ALTER TABLE public.users ADD COLUMN totp_secret TEXT, totp_enabled_at TIMESTAMPTZ` — both nullable so existing rows aren't disturbed; the per-user gate fires on `totp_enabled_at IS NOT NULL`.
+- `super_admin_recovery_codes` table — `(user_id, code_hash, used_at, created_at)`, UNIQUE(user_id, code_hash). Codes are sha256-hashed before insert; raw codes shown to the operator exactly once at enrollment.
+- `super_admin_2fa_challenges` table — bridges password-success → TOTP-success. Holds the freshly-minted Supabase access/refresh tokens for ≤5 min, keyed by sha256(challenge_token). The raw challenge_token is the bearer the client holds; only its hash sits on disk.
+- Sequencing: migration 043 mutates `public.users` so it lives after 034 per plan §12.1 #15. Auth hook only reads `gym_id` + `role`, so the two new columns don't affect token claim generation.
+
+**Backend:**
+- `lib/twoFactor.ts` — TOTP enrollment + verification (`otplib@12`), 8-char hex recovery codes (sha256-hashed), 32-byte hex challenge tokens, `safeEqualHex` constant-time compare. Server-side QR generation via `qrcode` returns a data URL so the console doesn't need a client-side QR dep.
+- `routes/twoFactor.ts` — two routers in one file:
+  - `authTwoFactorRouter` mounted at `/api/v1/auth/2fa` (PUBLIC_PATHS-listed) — POST `/verify` exchanges `{challenge_token, totp_code | recovery_code}` for the held Supabase session; consumes the challenge atomically with `is consumed_at null` to defeat double-submit races; writes a `2fa.login` (or `2fa.login_recovery_code`) audit row.
+  - `superAdminTwoFactorRouter` mounted at `/api/v1/super-admin/2fa` (`requireActiveUser` + `requireSuperAdmin`) — `GET /status`, `POST /enroll` (returns secret + otpauth URL + QR data URL, does NOT persist), `POST /confirm` (validates TOTP against echo'd secret, persists, regenerates 10 recovery codes, returns them once), `POST /disable` (re-auth gate via current TOTP), `POST /recovery-codes/regenerate` (re-auth gate via current TOTP).
+- `routes/auth.ts` POST `/login` — when the authenticated user is `super_admin` AND `totp_enabled_at IS NOT NULL`, the response is `{requires_2fa: true, challenge_token, expires_in: 300}` instead of the session bundle. Otherwise the response gains a `totp_enabled` boolean on the user payload so the console can route to enrollment on first login.
+- `middleware/auth.ts` PUBLIC_PATHS — added anchored regex for `POST /api/v1/auth/2fa/verify`.
+- `index.ts` — mounts `authTwoFactorRouter` BEFORE `authRouter` so a future catch-all on the auth router can't shadow it; mounts `superAdminTwoFactorRouter` BEFORE `superAdminRouter` for the same reason.
+
+**Console:**
+- `pages/LoginPage.tsx` — rewritten as a two-step state machine: `'credentials'` → `'totp'`. The TOTP step has a "Use recovery code" toggle and "Restart sign-in" escape hatch. After verify, totp_enabled is stored on the user object and the operator routes to `/gyms`.
+- `pages/EnrollTOTPPage.tsx` (new, mounted at `/2fa/setup`) — three stages: load enrollment → scan QR + enter 6-digit code → save recovery codes (gated by an explicit "I have saved" checkbox before "Continue to console"). Recovery codes are displayed in a 2-col mono grid with a one-click "copy all".
+- `lib/session.ts` — `StoredUser.totp_enabled` field + `needsTotpEnrollment()` helper.
+- `App.tsx` — `ProtectedRoute` redirects to `/2fa/setup` when authorized but unenrolled; new `EnrollGate` wraps `/2fa/setup` and bounces already-enrolled operators to `/gyms` so the route can't be used as a re-enrollment shortcut without re-auth.
+
+**Threat-model notes (deferred, logged in Phase B.5 follow-ups above):** TOTP secret stored plaintext at rest (encryption bundled with JWT rotation), challenge rows accumulate past TTL (cleanup cron deferred), `/auth/2fa/verify` shares `authLimiter` with `/login` (dedicated limiter deferred), no email alerts on login (deferred).
+
+**Existing-user rollout:** existing super_admin sessions before this code deploys have no `totp_enabled` flag in localStorage; on next page load `needsTotpEnrollment` returns true and they're forced through `/2fa/setup`. Existing accounts created via `seed:admin` start with `totp_enabled_at IS NULL` so first login returns the no-2FA branch with `totp_enabled: false`, then the same forced-enrollment flow applies. No backfill required; no breakage.
+
+**Verified:** `npm run -w backend build` clean. `npm run -w console build` clean (456 kB JS / 51 kB CSS pre-gzip — +10 kB JS for the LoginPage state machine + EnrollTOTPPage). `otplib` initially installed at `^13` which has a different functional API; pinned to `^12` for the legacy `authenticator` singleton.
+
+**Deploy order (must be exactly this):** migration 043 → backend redeploy (Railway picks up new login response shape + 2FA endpoints) → console redeploy. Inverting the order breaks the login SELECT (missing `totp_enabled_at` column) for ~minutes.
+
+**Next:** four remaining Phase B.5 blockers (JWT secret rotation, orphaned-auth-user cron, pre-deploy schema-drift check, superAdmin.ts:202 error-message split) can stack into one PR.
 
 ### 2026-05-09 · Root folder cleanup (4-agent triage)
 

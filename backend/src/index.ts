@@ -24,6 +24,7 @@ import adminRouter from './routes/admin';
 import trainerRouter from './routes/trainer';
 import duelsRouter from './routes/duels';
 import superAdminRouter from './routes/superAdmin';
+import { authTwoFactorRouter, superAdminTwoFactorRouter } from './routes/twoFactor';
 import leadsRouter from './routes/leads';
 import { startJobs, initJobs } from './jobs/index';
 
@@ -70,6 +71,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Mount the public 2FA verify route BEFORE the main auth router so there is no
+// chance the auth router accidentally shadows it via a future catch-all.
+app.use('/api/v1/auth/2fa', authTwoFactorRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/gyms', gymsRouter);
 app.use('/api/v1/users', usersRouter);
@@ -85,6 +89,7 @@ app.use('/api/v1/follow-requests', followRequestsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/push-tokens', pushTokensRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/super-admin/2fa', superAdminTwoFactorRouter);
 app.use('/api/v1/super-admin', superAdminRouter);
 app.use('/api/v1/leads', leadsRouter);
 app.use('/api/v1/trainer', trainerRouter);

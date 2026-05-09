@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import EnrollTOTPPage from './pages/EnrollTOTPPage';
 import GymsPage from './pages/GymsPage';
 import GymDetailPage from './pages/GymDetailPage';
 import GymsNewPage from './pages/GymsNewPage';
@@ -11,11 +12,21 @@ import InboxPage from './pages/InboxPage';
 import PipelinePage from './pages/PipelinePage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import Layout from './components/Layout';
-import { isAuthorized } from './lib/session';
+import { isAuthorized, needsTotpEnrollment } from './lib/session';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthorized()) return <Navigate to="/login" replace />;
+  // Phase B.5: super_admin without TOTP cannot reach any operational page.
+  // The /2fa/setup route handles its own authorization gate so it doesn't
+  // bounce in a loop.
+  if (needsTotpEnrollment()) return <Navigate to="/2fa/setup" replace />;
   return <Layout>{children}</Layout>;
+}
+
+function EnrollGate({ children }: { children: React.ReactNode }) {
+  if (!isAuthorized()) return <Navigate to="/login" replace />;
+  if (!needsTotpEnrollment()) return <Navigate to="/gyms" replace />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -23,6 +34,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/2fa/setup" element={<EnrollGate><EnrollTOTPPage /></EnrollGate>} />
 
         <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
         <Route path="/pipeline" element={<ProtectedRoute><PipelinePage /></ProtectedRoute>} />
