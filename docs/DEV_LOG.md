@@ -92,6 +92,23 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · PR-fix — admin LoginPage 2FA-shape regression + drop super_admin from ALLOWED_ROLES
+
+Hot-fix for a regression I introduced with yesterday's TOTP 2FA work. When a super_admin with 2FA enrolled hits `POST /auth/login`, the backend returns `{requires_2fa: true, challenge_token, expires_in}` — no `user` object. The console LoginPage was updated to handle that shape; the **admin LoginPage was not**, so it destructured `{ access_token, refresh_token, user }` to all undefined, then `isAllowedRole(undefined)` returned false and surfaced the wrong-reason "Admin access required." error. Founder hit this when trying to log into admin with their super_admin account today.
+
+**Changes:**
+- `admin/src/lib/session.ts` — `ALLOWED_ROLES` dropped from `['gym_owner', 'super_admin']` to `['gym_owner']`. Plan §6.1 / §8.1 #3 explicitly route super_admin through `/super-admin/*` via the console; the admin allowlist had drifted. The Phase A Tier 1 entry already removed super_admin from the **backend** `/admin/*` allowlist; this commit closes the front-end half of that cleanup.
+- `admin/src/pages/LoginPage.tsx` — handles three branches now:
+  - `data.requires_2fa === true` → "This account uses the operator console — sign in at https://iron-path-console.vercel.app"
+  - `user.role === 'super_admin'` → "Super admin accounts sign in at https://iron-path-console.vercel.app"
+  - any other non-`gym_owner` role → "Gym owner access required."
+
+The console URL is hard-coded for now via a `CONSOLE_URL` const at the top of the file; future move to `import.meta.env.VITE_CONSOLE_URL` when we have more environments.
+
+**Verified:** `npm run -w admin build` clean; bundle 771 kB → 771.71 kB pre-gzip (negligible).
+
+**Why no PR for super_admin testing the admin panel:** the council voted Q2=C (lightweight "preview as owner" mint in the console, opens admin in new tab with a gym_owner-scoped session). That's the next PR. This PR-fix just gives super_admin a clear redirect message in the meantime; it doesn't enable any new testing path on its own.
+
 ### 2026-05-10 · Admin design overhaul PR1 — substrate (5-agent council outcome)
 
 User asked the 5-agent council (Visual designer, Motion designer, Frontend impl engineer, UX/IA strategist, Creative director) for a redesign of the admin panel after calling the current design "basic and bland." Convergent recommendations across all agents: shadcn substrate + cn() helper, framer-motion via LazyMotion, Linear-style sliding nav pill, "forged dark" surface ladder, JetBrains Mono numerics, Whoop+Linear inspiration, Dashboard / Members / Announcements as the three highest-leverage pages, /grow left structurally + elevated visually. Reconciled into a 4-PR sequence (PR1 foundation → PR2 Dashboard hero → PR3 Grow rebuild → PR4+ per-page polish). User approved PR1 scope and authorized sourcing photography from the web (PR2 work). **This commit ships PR1 — no visual revolution yet, just the substrate everything else compounds on.**

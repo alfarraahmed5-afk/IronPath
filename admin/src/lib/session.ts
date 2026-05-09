@@ -13,7 +13,11 @@ export interface StoredUser {
   role?: string;
 }
 
-export const ALLOWED_ROLES = ['gym_owner', 'super_admin'] as const;
+// Plan §6.1 / §8.1 #3: super_admin operates via /super-admin/* through the
+// operator console. They access /admin/* only via impersonation (Phase D
+// full flow, or the lightweight "preview as owner" mint coming next), which
+// vends a *gym_owner-scoped* session — so super_admin never appears here.
+export const ALLOWED_ROLES = ['gym_owner'] as const;
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 export function readStoredUser(): StoredUser | null {

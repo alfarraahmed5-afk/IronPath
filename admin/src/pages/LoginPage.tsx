@@ -3,6 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { isAllowedRole } from '../lib/session';
 
+// Where to send super_admin attempts. Static for now; if the console URL ever
+// changes we can move this to a build-time env var.
+const CONSOLE_URL = 'https://iron-path-console.vercel.app';
+
 // Only honor a `next` redirect if it's a same-origin path. Reject empty,
 // protocol-relative (`//evil.com`), absolute URLs, and anything containing a
 // backslash (some browsers normalize `\` → `/` in Location, opening a redirect
@@ -33,10 +37,25 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      const { access_token, refresh_token, user } = res.data.data;
+      const data = res.data.data;
 
+      // 2FA-shape (introduced for super_admin login on the console). If we
+      // see this here, the credentials belong to an operator account and
+      // they're on the wrong app — point them at the console.
+      if (data?.requires_2fa) {
+        setError(`This account uses the operator console — sign in at ${CONSOLE_URL}`);
+        return;
+      }
+
+      const { access_token, refresh_token, user } = data;
       if (!isAllowedRole(user?.role)) {
-        setError('Admin access required.');
+        // Most common case after dropping super_admin from ALLOWED_ROLES.
+        // Same redirect message regardless of which non-gym_owner role hit.
+        setError(
+          user?.role === 'super_admin'
+            ? `Super admin accounts sign in at ${CONSOLE_URL}`
+            : 'Gym owner access required.'
+        );
         return;
       }
 
