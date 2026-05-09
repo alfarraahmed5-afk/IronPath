@@ -12,7 +12,7 @@ Single source of truth for development progress on the platform plan. Read this 
 
 - **Phase:** B — Super Admin Console v1 (4 teams in flight)
 - **Active unit:** B1 backend / B2 All Gyms + Gym Detail / B3 Subscription editor + Lead Inbox / B4 Manual creation + Sentry
-- **Last updated:** 2026-05-09 (Phase B v1 + Tier 2 polish, pre-PR)
+- **Last updated:** 2026-05-09 (Phase B v1 shipped to staging — console live at iron-path-console.vercel.app)
 
 ---
 
@@ -44,8 +44,14 @@ Single source of truth for development progress on the platform plan. Read this 
 - [ ] Swap `📌` emoji in `admin/src/pages/AnnouncementsPage.tsx` for Lucide `Pin`.
 - [x] Add `last_modified_by` to `gyms` before audit_log lands in Phase B. *(migration 041)*
 
+### Phase B.5 — prod-ship blockers (NEW, before any real customer touches prod)
+- [ ] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *security council vote flagged this; staging-only until merged.*
+- [ ] **Rotate Supabase legacy JWT secret** (anon + service_role) — service_role was leaked in client bundle for 15 days (2026-04-24 → 2026-05-09); user opted to defer rotation since console URL was never shared. Rotate before first paying customer.
+- [ ] **Manual gym creation: orphaned-auth-user reconciliation cron** — when `auth.admin.deleteUser` rollback fails, an `auth.users` row leaks with no `public.users` peer. Spotted as a real failure mode during deploy debug.
+- [ ] **Pre-deploy schema-drift check** — production was missing migrations 036–042 despite the code shipping months ago. CI (or a `predeploy` hook) should diff `information_schema.columns` against the migrations directory and fail loudly if drift exists.
+- [ ] **PATCH `/super-admin/gyms/:id/subscription` error message** — the SELECT-fails-or-no-rows branch at `superAdmin.ts:202` collapses both into "Gym not found", which masks real DB errors. Split into "Gym not found" (404) vs "Database error" (500); log the underlying `readErr` either way.
+
 ### Phase B v1 review carry-over (Tier 2)
-- [ ] **2FA (TOTP) for super_admin login** (plan §8.1 #1, §8.2, §12.4 #4) — *blocks prod ship per security council vote; staging-only until merged.*
 - [ ] Manual gym creation: orphaned-auth-user reconciliation cron when `auth.admin.deleteUser` rollback fails (backend HIGH).
 - [ ] Manual gym creation: derive owner `username` from email local-part + retry on 23505 (backend HIGH).
 - [ ] `/leads` disposable-email-domain blocklist + CAPTCHA after N invalid (security MED, plan §8.5).
@@ -70,6 +76,29 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-09 · Phase B v1 shipped to staging (console + admin live)
+
+PR #1 merged to master (`39be22d`). Walked the founder through end-to-end deploy: Vercel admin redeploy, new Vercel `iron-path-console` project, Railway CORS update, Supabase migration application. Console live at https://iron-path-console.vercel.app, admin at https://iron-path-admin.vercel.app, backend at https://backend-production-f43b.up.railway.app/api/v1.
+
+**Surfaces stood up:**
+- **Vercel admin** (`iron-path-admin`) — already existed; redeployed after fixing a `VITE_SUPABASE_ANON_KEY` env var that was actually holding the **service_role** key. The Vite bundle had been shipping it to every visitor's browser for 15 days. Anon key swapped in; service_role rotation deferred per founder call (URL never shared, no observed traffic). Logged as Phase B.5 blocker.
+- **Vercel console** (`iron-path-console`) — new project, Root Directory `console`, Vite preset, env: `VITE_API_URL` → Railway, `VITE_ENV` → `production`, Sentry DSN deferred.
+- **Railway backend** — `CORS_ALLOWED_ORIGINS` appended `https://iron-path-console.vercel.app`. Auto-redeployed.
+
+**Production schema gap discovered + fixed:** the production Supabase database was missing migrations **036–042** despite the code shipping months ago. Discovery path:
+1. First gym creation attempt → "Could not find the 'last_modified_at' column of 'gyms' in the schema cache" (041 missing).
+2. After applying 039–042, gym creation worked but **PATCH /super-admin/gyms/:id/subscription** still failed with "Gym not found".
+3. Root cause: PATCH SELECT references `mrr_cents`, which lives in 036 — also unapplied. The error handler at `superAdmin.ts:202` collapses `readErr || !before` into a single "Gym not found" branch, so a real schema error read as "no rows".
+4. Applied 036–038 too. Edit-subscription flow now passes end-to-end.
+
+**Migration 039 broken-as-shipped:** the partial unique index `WHERE created_at > NOW() - INTERVAL '7 days'` errored with `42P17 functions in index predicate must be marked IMMUTABLE`. Plan §6.4 spec'd it but the SQL never ran against real PG. **This commit replaces it** with a regular index `idx_leads_email ON leads (LOWER(email), created_at DESC)`; the time-windowed dedup intent moves to app code (Phase B.5 follow-up: dedup in `POST /leads` handler, return 200 idempotent on hit).
+
+**Phase B.5 backlog created** (above) — five hard blockers before any paying customer touches prod: 2FA, JWT rotation, orphaned-auth-user cron, pre-deploy schema-drift check, and the misleading-error-message fix.
+
+**Verified end-to-end:** super_admin login → /gyms list (3 gyms render with MRR / status / member counts) → click Test gym → Subscription tab → Edit subscription → Tier Starter→Growth → Save → modal closes, list reflects new tier.
+
+**Next:** root folder cleanup (the user-requested 4-agent triage of stale `GymApp_Technical_Specification_v*.md`, `PROGRESS.md`, `test_out.txt`, `Documents - Shortcut.lnk`, etc.). Then Phase B.5 work, then Phase C.
 
 ### 2026-05-09 · 4-agent council vote + Tier 2 polish (pre-PR)
 
