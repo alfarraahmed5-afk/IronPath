@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
-import { authLimiter } from '../middleware/rateLimit';
+import { authLimiter, refreshLimiter } from '../middleware/rateLimit';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 
 const router = Router();
@@ -134,7 +134,7 @@ router.post('/logout', requireActiveUser, async (_req: Request, res: Response, n
 });
 
 // POST /auth/refresh
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', refreshLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refresh_token } = req.body;
     if (!refresh_token) return next(new AppError('UNAUTHORIZED', 401, 'Missing refresh_token'));
