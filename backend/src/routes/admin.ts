@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 import { requireGymOwner } from '../middleware/roles';
+import { generatePoster, slugifyGymName, type PosterSize } from '../lib/posterPdf';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -621,6 +623,61 @@ router.delete('/challenges/:id', async (req: Request, res: Response, next: NextF
   } catch (err) {
     next(err);
   }
+});
+
+// ─── GET /admin/grow/poster — Phase C.1 member-acquisition QR poster ──────
+// Owner-scoped (requireGymOwner above). Streams an inline PDF blob keyed to
+// the gym's invite_code, branded with the gym's logo + accent color. Client
+// triggers it via a download link; no JSON envelope.
+router.get('/grow/poster', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const gymId = req.user!.gym_id!;
+    const requestedSize = typeof req.query.size === 'string' ? req.query.size.toLowerCase() : 'a4';
+    const size: PosterSize = requestedSize === 'a3' ? 'a3' : 'a4';
+
+    const { data: gym, error: readErr } = await supabase
+      .from('gyms')
+      .select('name, invite_code, accent_color, logo_url')
+      .eq('id', gymId)
+      .single();
+    if (readErr || !gym) {
+      return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+    }
+    if (!gym.invite_code) {
+      return next(new AppError('CONFLICT', 409, 'Gym has no invite code yet'));
+    }
+
+    // Best-effort logo fetch — a missing or unreachable logo falls back to the
+    // accent-band layout so a network blip doesn't fail the whole download.
+    let logoBytes: Uint8Array | null = null;
+    if (gym.logo_url) {
+      try {
+        const resp = await fetch(gym.logo_url);
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          logoBytes = new Uint8Array(buf);
+        } else {
+          logger.warn({ status: resp.status, gym_id: gymId }, 'Logo fetch returned non-2xx; using accent band');
+        }
+      } catch (err) {
+        logger.warn({ err, gym_id: gymId }, 'Logo fetch failed; using accent band');
+      }
+    }
+
+    const pdfBytes = await generatePoster({
+      gymName: gym.name,
+      inviteCode: gym.invite_code,
+      accentColor: gym.accent_color,
+      logoBytes,
+      size,
+    });
+
+    const filename = `ironpath-poster-${slugifyGymName(gym.name)}-${size}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=0, no-store');
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) { next(err); }
 });
 
 export default router;

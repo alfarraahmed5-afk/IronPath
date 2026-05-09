@@ -5,6 +5,7 @@ import MembersPage from './pages/MembersPage';
 import InvitesPage from './pages/InvitesPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import ChallengesPage from './pages/ChallengesPage';
+import GrowPage from './pages/GrowPage';
 import SettingsPage from './pages/SettingsPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import Layout from './components/Layout';
@@ -51,6 +52,10 @@ export default function App() {
         <Route
           path="/challenges"
           element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/grow"
+          element={<ProtectedRoute><GrowPage /></ProtectedRoute>}
         />
         <Route
           path="/settings"

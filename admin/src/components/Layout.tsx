@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Link2,
   Megaphone,
+  QrCode,
   Settings as SettingsIcon,
   Trophy,
   Users,
@@ -27,6 +28,7 @@ const NAV_LINKS: NavLinkDef[] = [
   { to: '/invites', label: 'Invites', Icon: Link2 },
   { to: '/announcements', label: 'Announcements', Icon: Megaphone },
   { to: '/challenges', label: 'Challenges', Icon: Trophy },
+  { to: '/grow', label: 'Grow', Icon: QrCode },
   { to: '/settings', label: 'Settings', Icon: SettingsIcon },
   { to: '/subscription', label: 'Subscription', Icon: CreditCard },
 ];

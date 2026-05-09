@@ -75,7 +75,14 @@ Single source of truth for development progress on the platform plan. Read this 
 - [x] Amend plan §3.7 ("gray-600 32px" → `ink-400`) and §6.4 migration table renumbering (041 = `gyms_last_modified_by`, coupons → 043+). *(Phase B Tier 2 polish)*
 
 ### Phase B — Super Admin Console v1 (in flight)
-### Phase C — Onboarding & retention (not started)
+### Phase C — Onboarding & retention (in flight)
+- [x] **C.1 — QR poster PDF generator + /grow page** *(landed 2026-05-10. Server-side `pdf-lib` poster, A4 + A3 sizes, branded with gym logo + accent. Owner downloads from new `/grow` page in admin.)*
+- [ ] **C.2 — 4-step onboarding wizard** (gates dashboard until done; reuses C.1's poster generator in step 2)
+- [ ] **C.3 — Trial banner** (day count + member/workout stats in admin header)
+- [ ] **C.4 — Tier-cap soft warning at 80% + hard block at 100%**
+- [ ] **C.5 — Trial-expiry email sequence** (Resend templates + cron, day 21/25/28/30/31/37 per plan §4.4)
+- [ ] **C.6 — Cancellation save flow** (reason picker → contextual offer → confirm)
+- [ ] **C.7 — Activation milestone celebrations** (per plan §4.8)
 ### Phase D — Sales acceleration (not started)
 ### Phase E — Analytics (not started)
 ### Phase F — Polish & scale prep (not started)
@@ -84,6 +91,33 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-10 · Phase C.1 — QR poster PDF + /grow page (4-agent council outcome)
+
+User asked the 4-agent council (Product/GTM, Engineering, Customer Success/UX, Plan-adherence) to vote on Phase C approach. Tally B=2 (Product, Plan-adherence: ship QR poster first standalone) + D=2 (Engineering, UX: ship wizard first with text invite). Reconciled: both camps agree both pieces ship — disagreement is just order. Engineering's react-pdf risk concern + Plan's §17 emphasis on the QR poster as the load-bearing artifact both point to a sequenced two-PR approach: ship the QR generator first (de-risks PDF tech in isolation; ships the activation artifact this week), then build the wizard around the proven generator. **This commit ships PR1 (Phase C.1).**
+
+**Backend — server-side PDF generation:**
+- `pdf-lib` added to backend deps (small, well-maintained, MIT, no native deps).
+- `backend/src/lib/posterPdf.ts` — generates A4 (210×297mm) or A3 (297×420mm) PDFs. Layout: top accent band (logo overlay if `gym.logo_url` present and reachable; otherwise solid accent-color band), centered headline `Join {gymName}` over `on IronPath` subtitle, large QR code (~55% inner width, error-correction level H so a future logo overlay won't break decode), instruction line, manual `or enter code` fallback in mono, footer `ironpath.app`. Layout uses `w * factor` for all dimensions so A4 → A3 is a clean upscale with no per-size code paths. Hex accent color parsed with fallback to plan §3.2 brand orange `#FF6B35`. PNG/JPEG logo support via `embedPng` → fallback `embedJpg`.
+- `backend/src/routes/admin.ts` — new `GET /admin/grow/poster?size=a4|a3` endpoint (gym-owner-scoped via existing `requireGymOwner`). Reads gym from JWT scope, best-effort fetches logo bytes via Node 18 fetch (warns + continues on failure so a CDN blip can't fail the download), generates PDF, streams as `application/pdf` with `Content-Disposition: attachment; filename="ironpath-poster-{slug}-{size}.pdf"`. Slug derived via new `slugifyGymName` helper (NFKD + ASCII filter + hyphen-join, max 40 chars, falls back to `gym`).
+- QR encodes `https://ironpath.app/join/{INVITE_CODE}`. Forward-compatible: even before that landing page exists, phones surface the URL as an actionable link via the camera UI, and we can wire Universal Links / a real bounce page later without reprinting any posters.
+
+**Admin frontend — `/grow` page:**
+- New `admin/src/pages/GrowPage.tsx` — header + invite-code display (with copy-to-clipboard) + two prominent download buttons (A4 desk-print, A3 wall-poster). Loading spinners on the buttons during PDF generation; per-size error states reset after 2.5s. Download flow uses `axios { responseType: 'blob' }` to capture the PDF, parses `Content-Disposition` for the filename, then triggers a hidden `<a>` click + `URL.revokeObjectURL` cleanup.
+- Four placeholder cards below the QR section (email blast template, SMS template, Instagram story, front-desk script) marked "Coming soon" — gives plan §4.5's full kit a visible home so future iterations have an obvious slot to plug into.
+- New `/grow` route in `admin/src/App.tsx` and `Lucide QrCode` nav link in `admin/src/components/Layout.tsx` between Challenges and Settings.
+
+**Threat-model / edge-case notes:**
+- The endpoint is owner-scoped — the JWT's `gym_id` is the only source of which gym's poster gets generated; there's no `:id` param to manipulate. A super_admin hitting `/admin/grow/poster` is denied at the existing `requireGymOwner` middleware (which excludes super_admin per plan §6.1).
+- Logo fetch is best-effort by design. If the URL 404s or the Storage CDN is slow, the PDF still ships with the accent-band fallback layout. Worst case is a slightly less branded poster, never a failed download.
+- No new migration needed — uses existing `gyms.invite_code`, `gyms.name`, `gyms.accent_color`, `gyms.logo_url`. Pre-deploy schema-drift check still passes.
+- No new client-side dep — PDF generation lives entirely server-side, so admin bundle size is unaffected by the choice (admin `index-…js` is 743 kB pre-gzip / 217 kB gzipped; was already over the 500 kB warning threshold before this PR).
+
+**Verified:** `npm run -w backend build` clean, `npm run -w admin build` clean.
+
+**Phase C status:** 1 of 7 items done. Next up: C.2 (onboarding wizard) — reuses this poster generator in step 2 of the 4-step flow. C.3 (trial banner) is a small follow-up that fits in the same PR if scope allows.
+
+**Deploy notes:** no DB migration, no console change. Push triggers Railway redeploy + Vercel admin redeploy. Quick smoke test: log in as a gym owner, navigate to /grow, click Download A4 — PDF should download with your gym's logo and invite code rendered.
 
 ### 2026-05-10 · Phase B.5 #3/#4/#5 + 2FA security-review fixes (4-agent council outcome)
 
