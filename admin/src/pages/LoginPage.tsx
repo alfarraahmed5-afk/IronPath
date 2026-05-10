@@ -130,19 +130,6 @@ export default function LoginPage() {
     }
   }
 
-  // Each <rect> in the Logomark, in the order it should reveal. The fill
-  // colors mirror Logomark.tsx so the staggered version reads as the same
-  // mark mid-build. Kept inline (rather than refactoring Logomark to expose
-  // a `motion` mode) per the spec's "wrap, don't replace" instruction.
-  const drawnRects: Array<{ x: number; y: number; w: number; h: number; rx: number; fill: string }> = [
-    { x: 6, y: 3, w: 16, h: 3.2, rx: 0.8, fill: '#D4D4DA' },
-    { x: 12, y: 3, w: 4, h: 22, rx: 0.6, fill: '#8A8A95' },
-    { x: 6, y: 21.8, w: 16, h: 3.2, rx: 0.8, fill: '#D4D4DA' },
-    { x: 9, y: 12, w: 10, h: 4, rx: 1, fill: '#FF6B35' },
-    { x: 7.5, y: 13, w: 2, h: 2, rx: 0.3, fill: '#D4D4DA' },
-    { x: 18.5, y: 13, w: 2, h: 2, rx: 0.3, fill: '#D4D4DA' },
-  ];
-
   return (
     <div className="min-h-screen flex flex-col lg:flex-row surface-shell text-ink-50">
       {/* ============================================================
@@ -207,49 +194,22 @@ export default function LoginPage() {
         }}
       >
         <div className="w-full max-w-sm">
-          {/* Logomark draw-in. On first visit (sessionStorage gate) and
-              with motion enabled, each <rect> fades + slides in on a
-              short stagger — feels like the mark is being struck.
-              Otherwise we just render the canonical Logomark. */}
+          {/* Logo entrance. On first visit (sessionStorage gate) and with
+              motion enabled, the logo scales + fades in. Otherwise it
+              renders instantly. The artwork is the actual app icon —
+              wordmark "IronPath" is baked in, so we don't render a
+              duplicate text wordmark beside it. */}
           <div className="flex flex-col items-center mb-8">
             {shouldDrawLogo ? (
-              <motion.svg
-                width={48}
-                height={48}
-                viewBox="0 0 28 28"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-label="IronPath"
-                role="img"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: {
-                    transition: { staggerChildren: 0.18, delayChildren: 0.12 },
-                  },
-                }}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1], delay: 0.08 }}
               >
-                {drawnRects.map((r, i) => (
-                  <motion.rect
-                    key={i}
-                    x={r.x}
-                    y={r.y}
-                    width={r.w}
-                    height={r.h}
-                    rx={r.rx}
-                    fill={r.fill}
-                    variants={{
-                      hidden: { opacity: 0, scale: 0.6 },
-                      visible: { opacity: 1, scale: 1 },
-                    }}
-                    style={{ transformOrigin: '14px 14px' }}
-                    transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
-                  />
-                ))}
-              </motion.svg>
+                <Logomark size={120} />
+              </motion.div>
             ) : (
-              <Logomark size={48} />
+              <Logomark size={120} />
             )}
 
             {greetingGym && (

@@ -55,15 +55,15 @@ export default function Layout({ children }: LayoutProps) {
           than the main column, so the rail reads like architectural chrome
           rather than another card. Visual designer council brief #2. */}
       <aside className="fixed left-0 top-0 h-full w-64 surface-shell border-r border-ink-800 flex flex-col z-10">
-        {/* Brand block */}
-        <div className="px-5 py-4 border-b border-ink-800 flex items-center gap-2.5">
-          <Logomark size={26} />
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-ink-50 font-semibold text-base tracking-tight">IronPath</span>
-            <span className="text-ink-400 text-[10px] font-medium uppercase tracking-[0.14em]">
-              Admin
-            </span>
-          </div>
+        {/* Brand block — the actual app logo from mobile/assets/icon.png.
+            The wordmark "IronPath" is baked into the artwork, so we don't
+            render a duplicate text wordmark next to it; just an "Admin"
+            tag to differentiate this surface from the operator console. */}
+        <div className="px-5 py-3 border-b border-ink-800 flex items-center gap-3">
+          <Logomark size={36} />
+          <span className="text-ink-400 text-[10px] font-medium uppercase tracking-[0.14em]">
+            Admin
+          </span>
         </div>
 
         {/* Nav — sliding ember pill via shared layoutId. The 2px indicator
