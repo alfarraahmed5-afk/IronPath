@@ -11,9 +11,13 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import { LayoutGroup, motion } from 'framer-motion';
 import { Logomark } from './Logomark';
+import { LivePulseStrip } from '@/components/LivePulseStrip';
+import { EmberSeam } from '@/components/EmberSeam';
 import { readStoredUser, signOut } from '../lib/session';
 import { cn } from '@/lib/utils';
+import { springModal } from '@/lib/motion';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -41,6 +45,12 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen surface-shell">
+      {/* Live Pulse Strip — α4 fills this with the real 4px ember band that
+          pulses left-to-right when a member starts a workout. Mounted here
+          fixed/edge-to-edge above the topbar so it sits at the absolute top
+          of the admin shell. */}
+      <LivePulseStrip />
+
       {/* Sidebar — chrome rail. surface-shell (#0A0A0B) sits one notch darker
           than the main column, so the rail reads like architectural chrome
           rather than another card. Visual designer council brief #2. */}
@@ -56,48 +66,68 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
-        {/* Nav — Linear-style 2px left active-bar instead of a full pill.
-            More architectural feel; still legible. Visual designer brief #2. */}
-        <nav className="flex-1 px-2 py-4 space-y-0.5">
-          {NAV_LINKS.map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'group relative flex items-center gap-3 pl-4 pr-3 py-2 rounded-md text-sm transition-colors',
-                  isActive
-                    ? 'text-ink-50 bg-brand-500/[0.08]'
-                    : 'text-ink-400 hover:text-ink-50 hover:bg-ink-850/60'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {/* The 2px active bar. Sits flush against the rounded-md edge so
-                      it reads as an indicator, not a stuck divider. */}
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-sm transition-opacity',
-                      isActive ? 'bg-brand-500 opacity-100' : 'opacity-0'
+        {/* Nav — sliding ember pill via shared layoutId. The 2px indicator
+            flies between items on a stiff spring rather than snap-toggling.
+            Inactive items ghost in a 30%-opacity preview pill on hover. */}
+        <LayoutGroup id="adminNav">
+          <nav className="flex-1 px-2 py-4 space-y-0.5">
+            {NAV_LINKS.map(({ to, label, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  cn(
+                    'group relative flex items-center gap-3 pl-4 pr-3 py-2 rounded-md text-sm transition-colors',
+                    isActive
+                      ? 'text-ink-50 bg-brand-500/[0.08]'
+                      : 'text-ink-400 hover:text-ink-50 hover:bg-ink-850/60'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {/* Sliding ember pill — only rendered behind the active
+                        item. Shared layoutId makes framer-motion fly the
+                        same DOM node between items on click. */}
+                    {isActive && (
+                      <motion.span
+                        layoutId="navActivePill"
+                        aria-hidden="true"
+                        className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-brand-500"
+                        transition={springModal}
+                      />
                     )}
-                  />
-                  <Icon
-                    size={16}
-                    strokeWidth={1.75}
-                    className={cn(
-                      'shrink-0 transition-colors',
-                      isActive ? 'text-brand-500' : 'text-ink-400 group-hover:text-ink-200'
+                    {/* Hover preview — CSS-only ghost pill at 30% opacity for
+                        inactive items, fades in on group hover. */}
+                    {!isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-brand-500 opacity-0 group-hover:opacity-30 transition-opacity duration-200"
+                      />
                     )}
-                    aria-hidden="true"
-                  />
-                  <span className="font-medium">{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+                    <Icon
+                      size={16}
+                      strokeWidth={isActive ? 2.25 : 1.75}
+                      className={cn(
+                        'shrink-0 transition-all duration-200',
+                        isActive ? 'text-brand-500' : 'text-ink-400 group-hover:text-ink-200'
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={cn(
+                        'font-medium transition-all duration-200',
+                        isActive ? 'tracking-tight' : 'tracking-normal'
+                      )}
+                    >
+                      {label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+        </LayoutGroup>
 
         {/* Bottom user info */}
         <div className="px-3 py-3 border-t border-ink-800">
@@ -120,7 +150,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* Main column. bg-ink-900 (#111114) — one elevation up from the rail. */}
       <div className="ml-64 flex-1 flex flex-col min-h-screen bg-ink-900">
         {/* Topbar */}
-        <header className="h-14 flex items-center justify-end px-6 gap-4 border-b border-ink-800 bg-ink-900">
+        <header className="relative h-14 flex items-center justify-end px-6 gap-4 border-b border-ink-800 bg-ink-900">
           <span className="text-ink-400 text-sm">{user.gym_name ?? user.email ?? ''}</span>
           <button
             type="button"
@@ -129,6 +159,9 @@ export default function Layout({ children }: LayoutProps) {
           >
             Sign out
           </button>
+          {/* Ember seam — 1px decorative hairline along the bottom edge of
+              the topbar. α4 ships the real breathing gradient + halo. */}
+          <EmberSeam className="absolute bottom-0 left-0 right-0 h-px" />
         </header>
 
         {/* Page content */}
