@@ -421,6 +421,10 @@ router.get('/history', requireActiveUser, async (req: Request, res: Response, ne
 });
 
 // GET /workouts/calendar — BEFORE /:id
+//
+// BE-A: optional ?include=set_counts,muscles enriches each day with
+// total completed-set counts and the union of primary_muscles trained.
+// Used by the streak heatmap (lens 7) for tap-to-detail tooltips.
 router.get('/calendar', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
@@ -429,6 +433,12 @@ router.get('/calendar', requireActiveUser, async (req: Request, res: Response, n
     if (!/^\d{4}-\d{2}-\d{2}/.test(start) || !/^\d{4}-\d{2}-\d{2}/.test(end)) {
       return next(new AppError('VALIDATION_ERROR', 422, 'Invalid start/end'));
     }
+
+    const includeRaw = String(req.query.include || '');
+    const includes = new Set(includeRaw.split(',').map(s => s.trim()).filter(Boolean));
+    const wantSetCounts = includes.has('set_counts');
+    const wantMuscles   = includes.has('muscles');
+
     const { data, error } = await supabase
       .from('workouts')
       .select('id,started_at')
@@ -442,7 +452,68 @@ router.get('/calendar', requireActiveUser, async (req: Request, res: Response, n
       const day = (w.started_at as string).slice(0, 10);
       (byDay[day] = byDay[day] || []).push(w.id);
     }
-    const days = Object.entries(byDay).map(([date, workout_ids]) => ({ date, workout_ids }));
+
+    type Day = {
+      date: string;
+      workout_ids: string[];
+      set_count?: number;
+      muscles?: string[];
+    };
+    let days: Day[] = Object.entries(byDay).map(([date, workout_ids]) => ({ date, workout_ids }));
+
+    // Optional enrichment. Single round-trip across all workouts in
+    // the window so we never N+1 the calendar.
+    if ((wantSetCounts || wantMuscles) && days.length > 0) {
+      const allWorkoutIds = days.flatMap(d => d.workout_ids);
+      const { data: exRows, error: exErr } = await supabase
+        .from('workout_exercises')
+        .select('id, workout_id, exercise_id, exercises(primary_muscles)')
+        .in('workout_id', allWorkoutIds);
+      if (exErr) throw exErr;
+
+      // Build per-workout: ex ids + muscle set
+      const exByWorkout: Record<string, { exIds: string[]; muscles: Set<string> }> = {};
+      for (const row of (exRows || []) as any[]) {
+        const wid = row.workout_id as string;
+        if (!exByWorkout[wid]) exByWorkout[wid] = { exIds: [], muscles: new Set() };
+        exByWorkout[wid].exIds.push(row.id as string);
+        const muscles: string[] = (row.exercises as any)?.primary_muscles ?? [];
+        for (const m of muscles) exByWorkout[wid].muscles.add(m);
+      }
+
+      let setsByExercise: Record<string, number> = {};
+      if (wantSetCounts) {
+        const allExIds = (exRows || []).map((r: any) => r.id as string);
+        if (allExIds.length > 0) {
+          const { data: setRows, error: setErr } = await supabase
+            .from('workout_sets')
+            .select('workout_exercise_id')
+            .in('workout_exercise_id', allExIds)
+            .eq('is_completed', true);
+          if (setErr) throw setErr;
+          for (const s of (setRows || []) as any[]) {
+            const k = s.workout_exercise_id as string;
+            setsByExercise[k] = (setsByExercise[k] || 0) + 1;
+          }
+        }
+      }
+
+      days = days.map(d => {
+        let setCount = 0;
+        const muscles = new Set<string>();
+        for (const wid of d.workout_ids) {
+          const w = exByWorkout[wid];
+          if (!w) continue;
+          for (const exId of w.exIds) setCount += setsByExercise[exId] || 0;
+          for (const m of w.muscles) muscles.add(m);
+        }
+        const out: Day = { date: d.date, workout_ids: d.workout_ids };
+        if (wantSetCounts) out.set_count = setCount;
+        if (wantMuscles)   out.muscles = Array.from(muscles).sort();
+        return out;
+      });
+    }
+
     res.json({ data: { days } });
   } catch (err) { next(err); }
 });
