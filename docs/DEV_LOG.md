@@ -109,19 +109,19 @@ Council Q2 vote (4-agent panel): Engineering + UX both voted **C** (lightweight 
 
 **Critical deploy step (must do before next push):** add `https://iron-path-admin.vercel.app/preview` to Supabase's **Redirect URLs** allowlist (Authentication → URL Configuration). Without this, `generateLink` will mint URLs that fail when clicked. Local dev: also add `http://localhost:5173/preview`.
 
-**Phase D §5.9 alignment notes (deferred to follow-up):** this lightweight preview deliberately omits (a) the persistent "You are viewing X as Y — Exit (14:53)" banner, (b) audit on first-use (only on issuance), (c) the re-auth gate before issue, (d) the `actor_id, on_behalf_of` request tagging, (e) read-only mode header, (f) deny-chained and deny-super↔super (these are no-ops today since only one super_admin exists and we never preview FROM a previewed session). All are tracked as Phase D scope.
+**Phase D §5.9 alignment notes (deferred to follow-up):** this lightweight preview deliberately omits (a) the persistent "You are viewing X as Y — Exit (14:53)" banner, (b) audit on first-use (only on issuance), (c) the re-auth gate before issue, (d) the `actor_id, on_behalf_of` request tagging, (e) read-only mode header, (f) deny-chained and deny-super↔super (moot today with only one super_admin and no preview-from-preview nesting). All are tracked as Phase D scope.
 
 **Verified:** `npm run -w backend build` clean, `npm run -w admin build` clean (776 → 778 kB pre-gzip / 226 → 227 kB gz — +2 kB pre-gzip for PreviewPage), `npm run -w console build` clean (455 → 457 kB pre-gzip / 137 → 138 kB gz — +2 kB pre-gzip for the button).
 
-**Phase B Tier 2 backlog item (Phase D §5.9 impersonation full flow) — partially satisfied.** This commit ships ~70% of D's capability without the banner + first-use audit. The full Phase D version stays on the backlog until sales ops scale beyond solo-founder.
+**Phase B Tier 2 backlog item (Phase D §5.9 impersonation full flow) — partially satisfied.** This commit ships the issuance half of D's goal without the persistent banner or first-use audit; the full Phase D version (with both) stays on the backlog until sales ops scale beyond solo-founder.
 
 ### 2026-05-10 · PR-Q1 — magic-link-on-create + admin /reset-password page (4-agent council outcome)
 
-User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote on two related onboarding/auth questions. **Q1 unanimous (4-0): magic-link-on-create.** Plan §5.7 already specified this; current code drifted to a never-returned `Tmp_${csprng}` password that left owners with no way to log in (the gap founder hit on 2026-05-10). Plaintext-in-email (B), hand-off URL (C), and console-show-once (D) were all rejected on threat-model grounds (plaintext leaks, operator-as-bearer-channel, no audit trail). This commit closes the gap.
+User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote on two related onboarding/auth questions. **Q1 unanimous (4-0): magic-link-on-create.** Plan §5.7 already specified this; current code drifted to a never-returned `Tmp_${csprng}` password that left owners with no way to log in. Plaintext-in-email (B), hand-off URL (C), and console-show-once (D) were all rejected on threat-model grounds (plaintext leaks, operator-as-bearer-channel, no audit trail). This commit closes that gap.
 
 **Backend changes:**
 - `backend/src/lib/email.ts` `sendWelcomeEmail` — extended with optional `setupUrl` and `posterTeaserUrl` params. When `setupUrl` is present, the email leads with a primary "Set your password" CTA (orange button, brand-tinted) followed by a 1-hour-expiry note. When `posterTeaserUrl` is present, a step-2 block points at /grow per the UX agent's "fold the QR-poster activation event into the very first email" recommendation. Existing callers (no-arg) keep the original tone.
-- `backend/src/routes/superAdmin.ts` manual-create handler — between gym creation and welcome-email send, calls `supabase.auth.admin.generateLink({type: 'recovery', email, options: {redirectTo: '${ADMIN_URL}/reset-password'}})` and threads `properties.action_link` into `sendWelcomeEmail`. Best-effort: `linkErr` and thrown errors are logged-and-continued so a Supabase generateLink hiccup doesn't block gym creation — operator can fall back to the standard `/forgot-password` flow.
+- `backend/src/routes/superAdmin.ts` manual-create handler — between gym creation and welcome-email send, calls `supabase.auth.admin.generateLink({type: 'recovery', email, options: {redirectTo: '${ADMIN_URL}/reset-password'}})` and passes `properties.action_link` as `setupUrl` to `sendWelcomeEmail`. Best-effort: `linkErr` and thrown errors are logged-and-continued so a Supabase generateLink hiccup doesn't block gym creation — operator can fall back to the standard `/forgot-password` flow.
 - `backend/src/routes/auth.ts` — new `POST /auth/set-password` endpoint. Schema `{access_token, new_password ≥ 8 chars}`. Validates the access_token via `supabaseAuth.auth.getUser`, updates the password via `supabase.auth.admin.updateUserById`, fetches the public.users row (rejects deleted/suspended), updates `last_active_at`, returns `{access_token, user}` so the SPA can store + navigate to /dashboard. Uses `authLimiter` (5/15min/IP).
 - `backend/src/middleware/auth.ts` — `POST /api/v1/auth/set-password` added to `PUBLIC_PATHS` (the recovery-hash flow runs before any normal session exists).
 
@@ -133,7 +133,7 @@ User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote 
 
 **Optional env var:** `ADMIN_URL` on Railway, defaults to `https://iron-path-admin.vercel.app`. Override for staging or branch previews if needed.
 
-**Verified:** `npm run -w backend build` clean. `npm run -w admin build` clean. Bundle 771 kB → 776 kB pre-gzip / 226 kB → 227 kB gzipped (+5 kB pre-gzip / +1 kB gz for the new ResetPasswordPage).
+**Verified:** `npm run -w backend build` clean, `npm run -w admin build` clean. Bundle 771 kB → 776 kB pre-gzip / 226 → 227 kB gzipped (+5 kB pre-gzip / +1 kB gz for the new ResetPasswordPage).
 
 **Phase B Tier 2 backlog item (manual-create response should return temp password) — superseded.** The temp-password-display problem is moot now: the temp password is generated only as Supabase's create-user requirement, immediately invalidated on first password set, and never communicated to anyone.
 
@@ -142,17 +142,12 @@ User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote 
 Hot-fix for a regression I introduced with yesterday's TOTP 2FA work. When a super_admin with 2FA enrolled hits `POST /auth/login`, the backend returns `{requires_2fa: true, challenge_token, expires_in}` — no `user` object. The console LoginPage was updated to handle that shape; the **admin LoginPage was not**, so it destructured `{ access_token, refresh_token, user }` to all undefined, then `isAllowedRole(undefined)` returned false and surfaced the wrong-reason "Admin access required." error. Founder hit this when trying to log into admin with their super_admin account today.
 
 **Changes:**
-- `admin/src/lib/session.ts` — `ALLOWED_ROLES` dropped from `['gym_owner', 'super_admin']` to `['gym_owner']`. Plan §6.1 / §8.1 #3 explicitly route super_admin through `/super-admin/*` via the console; the admin allowlist had drifted. The Phase A Tier 1 entry already removed super_admin from the **backend** `/admin/*` allowlist; this commit closes the front-end half of that cleanup.
-- `admin/src/pages/LoginPage.tsx` — handles three branches now:
-  - `data.requires_2fa === true` → "This account uses the operator console — sign in at https://iron-path-console.vercel.app"
-  - `user.role === 'super_admin'` → "Super admin accounts sign in at https://iron-path-console.vercel.app"
-  - any other non-`gym_owner` role → "Gym owner access required."
-
-The console URL is hard-coded for now via a `CONSOLE_URL` const at the top of the file; future move to `import.meta.env.VITE_CONSOLE_URL` when we have more environments.
+- `admin/src/lib/session.ts` — `ALLOWED_ROLES` dropped from `['gym_owner', 'super_admin']` to `['gym_owner']`. Plan §6.1 / §8.1 #3 routes super_admin through `/super-admin/*` via the console; the admin allowlist had drifted. The Phase A Tier 1 entry already removed super_admin from the **backend** `/admin/*` allowlist; this commit closes the front-end half of that cleanup.
+- `admin/src/pages/LoginPage.tsx` — now handles three error cases after validating: `requires_2fa === true` redirects to the console; `user.role === 'super_admin'` redirects to the console; any other non-`gym_owner` role shows "Gym owner access required." The console URL is hard-coded via `CONSOLE_URL` const (future: `import.meta.env.VITE_CONSOLE_URL` when we have more environments).
 
 **Verified:** `npm run -w admin build` clean; bundle 771 kB → 771.71 kB pre-gzip (negligible).
 
-**Why no PR for super_admin testing the admin panel:** the council voted Q2=C (lightweight "preview as owner" mint in the console, opens admin in new tab with a gym_owner-scoped session). That's the next PR. This PR-fix just gives super_admin a clear redirect message in the meantime; it doesn't enable any new testing path on its own.
+**Why no PR for super_admin testing the admin panel:** the council voted Q2=C (lightweight "preview as owner" mint in the console, opens admin in new tab with a gym_owner-scoped session). That's PR-Q2. This PR-fix just gives super_admin a clear redirect message in the meantime; it doesn't enable any new testing path on its own.
 
 ### 2026-05-10 · Admin design overhaul PR1 — substrate (5-agent council outcome)
 
