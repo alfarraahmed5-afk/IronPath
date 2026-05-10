@@ -17,7 +17,7 @@
  *
  * Founder rules respected:
  *  - No em dashes.
- *  - No mailto / Cal.com / Mindbody / Glofox.
+ *  - No banned-list strings (audit-banned-strings.mjs).
  */
 import React, { useEffect, useState } from 'react';
 import {

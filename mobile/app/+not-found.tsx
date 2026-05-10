@@ -8,7 +8,7 @@ import { colors, spacing } from '../src/theme/tokens';
 
 // Overrides expo-router's default unmatched-route screen, which would expose a
 // "Sitemap" link that lists every .tsx file in the app folder. That sitemap
-// is dev-only — clicking entries from production routes users into raw screens
+// is dev-only -- clicking entries from production routes users into raw screens
 // (including resurrecting old workout drafts via stale draft loaders).
 export default function NotFoundScreen() {
   const router = useRouter();

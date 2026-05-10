@@ -318,7 +318,7 @@ export default function UserProfileScreen() {
           {/* Stats row */}
           <Surface level={2} style={styles.statsRow}>
             <View style={styles.statCell}>
-              <Text variant="numeric" color="textPrimary">{stats?.total_workouts ?? '—'}</Text>
+              <Text variant="numeric" color="textPrimary">{stats?.total_workouts ?? '--'}</Text>
               <Text variant="overline" color="textTertiary">Workouts</Text>
             </View>
             <View style={styles.statDivider} />
@@ -453,7 +453,7 @@ export default function UserProfileScreen() {
           Challenge {user.username}
         </Text>
         <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.base }}>
-          Pinned: {pinnedExerciseName ?? '—'}
+          Pinned: {pinnedExerciseName ?? '--'}
         </Text>
         <Text variant="overline" color="textTertiary" style={{ marginBottom: spacing.sm }}>Metric</Text>
         {([

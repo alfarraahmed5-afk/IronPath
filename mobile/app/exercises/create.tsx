@@ -129,7 +129,7 @@ export default function CreateExerciseScreen() {
         body: form,
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          // Don't set Content-Type — let RN set the boundary
+          // Don't set Content-Type. Let RN set the boundary.
         } as any,
       });
       const json = await res.json();
@@ -148,7 +148,7 @@ export default function CreateExerciseScreen() {
     setMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
   }
 
-  const equipLabel = EQUIPMENT_OPTIONS.find(e => e.key === equipment)?.label ?? '—';
+  const equipLabel = EQUIPMENT_OPTIONS.find(e => e.key === equipment)?.label ?? '--';
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>

@@ -123,7 +123,7 @@ export default function ProfileScreen() {
       if (profileRes.status === 'fulfilled') {
         const fresh = (profileRes.value as any).data;
         setProfile(fresh);
-        // Keep the global authStore in sync — fixes the bug where username
+        // Keep the global authStore in sync -- fixes the bug where username
         // updates via /users/me PATCH didn't visually reflect until restart.
         if (fresh && setUser) setUser({ ...(user as any), ...fresh });
         // Fetch pinned challenge exercise name
@@ -171,7 +171,7 @@ export default function ProfileScreen() {
     );
   }
 
-  // Prefer authStore over local profile state — authStore is updated
+  // Prefer authStore over local profile state -- authStore is updated
   // immediately by Edit Profile via setUser(), and the focus refetch will
   // overwrite both shortly after. Falling back to local profile on first
   // mount (when authStore.user might be missing fields like bio).

@@ -12,8 +12,7 @@
  *
  * Founder rule reminders implemented here:
  *   - No mailto:; only WhatsApp -- handled in help.tsx.
- *   - ironpath.app -> ironpath.health -- about row links to the health
- *     domain.
+ *   - Canonical domain is ironpath.health -- about row links there.
  *   - No em dashes -- all copy uses periods.
  */
 import React from 'react';

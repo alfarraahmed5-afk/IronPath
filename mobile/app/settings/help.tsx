@@ -3,11 +3,10 @@
  *
  * Founder rule 10: WhatsApp is the only support channel.
  *   +20 10 3659 6238 -- https://wa.me/201036596238
- * Founder domain: ironpath.health (NOT ironpath.app).
+ * Founder domain: ironpath.health is the canonical domain.
  *
- * Previously this screen had mailto:support@ironpath.app links plus
- * https://ironpath.app/{privacy,terms} URLs. Both were direct rule
- * violations. Now: WhatsApp CTAs + .health domain everywhere.
+ * Previously this screen used mailto links and a non-canonical
+ * domain. Both have been replaced with WhatsApp CTAs + ironpath.health.
  */
 import React from 'react';
 import { View, ScrollView, StyleSheet, Linking } from 'react-native';

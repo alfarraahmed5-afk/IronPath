@@ -32,7 +32,7 @@ const GOALS: { key: Goal; label: string; desc: string }[] = [
 
 const EXPERIENCE_LEVELS: { key: Experience; label: string; desc: string }[] = [
   { key: 'beginner', label: 'Beginner', desc: 'Less than 1 year of training' },
-  { key: 'intermediate', label: 'Intermediate', desc: '1–3 years of consistent training' },
+  { key: 'intermediate', label: 'Intermediate', desc: '1-3 years of consistent training' },
   { key: 'advanced', label: 'Advanced', desc: '3+ years with a solid base' },
 ];
 

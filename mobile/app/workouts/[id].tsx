@@ -79,7 +79,7 @@ function formatSetDisplay(set: CompletedSet, loggingType: string): string {
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
   if (loggingType === 'distance' && set.distance_meters !== null) return `${set.distance_meters}m`;
-  return '—';
+  return '--';
 }
 
 export default function WorkoutDetailScreen() {

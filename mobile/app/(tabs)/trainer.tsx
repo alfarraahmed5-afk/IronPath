@@ -61,7 +61,7 @@ function formatPrescription(ex: NextSession['exercises'][number]): string {
     const s = ex.target_duration_seconds % 60;
     return `${ex.sets} × ${m > 0 ? `${m}m ` : ''}${s > 0 ? `${s}s` : ''}`;
   }
-  if (ex.reps_min !== null && ex.reps_max !== null) return `${ex.sets} × ${ex.reps_min}–${ex.reps_max} reps`;
+  if (ex.reps_min !== null && ex.reps_max !== null) return `${ex.sets} × ${ex.reps_min}-${ex.reps_max} reps`;
   if (ex.reps !== null) return `${ex.sets} × ${ex.reps} reps`;
   return `${ex.sets} sets`;
 }
@@ -127,7 +127,7 @@ export default function TrainerScreen() {
   function handleStartSession() {
     if (!session) return;
     // If the template returned 0 exercises (e.g. wger_id mismatch), start a
-    // blank named workout — the user can add exercises in-flight.
+    // blank named workout -- the user can add exercises in-flight.
     if (session.exercises.length === 0) {
       useWorkoutStore.getState().startWorkout(`${session.template_name || 'AI Trainer'} · ${session.session_label || 'Session'}`, null, []);
       router.push('/workout/active');
@@ -262,7 +262,7 @@ export default function TrainerScreen() {
                 <Text variant="bodyEmphasis" color="textPrimary">No prescribed exercises</Text>
                 <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
                   Your program template hasn't been linked to specific exercises yet.
-                  Tap below to start a blank workout — you can add exercises manually.
+                  Tap below to start a blank workout. You can add exercises manually.
                 </Text>
               </Surface>
             ) : session.exercises.map((ex, idx) => (
