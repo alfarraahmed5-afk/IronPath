@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 // Where to send super_admin attempts. Static for now; if the console URL ever
 // changes we can move this to a build-time env var.
-const CONSOLE_URL = 'https://iron-path-console.vercel.app';
+const CONSOLE_URL = 'https://console.ironpath.health';
 
 // "Gym Door" macro — a barbell with chalk dust mid-air, B&W after the
 // grayscale filter is applied below. Chosen from the Unsplash chalk-dust /
