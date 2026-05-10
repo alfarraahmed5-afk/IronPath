@@ -4,9 +4,16 @@
 // the active-members count and MRR; retention is a plain animated percent so
 // the row has a rhythm of three different number types instead of three
 // identical odometers.
+//
+// Locale-awareness: MRR currency switches between USD ($4,851) on EN and EGP
+// (118,500 ج.م) on AR. The ratio is anchored to the in-page mock gym, not to
+// any real exchange rate, so the EGP figure is chosen to feel plausible for
+// an Egyptian gym at the same member count rather than being a literal
+// conversion. Western Arabic numerals stay in both locales per the i18n
+// architect's spec.
 
 import NumberFlow from '@number-flow/react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface StatRowProps {
   /** When true, the numbers count up from 0 to their target values. Driven
@@ -18,7 +25,17 @@ interface StatRowProps {
 
 export function StatRow({ active, staticFinal = false }: StatRowProps) {
   const t = useTranslations('scenes.reveal.dashboard.stats');
+  const locale = useLocale();
+  const isAr = locale === 'ar';
   const target = active || staticFinal;
+
+  // Currency block: EN puts the symbol BEFORE the number; AR conventionally
+  // puts it AFTER. NumberFlow's prefix/suffix handles either side as opaque
+  // strings, so we just pick the right slot per locale.
+  const mrrTarget = isAr ? 118_500 : 4_851;
+  const mrrPrefix = isAr ? '' : '$';
+  const mrrSuffix = isAr ? ' ج.م' : '';
+
   return (
     <div
       className="grid grid-cols-3 gap-4 sm:gap-8 w-full"
@@ -33,9 +50,9 @@ export function StatRow({ active, staticFinal = false }: StatRowProps) {
       />
       <Stat
         label={t('monthlyRecurring')}
-        value={target ? 4851 : 0}
-        prefix="$"
-        suffix=""
+        value={target ? mrrTarget : 0}
+        prefix={mrrPrefix}
+        suffix={mrrSuffix}
       />
       <Stat
         label={t('retention')}

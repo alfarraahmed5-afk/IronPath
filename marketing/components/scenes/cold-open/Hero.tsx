@@ -16,7 +16,7 @@
 // will set the matching layoutId at the admin signup landing target.
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { VERCEL_EASE, springMagnetic } from '@/lib/motion';
 import { useReducedMotion } from '@/lib/preferences';
@@ -27,6 +27,17 @@ const SIGNUP_URL = '/start';
 // click handler + nav prefetch can't contend with the LCP frame budget.
 const CTA_INTERACTIVE_DELAY_MS = 1500;
 
+// Session-scoped flag used to skip the cold-open intro animation when the
+// visitor returns to / a second time. Without this, every back-nav re-fires
+// the blur(8px) -> 0 sequence and feels jarring (founder feedback).
+//
+// We READ on mount inside an effect so SSR + first paint render the
+// pre-animated state (blur, opacity 0). The first frame after hydration
+// then either plays the intro (first visit) or hard-snaps to the end state
+// (return visit). Either way the static SSR markup matches what React
+// renders on the client, so no hydration warning.
+const HERO_PLAYED_KEY = 'ironpath-hero-played';
+
 export interface HeroProps {
   className?: string;
 }
@@ -35,6 +46,27 @@ export function Hero({ className = '' }: HeroProps) {
   const reduced = useReducedMotion();
   const t = useTranslations('scenes.coldOpen');
   const [ctaArmed, setCtaArmed] = useState(false);
+
+  // `null` until we've checked sessionStorage. While null we render the
+  // pre-animated state (matches SSR). After the effect resolves, either:
+  //   - hasPlayed=true  -> snap to end state, no animation
+  //   - hasPlayed=false -> play the intro, then mark the flag
+  const [hasPlayed, setHasPlayed] = useState<boolean | null>(null);
+  const flagWriteScheduled = useRef(false);
+
+  useEffect(() => {
+    // Read inside useEffect so SSR doesn't try to touch sessionStorage and
+    // we don't get a hydration mismatch.
+    let played = false;
+    try {
+      played = window.sessionStorage.getItem(HERO_PLAYED_KEY) === 'true';
+    } catch {
+      // Private browsing / disabled storage -- treat as first visit, the
+      // animation just plays once per page load. Acceptable.
+      played = false;
+    }
+    setHasPlayed(played);
+  }, []);
 
   useEffect(() => {
     // Wait for first paint, then schedule arming via requestIdleCallback so
@@ -59,9 +91,36 @@ export function Hero({ className = '' }: HeroProps) {
     };
   }, []);
 
+  // Mark the flag once the headline animation has had time to land. We
+  // schedule it after the animation duration + delay so a hard back-nav
+  // mid-intro still records "played" for next time.
+  useEffect(() => {
+    if (hasPlayed !== false || flagWriteScheduled.current) return;
+    flagWriteScheduled.current = true;
+    const t = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(HERO_PLAYED_KEY, 'true');
+      } catch {
+        // No-op: see read path above.
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [hasPlayed]);
+
+  // When we've confirmed the visitor has seen the intro this session,
+  // collapse all three animations to a static end-state. No translate, no
+  // blur, no opacity tween -- exactly matches the post-animation frame.
+  const skipIntro = hasPlayed === true;
+
   // Reduced-motion variant: skip blur + translate, keep a 200ms opacity
   // tween so the page doesn't snap-pop.
-  const headlineAnim = reduced
+  const headlineAnim = skipIntro
+    ? {
+        initial: { opacity: 1, y: 0, filter: 'blur(0px)' },
+        animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+        transition: { duration: 0 },
+      }
+    : reduced
     ? {
         initial: { opacity: 0 },
         animate: { opacity: 1 },
@@ -73,7 +132,13 @@ export function Hero({ className = '' }: HeroProps) {
         transition: { duration: 0.6, ease: VERCEL_EASE, delay: 0.2 },
       };
 
-  const subAnim = reduced
+  const subAnim = skipIntro
+    ? {
+        initial: { opacity: 1, y: 0 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0 },
+      }
+    : reduced
     ? {
         initial: { opacity: 0 },
         animate: { opacity: 1 },
@@ -85,7 +150,13 @@ export function Hero({ className = '' }: HeroProps) {
         transition: { duration: 0.48, ease: VERCEL_EASE, delay: 0.26 },
       };
 
-  const ctaAnim = reduced
+  const ctaAnim = skipIntro
+    ? {
+        initial: { opacity: 1, y: 0 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0 },
+      }
+    : reduced
     ? {
         initial: { opacity: 0 },
         animate: { opacity: 1 },

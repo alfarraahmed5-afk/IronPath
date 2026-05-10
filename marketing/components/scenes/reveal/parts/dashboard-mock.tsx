@@ -6,8 +6,13 @@
 // inherits CSS theming, and lets the sidebar pill animate live. A static
 // AVIF poster from /public/scene-3 could be swapped in later if mid-tier
 // mobile renders this slowly -- slot for that exists below.
+//
+// Locale-awareness: the example gym name is "Iron & Oak" in EN (a Latin
+// proper noun, kept LTR) and "نادي الحديد" in AR (native Arabic name, no
+// Latin bleed in the cinematic reveal). The translation flips both string
+// and the lang/dir attributes per locale.
 
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { SidebarPill } from './sidebar-pill';
 import { StatRow } from './stat-row';
 
@@ -20,20 +25,28 @@ interface DashboardMockProps {
 
 export function DashboardMock({ dropped, staticFinal = false }: DashboardMockProps) {
   const t = useTranslations('scenes.reveal.dashboard');
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+
   return (
     <div
       className="w-full max-w-[1100px] mx-auto rounded-2xl border border-ink-800 bg-ink-900/80 backdrop-blur-sm shadow-[0_40px_120px_-40px_rgba(0,0,0,0.8)] overflow-hidden"
       // The admin app uses this approximate layout; mirroring it gives the
       // visitor an instant "oh, that's the actual product" recognition.
     >
-      {/* Browser chrome -- three dots, address bar */}
+      {/* Browser chrome -- three dots, address bar. The address-bar URL is a
+          brand wordmark so it stays Latin in any locale. */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-800 bg-ink-950/60">
         <div className="flex gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-ink-700" />
           <span className="h-2.5 w-2.5 rounded-full bg-ink-700" />
           <span className="h-2.5 w-2.5 rounded-full bg-ink-700" />
         </div>
-        <div className="ml-3 px-3 py-1 rounded text-[10px] font-mono text-ink-400 bg-ink-900 border border-ink-800">
+        <div
+          className="ml-3 px-3 py-1 rounded text-[10px] font-mono text-ink-400 bg-ink-900 border border-ink-800"
+          lang="en"
+          dir="ltr"
+        >
           admin.ironpath.health
         </div>
       </div>
@@ -43,10 +56,12 @@ export function DashboardMock({ dropped, staticFinal = false }: DashboardMockPro
         <aside className="border-r border-ink-800 bg-ink-950/40 min-h-[320px]">
           <div
             className="px-3 py-3 text-[10px] font-display tracking-tight text-ink-100 border-b border-ink-800"
-            // Gym name "Iron & Oak" stays Latin script in Arabic -- it's a
-            // proper noun in the example brand.
-            lang="en"
-            dir="ltr"
+            // Gym name flips per locale: Latin "Iron & Oak" in EN flow,
+            // native Arabic "نادي الحديد" in AR flow. Setting lang/dir to
+            // match the actual script keeps the bidirectional algorithm
+            // happy and avoids the "Latin name garbled inside RTL" bug.
+            lang={isAr ? 'ar' : 'en'}
+            dir={isAr ? 'rtl' : 'ltr'}
           >
             {t('gymName')}
           </div>

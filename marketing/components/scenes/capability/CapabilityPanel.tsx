@@ -1,7 +1,7 @@
 'use client';
 
 import { m } from 'framer-motion';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useMessages, useLocale } from 'next-intl';
 import { VERCEL_EASE } from '@/lib/motion';
 
 // CapabilityPanel -- single horizontal-scroll panel inside the Capability act.
@@ -9,6 +9,16 @@ import { VERCEL_EASE } from '@/lib/motion';
 // panel reads as "this is the actual product" without needing a screenshot
 // pipeline. Replace the inline mock with an AVIF (`/scene-4/<slug>.avif`)
 // when art is finalized -- the prop API is intentionally flexible.
+//
+// Locale-awareness:
+//   - Roster member names + initials flip per locale (Latin in EN, Arabic in
+//     AR). Founder mandate after first deploy: no Latin mock names bleeding
+//     into the Arabic page.
+//   - Receipt currency switches between USD ($) on EN and EGP (ج.م) on AR
+//     with locale-appropriate amounts.
+//   - Pulse lifter names + movements flip per locale.
+//   - Member name <span lang/dir> attributes follow the active locale so the
+//     bidirectional algorithm doesn't garble runs.
 
 export type CapabilitySlug = 'roster' | 'grow' | 'receipt' | 'pulse';
 
@@ -141,13 +151,44 @@ function Sparkline({ values, accent = false }: { values: number[]; accent?: bool
   );
 }
 
+interface RosterMember {
+  initials: string;
+  name: string;
+  weeks: number[];
+  streak: number;
+  accent?: boolean;
+}
+
+interface PulseLifter {
+  who: string;
+  move: string;
+  weight: string;
+  mins: number;
+}
+
+// Helper: pull an array out of the message catalog. next-intl's
+// useTranslations doesn't support arrays directly, so we tap useMessages and
+// narrow the shape ourselves.
+function useMockArray<T>(path: string[], fallback: T[]): T[] {
+  const messages = useMessages() as Record<string, unknown>;
+  let cursor: unknown = messages;
+  for (const segment of path) {
+    if (cursor && typeof cursor === 'object' && segment in (cursor as Record<string, unknown>)) {
+      cursor = (cursor as Record<string, unknown>)[segment];
+    } else {
+      return fallback;
+    }
+  }
+  return Array.isArray(cursor) ? (cursor as T[]) : fallback;
+}
+
 function RosterMock() {
   const t = useTranslations('scenes.capability.mocks');
-  // 8 mock members -- initial avatars, sparkline of last-8-week attendance.
-  // Member names stay Latin script in both locales (they're proper nouns from
-  // the example brand "Iron & Oak"). The streak suffix ("w" / "أ") is the
-  // only translatable text on the row.
-  const rows = [
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+
+  // EN defaults; AR catalog overrides via scenes.capability.mocks.rosterMembers.
+  const defaultRows: RosterMember[] = [
     { initials: 'AM', name: 'Alex Morgan',    weeks: [3, 4, 4, 3, 5, 4, 5, 5], streak: 12 },
     { initials: 'JR', name: 'Jamie Reyes',    weeks: [2, 3, 3, 4, 3, 4, 4, 4], streak: 8 },
     { initials: 'KP', name: 'Kai Patel',      weeks: [5, 5, 4, 5, 5, 4, 5, 5], streak: 22 },
@@ -155,18 +196,20 @@ function RosterMock() {
     { initials: 'TC', name: 'Taylor Chen',    weeks: [4, 4, 3, 3, 4, 4, 4, 5], streak: 9 },
     { initials: 'RW', name: 'Riley Walker',   weeks: [3, 3, 4, 5, 4, 5, 5, 4], streak: 11 },
   ];
+  const rows = useMockArray<RosterMember>(['scenes', 'capability', 'mocks', 'rosterMembers'], defaultRows);
   const streakSuffix = t('rosterStreakSuffix');
+
   return (
     <MockShell label={t('rosterLabel')}>
       <ul className="divide-y divide-ink-800/70">
         {rows.map((r) => (
           <li
-            key={r.initials}
+            key={r.name}
             className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0"
           >
             <span
-              lang="en"
-              dir="ltr"
+              lang={isAr ? 'ar' : 'en'}
+              dir={isAr ? 'rtl' : 'ltr'}
               className={[
                 'size-8 rounded-full grid place-items-center text-[11px] font-mono',
                 r.accent
@@ -176,7 +219,11 @@ function RosterMock() {
             >
               {r.initials}
             </span>
-            <span lang="en" dir="ltr" className="flex-1 text-sm text-ink-100 truncate">
+            <span
+              lang={isAr ? 'ar' : 'en'}
+              dir={isAr ? 'rtl' : 'ltr'}
+              className="flex-1 text-sm text-ink-100 truncate"
+            >
               {r.name}
             </span>
             <Sparkline values={r.weeks} accent={r.accent} />
@@ -215,6 +262,8 @@ function GrowMock() {
             </p>
             <div className="flex items-center gap-3">
               <FakeQR />
+              {/* "IRONPATH" is the brand wordmark and the URL is a slug -- both
+                  stay LTR in any locale. */}
               <div className="text-[10px] font-mono text-ink-700 leading-tight" lang="en" dir="ltr">
                 IRONPATH
                 <br />
@@ -281,22 +330,59 @@ function FakeQR() {
 
 function ReceiptMock() {
   const t = useTranslations('scenes.capability.mocks');
-  // Paper-styled subscription view. Mono type, dotted leaders.
-  // Labels translate; amounts stay USD (founder kept English-locale pricing
-  // in USD; the AR Cairo wedge has separate EGP pricing on /eg).
+  const messages = useMessages() as {
+    scenes?: { capability?: { mocks?: {
+      receiptCurrency?: string;
+      receiptAmounts?: { standard?: string; coached?: string; dropIn?: string; refunds?: string; net?: string };
+    } } };
+  };
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+
+  // Currency + amounts come from the catalog so AR shows EGP and EN shows USD.
+  // Defaults preserve the original EN behavior.
+  const currency = messages.scenes?.capability?.mocks?.receiptCurrency ?? '$';
+  const amounts = messages.scenes?.capability?.mocks?.receiptAmounts ?? {
+    standard: '8,520',
+    coached: '1,710',
+    dropIn: '60',
+    refunds: '−45',
+    net: '10,245',
+  };
+
+  // Format the amount with the currency on the natural side per locale.
+  // EN: "$8,520". AR: "8,520 ج.م" (number then unit, like spoken Arabic).
+  function fmt(value: string | undefined, fallback: string): string {
+    const v = value ?? fallback;
+    if (isAr) return `${v} ${currency}`;
+    // For negatives in EN we want "−$45", not "$−45". Detect leading sign.
+    if (v.startsWith('−') || v.startsWith('-')) {
+      return `${v[0]}${currency}${v.slice(1)}`;
+    }
+    return `${currency}${v}`;
+  }
+
   const lines = [
-    { label: t('receiptLines.standard', { count: 142 }), amount: '$8,520' },
-    { label: t('receiptLines.coached', { count: 18 }), amount: '$1,710' },
-    { label: t('receiptLines.dropIn', { count: 4 }), amount: '$60' },
-    { label: t('receiptLines.refunds'), amount: '−$45' },
+    { label: t('receiptLines.standard', { count: 142 }), amount: fmt(amounts.standard, '8,520') },
+    { label: t('receiptLines.coached', { count: 18 }), amount: fmt(amounts.coached, '1,710') },
+    { label: t('receiptLines.dropIn', { count: 4 }), amount: fmt(amounts.dropIn, '60') },
+    { label: t('receiptLines.refunds'), amount: fmt(amounts.refunds, '−45') },
   ];
+  const netAmount = fmt(amounts.net, '10,245');
+
   return (
     <MockShell label={t('receiptLabel')}>
       <div className="font-mono text-[12px] text-ink-200 leading-relaxed">
         <div className="text-center pb-2 border-b border-dashed border-ink-700/70">
-          {/* Receipt header is the example brand name -- Latin script in any
-              locale because it's a proper noun in the mock. */}
-          <div className="text-[10px] text-ink-500" lang="en" dir="ltr">
+          {/* Receipt header is the example brand name. EN: "IRONPATH GYM ·
+              OAK ST" (Latin). AR: "نادي الحديد · فرع المعادي" (Arabic). The
+              lang/dir attributes flip per locale so the bidirectional
+              algorithm respects the script. */}
+          <div
+            className="text-[10px] text-ink-500"
+            lang={isAr ? 'ar' : 'en'}
+            dir={isAr ? 'rtl' : 'ltr'}
+          >
             {t('receiptHeader')}
           </div>
           <div className="text-[10px] text-ink-500">{t('receiptPeriod')}</div>
@@ -317,7 +403,7 @@ function ReceiptMock() {
         <div className="border-t border-dashed border-ink-700/70 pt-2 grid grid-cols-[1fr_auto] gap-3">
           <span className="text-ink-400">{t('receiptNet')}</span>
           <span data-numeric className="tabular-nums text-brand-400 font-semibold">
-            <bdi>$10,245</bdi>
+            <bdi>{netAmount}</bdi>
           </span>
         </div>
         <div className="text-center pt-3 text-[10px] text-ink-500">
@@ -330,15 +416,18 @@ function ReceiptMock() {
 
 function PulseMock() {
   const t = useTranslations('scenes.capability.mocks');
-  // Live ember sweep + active-now counter. The hairline animates via the
-  // existing `animate-pulse-travel` keyframe in tailwind config.
-  // Lifter names + movements stay Latin (mock data from the example brand).
-  const lifts = [
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+
+  // Lifter names + movements flip per locale. Defaults preserve EN behavior.
+  const defaultLifts: PulseLifter[] = [
     { who: 'Kai',   move: 'Back squat',   weight: '275 lb', mins: 1 },
     { who: 'Jamie', move: 'Bench press',  weight: '185 lb', mins: 2 },
     { who: 'Alex',  move: 'Deadlift',     weight: '315 lb', mins: 3 },
     { who: 'Riley', move: 'Front squat',  weight: '205 lb', mins: 5 },
   ];
+  const lifts = useMockArray<PulseLifter>(['scenes', 'capability', 'mocks', 'pulseLifters'], defaultLifts);
+
   return (
     <MockShell label={t('pulseLabel')}>
       <div className="space-y-3">
@@ -361,12 +450,18 @@ function PulseMock() {
             >
               <span className="flex items-center gap-2.5">
                 <span className="size-1.5 rounded-full bg-brand-450" />
-                <span lang="en" dir="ltr" className="text-ink-100">{l.who}</span>
-                <span lang="en" dir="ltr" className="text-ink-400">, {l.move}</span>
+                <span lang={isAr ? 'ar' : 'en'} dir={isAr ? 'rtl' : 'ltr'} className="text-ink-100">
+                  {l.who}
+                </span>
+                <span lang={isAr ? 'ar' : 'en'} dir={isAr ? 'rtl' : 'ltr'} className="text-ink-400">
+                  , {l.move}
+                </span>
               </span>
               <span className="flex items-center gap-3 text-xs">
-                <span data-numeric lang="en" dir="ltr" className="tabular-nums text-ink-200">
-                  {l.weight}
+                {/* Weight string contains a unit ("kg", "lb", "كجم") -- keep
+                    it in its own bidi-isolated run so digits + unit stick. */}
+                <span data-numeric className="tabular-nums text-ink-200">
+                  <bdi>{l.weight}</bdi>
                 </span>
                 <span className="text-ink-500 w-16 text-right">
                   {t('pulseMinutesAgo', { mins: l.mins })}

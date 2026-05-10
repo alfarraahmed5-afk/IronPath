@@ -3,13 +3,52 @@
 // The 3-panel admin-style bento that staggers in after the drop. Uses the
 // shared `listStagger` / `listItem` motion presets so the cadence matches the
 // rest of the marketing site (and the admin app).
+//
+// Locale-aware data: member names, MRR amount, and currency symbol all flow
+// from the message catalog so the AR variant shows Egyptian names + EGP and
+// the EN variant shows Latin names + USD. Founder mandate after first deploy:
+// no Latin mock names bleeding into the Arabic flow.
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useMessages, useLocale } from 'next-intl';
 import { listStagger, listItem } from '@/lib/motion';
+
+interface BentoMember {
+  name: string;
+  days: number;
+}
 
 export function Bento() {
   const t = useTranslations('scenes.reveal.bento');
+  const messages = useMessages() as {
+    scenes?: {
+      reveal?: {
+        bento?: {
+          members?: BentoMember[];
+          monthlyRevenue?: string;
+          currencySymbol?: string;
+        };
+      };
+    };
+  };
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+
+  // Locale-keyed mock members. Defaults preserve EN behavior if a message
+  // catalog ever omits the array.
+  const defaultMembers: BentoMember[] = [
+    { name: 'Marcus T.', days: 11 },
+    { name: 'Sara K.', days: 9 },
+    { name: 'Dev P.', days: 7 },
+  ];
+  const members = messages.scenes?.reveal?.bento?.members ?? defaultMembers;
+
+  // MRR is rendered as a pre-formatted string per locale: "$4,851" in EN,
+  // "118,500" + "ج.م" suffix in AR. The AR side puts the currency word AFTER
+  // the number, which is the natural order in spoken Arabic ("ميتين جنيه").
+  const mrrAmount = messages.scenes?.reveal?.bento?.monthlyRevenue ?? '4,851';
+  const currencySymbol = messages.scenes?.reveal?.bento?.currencySymbol ?? '$';
+
   return (
     <LazyMotion features={domAnimation}>
       <m.div
@@ -23,9 +62,14 @@ export function Bento() {
             <span className="text-[10px] font-mono text-brand-400">{t('churn.flagged', { count: 3 })}</span>
           </div>
           <ul className="space-y-2 text-xs">
-            <ChurnRow name="Marcus T." days={11} dayLabel={t('churn.quietDays', { days: 11 })} />
-            <ChurnRow name="Sara K." days={9} dayLabel={t('churn.quietDays', { days: 9 })} />
-            <ChurnRow name="Dev P." days={7} dayLabel={t('churn.quietDays', { days: 7 })} />
+            {members.map((member) => (
+              <ChurnRow
+                key={member.name}
+                name={member.name}
+                days={member.days}
+                dayLabel={t('churn.quietDays', { days: member.days })}
+              />
+            ))}
           </ul>
         </m.div>
 
@@ -44,8 +88,24 @@ export function Bento() {
             <span className="text-[10px] uppercase tracking-wider text-ink-400">{t('billing.eyebrow')}</span>
             <span className="text-[10px] font-mono text-success">{t('billing.status')}</span>
           </div>
+          {/* Currency block: in EN we render "$4,851" as a single LTR run; in
+              AR the natural order is "118,500 ج.م" (number then unit). Wrap
+              the numeric span in <bdi> so the bidirectional algorithm keeps
+              the digits together regardless of surrounding direction. */}
           <div className="flex items-baseline gap-2">
-            <div data-numeric className="font-display text-2xl text-ink-50">$4,851</div>
+            <div data-numeric className="font-display text-2xl text-ink-50">
+              {isAr ? (
+                <>
+                  <bdi>{mrrAmount}</bdi>
+                  <span className="text-ink-300 text-base ms-1.5">{currencySymbol}</span>
+                </>
+              ) : (
+                <>
+                  {currencySymbol}
+                  <bdi>{mrrAmount}</bdi>
+                </>
+              )}
+            </div>
             <div className="text-[10px] text-ink-400">{t('billing.perMonth')}</div>
           </div>
           <p className="mt-2 text-xs text-ink-300">{t('billing.caption')}</p>

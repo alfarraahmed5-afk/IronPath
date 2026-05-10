@@ -9,11 +9,12 @@
 //   3. Geo cookie (geo-city, 1 day) sourced from Vercel's x-vercel-ip-city
 //      header -- used by hero copy to soft-personalize ("Trusted by 12 gyms
 //      in Chicago" etc.) without ever shipping a geo-IP library to client.
-//   4. Locale cookie (NEXT_LOCALE, 1 year). Detection cascade per
-//      lib/locale.ts: cookie > URL > geo country > Accept-Language > 'en'.
-//      The URL ALWAYS wins for the request itself (a visitor on /ar/* gets
-//      Arabic regardless of cookie), and the cookie sticks the choice for
-//      next time. Default locale is 'en'; visiting `/` stays English.
+//   4. Locale cookie (NEXT_LOCALE, 1 year). URL is the absolute source of
+//      truth: every /ar/* request renders Arabic (and the cookie is
+//      rewritten to 'ar'); every other path renders English (and the
+//      cookie is rewritten to 'en'). Cookie is only ever a *first-visit
+//      hint* used by the locale-switcher to pick a default landing locale
+//      on the very first hit; once a URL is in play the URL wins.
 //
 // Hard rules:
 //   - NO database calls, NO heavy computation, NO awaits other than the
@@ -22,9 +23,10 @@
 //   - Cookies use httpOnly:false because the client and the server both
 //     need to read them. They are NOT sensitive (no PII, no auth) -- just
 //     experiment + personalization carriers.
-//   - We do NOT redirect based on geo. Returning Egyptian visitors should
-//     not be auto-bounced to /ar without explicit consent (i18n architect
-//     and GTM strategist both flagged this as the #1 hostility complaint).
+//   - We NEVER redirect based on geo OR Accept-Language. URL is truth.
+//     A visitor with a stale `NEXT_LOCALE=ar` cookie who lands on /pricing
+//     gets the EN page (and the cookie flips to 'en' on the response).
+//     A visitor on /ar/pricing gets the AR page regardless of cookie.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import {
@@ -154,26 +156,41 @@ function applyCookies(req: NextRequest, res: NextResponse): void {
     });
   }
 
-  // Locale -- sticky cookie, detection cascade per lib/locale.ts.
-  // We only WRITE the cookie when (a) URL contains an explicit /ar prefix
-  // (the user navigated to a localized URL -- make it stick) OR (b) the
-  // cookie is missing entirely AND we have at least one signal pointing
-  // away from the default. This avoids overwriting a user's prior choice.
+  // Locale -- URL is the source of truth. /ar/* renders Arabic;
+  // anything else renders English. The cookie is rewritten to match
+  // the URL so a single bad-cookie state can never poison subsequent
+  // RSC renders that read the cookie via `lib/i18n.ts`'s `getLocale()`.
+  //
+  // The detectLocale() cascade only runs for the FIRST visit (no cookie
+  // yet AND visitor is on `/`) so we can record a first-visit hint.
+  // Even then, the URL still wins -- we don't redirect; we just drop a
+  // sticky cookie so the next visit's locale-switcher knows the
+  // visitor's expressed preference.
   const existingLocale = req.cookies.get(LOCALE_COOKIE)?.value;
-  const detected = detectLocale({
-    cookie: existingLocale,
-    pathname: req.nextUrl.pathname,
-    country,
-    acceptLanguage: req.headers.get('accept-language'),
-  });
-
-  // Set/refresh the cookie when the URL explicitly carries /ar (so a fresh
-  // /ar visit converts to a sticky preference) OR when no cookie exists at
-  // all (record the first-visit detection so subsequent visits are stable).
   const urlHasAr =
     req.nextUrl.pathname === '/ar' || req.nextUrl.pathname.startsWith('/ar/');
+  const urlLocaleMatch: 'en' | 'ar' = urlHasAr ? 'ar' : 'en';
+
   const cookieMissingOrInvalid = !isLocale(existingLocale);
-  if (urlHasAr || cookieMissingOrInvalid) {
+  // First-visit hint: only on `/` with no prior cookie do we honor
+  // geo / Accept-Language detection. Visitors on any deeper URL get
+  // the URL-derived locale baked into the cookie.
+  const firstVisitToHome =
+    cookieMissingOrInvalid && req.nextUrl.pathname === '/';
+  const detected = firstVisitToHome
+    ? detectLocale({
+        cookie: existingLocale,
+        pathname: req.nextUrl.pathname,
+        country,
+        acceptLanguage: req.headers.get('accept-language'),
+      })
+    : urlLocaleMatch;
+
+  // Always set the cookie when (a) the URL implies a different locale
+  // than the cookie, or (b) the cookie is missing/invalid. This keeps
+  // the URL and cookie in lockstep so cookie-driven downstream readers
+  // (lib/i18n.ts getLocale, the legal pages) never disagree with the URL.
+  if (cookieMissingOrInvalid || existingLocale !== urlLocaleMatch) {
     res.cookies.set({
       name: LOCALE_COOKIE,
       value: detected,

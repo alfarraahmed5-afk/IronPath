@@ -1,68 +1,59 @@
-// /eg -- Cairo wedge page.
+// /ar/eg -- Cairo wedge in pure Arabic (no inline English flex). The /eg
+// EN page is bilingual by founder direction (English-with-Arabic-flex);
+// this page is the pure-Arabic mirror for visitors who landed on /ar
+// first and clicked through to the EGP pricing.
 //
-// Per the GTM strategist (council lens 4): ship a single static landing
-// page for Cairo BEFORE investing in full i18n architecture. One page,
-// one CTA (WhatsApp to Ahmed), one number (+20 10 3659 6238). Use it to
-// book 5 in-person Cairo demos in week 1. Architecture follows demand.
-//
-// English-with-Arabic-flex per copywriter's deck -- Arabic key phrases
-// inline (`dir="rtl"` spans), English body copy. EGP pricing visible.
-// No founder photo, no last name (founder direction).
+// Coordination: Super Agent 2 owns the EN /eg copy + structure. This
+// page mirrors that structure 1:1 in Egyptian Arabic. EGP prices stay
+// numeric (Latin digits per Egyptian SaaS convention). No em dashes.
+// "Ahmed" only -- no full name.
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { setRequestLocale } from 'next-intl/server';
 import { buildMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = buildMetadata({
-  title: 'For Cairo gyms',
+  title: 'للجيمات في القاهرة',
   description:
-    "For independent Cairo gyms tired of tracking memberships in Excel and chasing payments in WhatsApp. Free in-person demo with Ahmed.",
+    'لجيمات القاهرة المستقلة اللي تعبت من الإكسل والواتساب. عرض شخصي مجاني مع أحمد.',
   path: '/eg',
+  locale: 'ar',
 });
 
 const WHATSAPP_NUMBER = '+20 10 3659 6238';
 const WHATSAPP_LINK =
   'https://wa.me/201036596238?text=' +
-  encodeURIComponent("Hi Ahmed -- I run a gym in Cairo and I'd like to see IronPath.");
+  encodeURIComponent('أهلاً يا أحمد، أنا عندي جيم في القاهرة وعايز أشوف IronPath.');
 
 interface Tier {
   name: string;
-  arName: string;
   priceEgp: number;
   cap: string;
-  arCap: string;
   tagline: string;
 }
 
-// Founder-confirmed EGP pricing (1350 / 2750 / 5300, monthly). Lens 1
-// recommended 799/1499/2999 based on EGP 500/mo benchmark; founder
-// chose higher tier to position above the GymFlow incumbent.
+// Founder-confirmed EGP pricing -- mirrors /eg exactly.
 const TIERS: Tier[] = [
   {
-    name: 'Starter',
-    arName: 'مبتدي',
+    name: 'مبتدي',
     priceEgp: 1_350,
-    cap: 'Up to 50 members',
-    arCap: 'لحد 50 عضو',
-    tagline: "Everything you need to run a small gym without spreadsheets.",
+    cap: 'لحد 50 عضو',
+    tagline: 'كل اللي محتاجه عشان تشغّل جيم صغير من غير شيتات إكسل.',
   },
   {
-    name: 'Growth',
-    arName: 'نمو',
+    name: 'نمو',
     priceEgp: 2_750,
-    cap: 'Up to 200 members',
-    arCap: 'لحد 200 عضو',
-    tagline: 'For gyms past the first plateau, scaling staff and class load.',
+    cap: 'لحد 200 عضو',
+    tagline: 'للجيمات اللي عدّت أوّل مرحلة وعمالة تكبّر طاقم وحصص.',
   },
   {
-    name: 'Pro',
-    arName: 'برو',
+    name: 'برو',
     priceEgp: 5_300,
-    cap: 'No member cap',
-    arCap: 'بدون حد للأعضاء',
-    tagline: 'For multi-location gyms and operators with their own stack.',
+    cap: 'بدون حد للأعضاء',
+    tagline: 'لجيمات الفروع المتعددة وأصحاب الستاك التشغيلي الخاص.',
   },
 ];
 
@@ -70,15 +61,22 @@ function formatEgp(n: number): string {
   return n.toLocaleString('en-US');
 }
 
-export default function EgyptPage() {
+export default function ArabicEgyptPage() {
+  setRequestLocale('ar');
+
   return (
-    <main className="bg-ink-950 text-ink-50 min-h-screen">
-      {/* Top utility bar -- minimal, no cinematic chrome on this page. */}
+    <main
+      className="bg-ink-950 text-ink-50 min-h-screen"
+      dir="rtl"
+      lang="ar"
+    >
+      {/* Top utility bar */}
       <nav className="border-b border-ink-900">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link
-            href="/"
+            href="/ar"
             className="font-display text-base tracking-tight text-ink-100 hover:text-ink-50 transition-colors"
+            dir="ltr"
           >
             IronPath
           </Link>
@@ -88,30 +86,23 @@ export default function EgyptPage() {
             rel="noreferrer noopener"
             className="text-sm text-ink-300 hover:text-ink-50 transition-colors"
           >
-            WhatsApp
+            واتساب
           </a>
         </div>
       </nav>
 
-      {/* Hero -- bilingual */}
+      {/* Hero */}
       <section className="px-4 sm:px-6 py-20 sm:py-28">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-brand-400 mb-4 tracking-wider">
-            FOR CAIRO GYMS
+            للجيمات في القاهرة
           </p>
-          <h1
-            dir="rtl"
-            lang="ar"
-            className="font-display text-3xl sm:text-5xl text-ink-50 mb-3 tracking-tight leading-tight"
-          >
+          <h1 className="font-display text-3xl sm:text-5xl text-ink-50 mb-3 tracking-tight leading-tight">
             شغّل الجيم، مش جروبات الواتساب.
           </h1>
-          <p className="font-display text-2xl sm:text-3xl text-ink-200 mb-8 tracking-tight">
-            Run your gym, not WhatsApp groups.
-          </p>
           <p className="text-base sm:text-lg text-ink-300 max-w-xl mb-10 leading-relaxed">
-            For independent Cairo gyms tired of tracking memberships in Excel,
-            chasing payments in DMs, and remembering everything themselves.
+            لجيمات القاهرة المستقلة اللي تعبت من متابعة الاشتراكات في الإكسل،
+            وملاحقة الفلوس في الـDM، وإنها فاكرة كل حاجة بنفسها.
           </p>
           <a
             href={WHATSAPP_LINK}
@@ -120,10 +111,10 @@ export default function EgyptPage() {
             className="inline-flex items-center gap-3 px-6 py-3.5 rounded-md bg-brand-500 hover:bg-brand-450 text-white font-medium text-base transition-colors"
           >
             <WhatsAppGlyph />
-            <span>Talk to Ahmed on WhatsApp</span>
+            <span>كلّم أحمد على الواتساب</span>
           </a>
-          <p className="text-xs text-ink-400 mt-4 font-mono">
-            {WHATSAPP_NUMBER} · Free in-person demo at your gym
+          <p className="text-xs text-ink-400 mt-4 font-mono" dir="ltr">
+            {WHATSAPP_NUMBER} · عرض شخصي مجاني في الجيم بتاعك
           </p>
         </div>
       </section>
@@ -134,26 +125,21 @@ export default function EgyptPage() {
       <section className="px-4 sm:px-6 py-20 sm:py-24">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-ink-400 mb-3 tracking-wider">
-            BEFORE
+            قبل
           </p>
           <h2 className="font-display text-2xl sm:text-3xl text-ink-100 mb-6 tracking-tight">
-            You&rsquo;re losing members in your DMs.
+            إنت بتخسر أعضاء في الـDMs بتاعتك.
           </h2>
           <div className="space-y-5 text-ink-300 leading-relaxed">
             <p>
-              Forty members. One spreadsheet. Three WhatsApp groups. The cash
-              you collected last week is in your phone notes.
+              أربعين عضو. شيت إكسل واحد. تلات جروبات واتساب. الفلوس اللي
+              قبضتها الأسبوع اللي فات في نوتس التليفون.
             </p>
             <p>
-              Members forget you exist between sessions. Renewals slip. New
-              sign-ups go to whoever follows up first, and you&rsquo;re the
-              one running the front desk.
+              الأعضاء بينسوا إنك موجود ما بين الحصص. التجديدات بتفوت. أي حد
+              بيسأل بيروح للي يرد عليه الأول. وإنت ماسك الاستقبال بنفسك.
             </p>
-            <p
-              dir="rtl"
-              lang="ar"
-              className="text-ink-200 text-lg font-display"
-            >
+            <p className="text-ink-200 text-lg font-display">
               النظام كله شغّال على إنك فاكر كل حاجة. لما تنسى، الجيم بيخسر.
             </p>
           </div>
@@ -162,54 +148,54 @@ export default function EgyptPage() {
 
       <hr className="border-ink-900" />
 
-      {/* What you actually get -- only ship what we have */}
+      {/* What you actually get */}
       <section className="px-4 sm:px-6 py-20 sm:py-24">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-ink-400 mb-3 tracking-wider">
-            WHAT YOU GET
+            بتاخد إيه
           </p>
           <h2 className="font-display text-2xl sm:text-3xl text-ink-100 mb-8 tracking-tight">
-            Your gym, in one screen.
+            جيمك، في شاشة واحدة.
           </h2>
           <ul className="space-y-4">
             {[
               {
-                en: 'Member app on iOS + Android',
+                title: 'تطبيق الأعضاء على iOS وAndroid',
                 detail:
-                  'Workouts, attendance, schedules. Members open it, they remember you exist.',
+                  'تمارين، حضور، جداول. الأعضاء يفتحوه، يفتكروا إنك موجود.',
               },
               {
-                en: 'Membership tracker that lives in a system',
+                title: 'متابعة الاشتراكات في نظام مش في إكسل',
                 detail:
-                  'Not Excel. Not your phone. One source of truth for who is active, who is expiring, who has paid.',
+                  'مش إكسل. مش تليفونك. مرجع واحد لمين نشط، مين مدّته خلصت، مين دفع.',
               },
               {
-                en: 'Workout library, 600+ movements',
+                title: 'مكتبة تمارين، أكتر من 600 حركة',
                 detail:
-                  'Build routines fast. Send to a member or assign to a class.',
+                  'ركّب روتين بسرعة. ابعته لعضو أو خصّصه لحصة كاملة.',
               },
               {
-                en: 'Push + email notifications',
+                title: 'إشعارات Push وإيميل',
                 detail:
-                  "You're back in your members' pockets. Renewal reminders, class invites, retention nudges, automated.",
+                  'إنت رجعت تاني في جيب الأعضاء. تذكير التجديد، دعوة الحصص، رسائل تثبيت العضو، كله أوتوماتيك.',
               },
               {
-                en: 'QR poster for the gym wall',
+                title: 'بوستر QR لحيطة الجيم',
                 detail:
-                  "Print one poster. Members scan, they're in. The single highest-leverage activation event.",
+                  'اطبع بوستر واحد. الأعضاء يفسحوا، يدخلوا في النظام. أعلى نقطة تفعيل قيمة بنشوفها.',
               },
               {
-                en: 'Web dashboard for the owner',
+                title: 'لوحة تحكم ويب لصاحب الجيم',
                 detail:
-                  "Active members, MRR, retention, today's check-ins. You see the gym at a glance from your laptop.",
+                  'الأعضاء النشطين، الإيراد الشهري، الاحتفاظ، تسجيلات اليوم. شوف الجيم بنظرة واحدة من اللاب توب.',
               },
             ].map((feat) => (
               <li
-                key={feat.en}
-                className="flex gap-3 border-l-2 border-brand-500/30 pl-4"
+                key={feat.title}
+                className="flex gap-3 border-r-2 border-brand-500/30 pr-4"
               >
                 <div className="flex-1">
-                  <p className="text-ink-100 font-medium">{feat.en}</p>
+                  <p className="text-ink-100 font-medium">{feat.title}</p>
                   <p className="text-ink-400 text-sm mt-1 leading-relaxed">
                     {feat.detail}
                   </p>
@@ -226,14 +212,14 @@ export default function EgyptPage() {
       <section className="px-4 sm:px-6 py-20 sm:py-24">
         <div className="mx-auto max-w-5xl">
           <p className="font-mono text-[11px] text-ink-400 mb-3 tracking-wider">
-            PRICING
+            الأسعار
           </p>
           <h2 className="font-display text-2xl sm:text-3xl text-ink-100 mb-3 tracking-tight">
-            Pricing in EGP. Monthly. Pay when you&rsquo;re ready.
+            أسعار بالجنيه. شهرية. ادفع لما تكون جاهز.
           </h2>
           <p className="text-ink-300 mb-12 max-w-xl leading-relaxed">
-            Start with a free in-person demo. Pay only when you&rsquo;re using
-            the platform with real members.
+            ابدأ بعرض شخصي مجاني في الجيم بتاعك. ادفع بس لما تستخدم النظام
+            مع أعضائك الفعليين.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
@@ -248,18 +234,11 @@ export default function EgyptPage() {
                 ].join(' ')}
               >
                 <div className="mb-4">
-                  <p className="font-mono text-[11px] text-ink-400 tracking-wider">
-                    {tier.name.toUpperCase()}
-                  </p>
-                  <p
-                    dir="rtl"
-                    lang="ar"
-                    className="font-display text-sm text-ink-300 mt-0.5"
-                  >
-                    {tier.arName}
+                  <p className="font-display text-sm text-ink-300">
+                    {tier.name}
                   </p>
                 </div>
-                <div className="mb-3" data-numeric>
+                <div className="mb-3" data-numeric dir="ltr">
                   <span className="font-display text-4xl sm:text-5xl text-ink-50 font-semibold">
                     {formatEgp(tier.priceEgp)}
                   </span>
@@ -268,13 +247,6 @@ export default function EgyptPage() {
                   </span>
                 </div>
                 <p className="text-ink-300 text-sm mb-1">{tier.cap}</p>
-                <p
-                  dir="rtl"
-                  lang="ar"
-                  className="text-ink-400 text-xs font-display mb-5"
-                >
-                  {tier.arCap}
-                </p>
                 <p className="text-ink-300 text-sm leading-relaxed mb-6 flex-1">
                   {tier.tagline}
                 </p>
@@ -290,7 +262,7 @@ export default function EgyptPage() {
                   ].join(' ')}
                 >
                   <WhatsAppGlyph small />
-                  <span>Talk to Ahmed</span>
+                  <span>كلّم أحمد</span>
                 </a>
               </article>
             ))}
@@ -298,8 +270,8 @@ export default function EgyptPage() {
 
           <div className="mt-10 text-sm text-ink-400 leading-relaxed max-w-2xl">
             <p>
-              Pay by Paymob, Fawry, or InstaPay when you upgrade. No card
-              needed to start. Switch tiers anytime.
+              الدفع عن طريق Paymob أو Fawry أو InstaPay لما تترقّى. مش هتحتاج
+              فيزا عشان تبدأ. غيّر الباقة في أي وقت.
             </p>
           </div>
         </div>
@@ -311,18 +283,11 @@ export default function EgyptPage() {
       <section className="px-4 sm:px-6 py-24 sm:py-32">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl sm:text-4xl text-ink-50 mb-4 tracking-tight">
-            Let&rsquo;s talk.
-          </h2>
-          <p
-            dir="rtl"
-            lang="ar"
-            className="font-display text-xl sm:text-2xl text-ink-200 mb-8"
-          >
             تعالى نتكلّم.
-          </p>
+          </h2>
           <p className="text-ink-300 mb-10 leading-relaxed">
-            Send Ahmed a WhatsApp. He&rsquo;ll come to your gym for a free
-            in-person demo, usually within a week.
+            ابعت لأحمد واتساب. هييجيلك جيمك يعمل عرض شخصي مجاني، عادةً في
+            خلال أسبوع.
           </p>
           <a
             href={WHATSAPP_LINK}
@@ -331,34 +296,32 @@ export default function EgyptPage() {
             className="inline-flex items-center gap-3 px-7 py-4 rounded-md bg-brand-500 hover:bg-brand-450 text-white font-medium text-base transition-colors"
           >
             <WhatsAppGlyph />
-            <span>Talk to Ahmed on WhatsApp</span>
+            <span>كلّم أحمد على الواتساب</span>
           </a>
-          <p className="text-sm text-ink-400 mt-5 font-mono">
+          <p className="text-sm text-ink-400 mt-5 font-mono" dir="ltr">
             {WHATSAPP_NUMBER}
           </p>
         </div>
       </section>
 
-      {/* Quiet footer -- no founder name, no LinkedIn, no Cal.com.
-          Just the basics + a way back to the international site. */}
       <footer className="border-t border-ink-900 px-4 sm:px-6 py-10 text-xs text-ink-400">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row gap-4 sm:justify-between">
           <span>© {new Date().getFullYear()} IronPath</span>
           <nav className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/" className="hover:text-ink-100 transition-colors">
+            <Link href="/" className="hover:text-ink-100 transition-colors" hrefLang="en">
               International site
             </Link>
             <Link
-              href="/privacy"
+              href="/ar/privacy"
               className="hover:text-ink-100 transition-colors"
             >
-              Privacy
+              الخصوصية
             </Link>
             <Link
-              href="/terms"
+              href="/ar/terms"
               className="hover:text-ink-100 transition-colors"
             >
-              Terms
+              الشروط
             </Link>
           </nav>
         </div>

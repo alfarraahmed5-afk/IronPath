@@ -44,20 +44,23 @@
     "incitingIncident": {
       "ariaLabel": "Inciting incident, what gym ownership looks like before IronPath",
       "eyebrow": "BEFORE",
-      "headline": "What gym ownership looks like at 11:47am.",
+      "headline": "What ownership looks like at 11:47am.",
       "lede": "Forty members. One spreadsheet. No signal. The work is real but the system is held together by you remembering everything.",
       "cards": {
         "memberships": {
           "eyebrow": "Memberships",
-          "caption": "Two hundred rows in Excel. One coach who knows where the truth is."
+          "headline": "Two hundred rows in Excel.",
+          "caption": "One coach who knows where the truth is. The new hire stares at the file and asks who is still active."
         },
         "clock": {
-          "eyebrow": "11:47am",
-          "caption": "You opened at 6. Three people came. The rest, you assume, are coming."
+          "eyebrow": "Schedule",
+          "headline": "Class times live in your head.",
+          "caption": "You changed Tuesday's slot last week. Half the regulars showed up at the old time anyway."
         },
         "phone": {
-          "eyebrow": "No signal",
-          "caption": "No notifications. No new sign-ups. Members forget you exist between sessions."
+          "eyebrow": "Signal",
+          "headline": "No reach between sessions.",
+          "caption": "Members close the app and forget you exist. New sign-ups flow to whoever follows up first, and you are running the front desk."
         }
       }
     },
@@ -165,10 +168,10 @@
           "cap": "Up to 50 members",
           "tagline": "For the studio finding its rhythm.",
           "features": {
-            "f1": "Member roster & attendance",
-            "f2": "Workout programming, 600+ movements",
-            "f3": "QR poster forge",
-            "f4": "Email support"
+            "f1": "Member app (iOS + Android)",
+            "f2": "Workout builder, 600+ movements",
+            "f3": "QR poster for the gym wall",
+            "f4": "Email support, 1 business day"
           },
           "cta": "Start free trial"
         },
@@ -246,7 +249,13 @@
       "idle": "Start my 30-day trial",
       "submitting": "Starting your trial...",
       "trust": "No credit card. Set up in 5 minutes. Cancel anytime.",
-      "genericError": "Something went wrong on our end. Try again. If it keeps failing, email hello@ironpath.health."
+      "genericError": "Something went wrong. Try again or WhatsApp Ahmed directly."
+    },
+    "success": {
+      "eyebrow": "GOT IT",
+      "headline": "Thanks. Ahmed will reply within the day.",
+      "body": "In the meantime, want to skip the queue? WhatsApp him directly.",
+      "whatsappCta": "WhatsApp Ahmed"
     }
   },
   "common": {
@@ -419,7 +428,7 @@
         },
         {
           "q": "What's on the roadmap that I'd care about?",
-          "a_html": "Class scheduling + waitlists, churn dashboard, multi-location, and a member-import wizard are all in the next two quarters. The full list with target dates is on the <link>roadmap</link>."
+          "a_html": "Member-import wizard lands Q3 2026; Stripe billing self-serve, class scheduling + waitlists, and role-based permissions are Q4 2026; churn risk dashboard and webhooks are Q1 2027; multi-location lands Q2 2027. The full list with current target dates is on the <link>roadmap</link>."
         }
       ]
     },

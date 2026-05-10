@@ -1,10 +1,15 @@
 // Root layout -- owns the single <html>/<body> for the entire app.
 //
-// Locale resolution:
-//   - We read the request pathname via next/headers' `headers()` (Next 15
-//     populates `x-invoke-path` / `next-url` / `x-pathname`), and set
-//     <html lang="ar-EG" dir="rtl"> for any /ar/* request, English defaults
-//     for everything else.
+// Locale resolution (URL is the source of truth, cookie is a hint):
+//   1. Inspect the request URL via the `x-pathname` header that the edge
+//      middleware forwards on every request (Next 15's `headers()` reads
+//      request headers, not URL, so the layout cannot inspect the path
+//      otherwise). If the pathname starts with `/ar` we render Arabic;
+//      everything else renders English. URL is non-negotiable.
+//   2. Fall back to the `NEXT_LOCALE` cookie ONLY when no header is
+//      forwarded (e.g. during build-time prerender of error pages). The
+//      middleware always forwards the header in production, so cookie
+//      fallback is purely defensive.
 //   - This forces the root render to be dynamic, but the cinematic surface
 //     does not benefit much from static generation (LCP is dominated by the
 //     hero AVIF + the LazyMotion bundle, not the HTML shell). Net cost on
@@ -21,7 +26,7 @@
 //     the SEO signal differs.
 
 import type { Metadata, Viewport } from 'next';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import Script from 'next/script';
@@ -31,7 +36,13 @@ import {
   monaSans,
   ibmPlexSansArabic,
 } from '@/lib/fonts';
-import { htmlDir, htmlLang, type Locale } from '@/lib/locale';
+import {
+  LOCALE_COOKIE,
+  htmlDir,
+  htmlLang,
+  isLocale,
+  type Locale,
+} from '@/lib/locale';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -49,9 +60,11 @@ export const viewport: Viewport = {
 };
 
 async function resolveLocale(): Promise<Locale> {
+  // 1. URL is the source of truth. Next 15 surfaces the request URL
+  //    through several headers depending on the adapter (Vercel Edge
+  //    vs. Node). The `x-pathname` header is set by our middleware on
+  //    every request, the others are Next-internal fallbacks.
   const h = await headers();
-  // Next 15 surfaces the request URL through several headers depending on
-  // adapter (Vercel Edge vs. Node, etc.). Try them in order; first hit wins.
   const candidates = [
     h.get('x-pathname'),
     h.get('x-invoke-path'),
@@ -65,7 +78,22 @@ async function resolveLocale(): Promise<Locale> {
     if (path === '/ar' || path.startsWith('/ar/') || path.startsWith('/ar?')) {
       return 'ar';
     }
+    // Any other path is explicitly EN -- the URL trumps the cookie.
+    if (path && path.length > 0) return 'en';
   }
+
+  // 2. Cookie fallback. Reached only when no URL header is forwarded
+  //    (build-time prerender of an error page, etc.). The middleware
+  //    forwards `x-pathname` on every real request, so this branch
+  //    should be exceedingly rare in production.
+  try {
+    const c = await cookies();
+    const v = c.get(LOCALE_COOKIE)?.value;
+    if (isLocale(v)) return v;
+  } catch {
+    // cookies() throws outside a request context; fall through.
+  }
+
   return 'en';
 }
 
