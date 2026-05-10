@@ -36,12 +36,23 @@ export default function LoginPage() {
     navigate(totpEnabled ? '/gyms' : '/2fa/setup');
   }
 
-  async function handleCredentials(e: React.FormEvent) {
+  async function handleCredentials(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
+    // Read values from the form rather than React state. Browser password
+    // managers can autofill controlled inputs in ways that don't fire
+    // React's onChange — leaving `email`/`password` state empty even
+    // though the DOM value is populated. FormData reads the live DOM,
+    // so autofill always works. (Same fix we applied to admin/LoginPage.)
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = String(formData.get('email') ?? email).trim();
+    const submittedPassword = String(formData.get('password') ?? password);
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post('/auth/login', {
+        email: submittedEmail,
+        password: submittedPassword,
+      });
       const data = res.data.data;
 
       if (data.requires_2fa) {
@@ -116,6 +127,7 @@ export default function LoginPage() {
 
             <Field label="Email">
               <input
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -128,6 +140,7 @@ export default function LoginPage() {
 
             <Field label="Password" mb="mb-6">
               <input
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
