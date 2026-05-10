@@ -105,6 +105,9 @@ const PROBES: SchemaProbe[] = [
     description: 'gym_volume_percentile() function',
     run: probeFunction('gym_volume_percentile', { p_user_id: '00000000-0000-0000-0000-000000000000' }),
   },
+  // BE-N (cinematic overhaul) -- streak tier ladder.
+  { migration: '052', description: 'streak_tier_thresholds table', run: probeTable('streak_tier_thresholds') },
+  { migration: '052', description: 'streak_tier_thresholds.threshold_days column', run: probeColumn('streak_tier_thresholds', 'threshold_days') },
 ];
 
 export interface SchemaCheckResult {

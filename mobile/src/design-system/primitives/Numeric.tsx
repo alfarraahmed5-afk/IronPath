@@ -117,9 +117,9 @@ function DigitColumn({ digit, height, duration, reduceMotion, textStyle, width }
  * clip. Caller can override via style.
  */
 function approxDigitWidth(variant: TypeVariant): number {
-  const t = typeTokens[variant];
+  const t = typeTokens[variant] as { fontSize: number; fontFamily?: string };
   // Numeric variants use BarlowCondensed; condensed ~0.55, regular ~0.62.
-  const ratio = String(t.fontFamily).includes('Condensed') ? 0.55 : 0.62;
+  const ratio = String(t.fontFamily ?? '').includes('Condensed') ? 0.55 : 0.62;
   return Math.ceil(t.fontSize * ratio);
 }
 
@@ -141,8 +141,8 @@ export function Numeric({
   );
   const slots = useMemo(() => splitSlots(formatted), [formatted]);
 
-  const variantStyle = typeTokens[variant];
-  const lineHeight = (variantStyle.lineHeight ?? variantStyle.fontSize) as number;
+  const variantStyle = typeTokens[variant] as TextStyle & { fontSize: number; lineHeight?: number; fontFamily?: string };
+  const lineHeight = (variantStyle.lineHeight ?? variantStyle.fontSize);
   const baseTextStyle: StyleProp<TextStyle> = useMemo(
     () => [
       variantStyle as TextStyle,

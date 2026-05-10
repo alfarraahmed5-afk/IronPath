@@ -93,7 +93,9 @@ export function LivePulseStrip({
   const sweepX = useSharedValue(-sliverPx);
   // 1 = visible (sweep underway), 0 = idle (hairline only).
   const sliverOpacity = useSharedValue(0);
-  const isFocused = useSharedValue(true);
+  // 1 = focused, 0 = blurred. We use a number-typed shared value so
+  // worklet code can branch with arithmetic instead of bool ops.
+  const isFocused = useSharedValue(1);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -160,8 +162,10 @@ export function LivePulseStrip({
           {/* Hairline -- always on. */}
           <Rect x={0} y={0} width={width} height={height} color={hairline} opacity={DEFAULT_HAIRLINE_ALPHA} />
           {/* Ember sliver sweep. Linear gradient from transparent ->
-              crimson core -> transparent so the head + tail fade. */}
-          <Group opacity={sliverOpacity}>
+              crimson core -> transparent so the head + tail fade.
+              Skia reads the SharedValue at runtime via .value; the
+              cast is only to satisfy TS's stricter prop types. */}
+          <Group opacity={sliverOpacity as any}>
             <Rect x={0} y={0} width={width} height={height}>
               <LinearGradient
                 start={sliverStart}

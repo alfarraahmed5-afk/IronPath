@@ -25,7 +25,19 @@ export interface BadgeContext {
   startedAt: string;
 }
 
-export async function checkAndAwardBadges(ctx: BadgeContext): Promise<void> {
+/**
+ * BE-J (cinematic overhaul): a richer return shape so the
+ * /workouts handler can include `newly_unlocked_badges` in the
+ * celebrate-screen response. Each entry is the badge_key + the
+ * human-readable label; the caller (and the celebrate UI) renders
+ * the icon from the key.
+ */
+export interface UnlockedBadge {
+  badge_key: string;
+  label: string;
+}
+
+export async function checkAndAwardBadges(ctx: BadgeContext): Promise<UnlockedBadge[]> {
   try {
     const { data: settings } = await supabase
       .from('user_settings')
@@ -95,6 +107,8 @@ export async function checkAndAwardBadges(ctx: BadgeContext): Promise<void> {
     if (localDt.hour < 7) earned.push('early_bird');
     if (localDt.hour >= 22) earned.push('night_owl');
 
+    const unlocked: UnlockedBadge[] = [];
+
     for (const badge of earned) {
       const { data: inserted, error } = await supabase
         .from('user_badges')
@@ -112,6 +126,8 @@ export async function checkAndAwardBadges(ctx: BadgeContext): Promise<void> {
       }
 
       const label = BADGE_LABELS[badge] || badge;
+      unlocked.push({ badge_key: badge, label });
+
       await supabase.from('notifications').insert({
         user_id: ctx.userId,
         gym_id: ctx.gymId,
@@ -130,7 +146,10 @@ export async function checkAndAwardBadges(ctx: BadgeContext): Promise<void> {
         });
       }
     }
+
+    return unlocked;
   } catch (err) {
     logger.error({ err }, 'Badge check failed');
+    return [];
   }
 }

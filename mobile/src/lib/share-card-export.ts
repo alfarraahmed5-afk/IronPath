@@ -28,7 +28,7 @@
  * defers to the same capture mechanism.
  */
 import { Platform, Linking } from 'react-native';
-import { captureRef, ViewShotOptions } from 'react-native-view-shot';
+import { captureRef, CaptureOptions as ViewShotCaptureOptions } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
 export interface ShareCardDimensions {
@@ -58,7 +58,7 @@ export async function captureShareCardRef(
   opts: Partial<CaptureOptions> = {},
 ): Promise<string> {
   const merged = { ...DEFAULT_OPTS, ...opts };
-  const captureOpts: ViewShotOptions = {
+  const captureOpts: ViewShotCaptureOptions = {
     format: merged.format,
     quality: merged.quality,
     width: merged.width,
