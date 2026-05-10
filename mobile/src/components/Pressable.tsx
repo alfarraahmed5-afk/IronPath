@@ -1,58 +1,10 @@
-import { Pressable as RNPressable, PressableProps, StyleSheet, ViewStyle } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { haptic } from '../lib/haptics';
-
-const AnimatedPressable = Animated.createAnimatedComponent(RNPressable);
-
-type Props = PressableProps & {
-  hapticType?: 'light' | 'medium' | 'select' | 'none';
-  scaleOnPress?: boolean;
-  style?: ViewStyle | ViewStyle[];
-  children: React.ReactNode;
-  accessibilityLabel: string;
-};
-
-export function Pressable({
-  hapticType = 'light',
-  scaleOnPress = true,
-  onPress,
-  style,
-  children,
-  hitSlop,
-  accessibilityLabel,
-  disabled,
-  ...rest
-}: Props) {
-  const scale = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedPressable
-      onPressIn={() => {
-        if (scaleOnPress) {
-          scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
-        }
-        if (hapticType !== 'none' && !disabled) {
-          haptic[hapticType]?.();
-        }
-      }}
-      onPressOut={() => {
-        if (scaleOnPress) {
-          scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-        }
-      }}
-      onPress={onPress}
-      hitSlop={hitSlop ?? { top: 8, bottom: 8, left: 8, right: 8 }}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      disabled={disabled}
-      style={[animStyle, style as ViewStyle]}
-      {...rest}
-    >
-      {children}
-    </AnimatedPressable>
-  );
-}
+/**
+ * Legacy Pressable -- shim that re-exports the design-system Pressable.
+ *
+ * The legacy file is preserved at this path so existing imports across
+ * the app continue to resolve. The design-system version fixes the
+ * haptic-on-press-in scroll-spam bug (lens 8 row 6) and adds
+ * android_ripple forwarding.
+ */
+export { Pressable } from '../design-system/primitives/Pressable';
+export type { IronPressableProps as PressableProps } from '../design-system/primitives/Pressable';

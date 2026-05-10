@@ -17,13 +17,12 @@
  *
  * Min touch target: 44pt iOS / 48pt Android via default hitSlop.
  */
-import React, { forwardRef } from 'react';
+import React from 'react';
 import {
   Pressable as RNPressable,
   PressableProps,
   ViewStyle,
   Platform,
-  type View,
   type PressableAndroidRippleConfig,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -38,6 +37,9 @@ export interface IronPressableProps extends Omit<PressableProps, 'children' | 's
   /** Named haptic from the canonical map. Default: `rowTap`. Set to
    *  `'none'` to suppress. */
   haptic?: HapticKey | 'none';
+  /** Legacy alias for `haptic` -- accepted for backwards-compat with
+   *  pre-overhaul call sites. New code should use `haptic`. */
+  hapticType?: 'light' | 'medium' | 'heavy' | 'select' | 'success' | 'warning' | 'error' | 'none';
   /** Disable the press-scale animation (kept for API compat with
    *  legacy callers). */
   scaleOnPress?: boolean;
@@ -45,7 +47,9 @@ export interface IronPressableProps extends Omit<PressableProps, 'children' | 's
   pressScale?: number;
   /** Forward android_ripple. Pass `null` to disable ripple. */
   android_ripple?: PressableAndroidRippleConfig | null;
-  style?: ViewStyle | ViewStyle[];
+  /** Style overrides. Accepts the full ViewStyle union plus the
+   *  legacy `false | {...}` pattern so existing code keeps compiling. */
+  style?: ViewStyle | (ViewStyle | false | undefined | null)[] | (ViewStyle | false | undefined | null);
   children: React.ReactNode;
 }
 
@@ -55,24 +59,27 @@ const DEFAULT_RIPPLE: PressableAndroidRippleConfig = {
   foreground: true,
 };
 
-export const Pressable = forwardRef<View, IronPressableProps>(function Pressable(
-  {
-    haptic: hapticKey = 'rowTap',
-    scaleOnPress = true,
-    pressScale = 0.97,
-    onPress,
-    onPressIn,
-    onPressOut,
-    style,
-    children,
-    hitSlop,
-    accessibilityLabel,
-    disabled,
-    android_ripple,
-    ...rest
-  },
-  ref,
-) {
+export function Pressable({
+  haptic: hapticKey,
+  hapticType,
+  scaleOnPress = true,
+  pressScale = 0.97,
+  onPress,
+  onPressIn,
+  onPressOut,
+  style,
+  children,
+  hitSlop,
+  accessibilityLabel,
+  disabled,
+  android_ripple,
+  ...rest
+}: IronPressableProps) {
+  // Resolve haptic name. New `haptic` prop wins; fall back to legacy
+  // `hapticType` which maps to the same primitives by name.
+  const resolvedHaptic: HapticKey | 'none' =
+    hapticKey ?? (hapticType as HapticKey | undefined) ?? 'rowTap';
+
   const { animStyle, pressIn, pressOut } = usePressScale(pressScale);
 
   function handlePressIn(e: any) {
@@ -84,8 +91,8 @@ export const Pressable = forwardRef<View, IronPressableProps>(function Pressable
     onPressOut?.(e);
   }
   function handlePress(e: any) {
-    if (hapticKey !== 'none' && !disabled) {
-      haptic[hapticKey]?.();
+    if (resolvedHaptic !== 'none' && !disabled) {
+      haptic[resolvedHaptic]?.();
     }
     onPress?.(e);
   }
@@ -98,7 +105,6 @@ export const Pressable = forwardRef<View, IronPressableProps>(function Pressable
 
   return (
     <AnimatedPressable
-      ref={ref as any}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
@@ -114,4 +120,4 @@ export const Pressable = forwardRef<View, IronPressableProps>(function Pressable
       {children as any}
     </AnimatedPressable>
   );
-});
+}
