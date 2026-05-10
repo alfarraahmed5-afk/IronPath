@@ -6,9 +6,15 @@
  * land real implementations.
  */
 export { Card } from './Card';
+export type { CardProps, CardVariant, CardLevel } from './Card';
 export { Hero } from './Hero';
-export { ListRow } from './ListRow';
+export type { HeroProps } from './Hero';
+export { ListRow, deleteAction, pinAction } from './ListRow';
+export type { ListRowProps, ListRowSwipeAction } from './ListRow';
 export { Tile } from './Tile';
+export type { TileProps, TileSize } from './Tile';
+export type { EmberSeamProps } from './EmberSeam';
+export type { IronPressableProps } from './Pressable';
 export { Numeric } from './Numeric';
 export { Eyebrow } from './Eyebrow';
 export { Section } from './Section';
