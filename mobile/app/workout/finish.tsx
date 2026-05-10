@@ -192,21 +192,49 @@ export default function FinishWorkoutScreen() {
         })),
       };
 
-      const result = await api.post<{ data: { workout: { id: string; ordinal_number: number }; prs_detected: string[] } }>(
-        '/workouts', body
-      );
+      const result = await api.post<{
+        data: {
+          workout: { id: string; ordinal_number: number };
+          prs_detected: string[];
+          prs_detected_v2?: Array<{
+            label: string;
+            exercise_id?: string;
+            exercise_name?: string;
+            record_type?: string;
+            value?: number;
+            previous_best?: number | null;
+            delta_pct?: number | null;
+          }>;
+          gym_percentile?: number | null;
+          newly_unlocked_badges?: Array<{ badge_key: string; label?: string }>;
+        };
+      }>('/workouts', body);
 
       finishWorkout();
 
       const prs = result.data?.prs_detected ?? [];
+      const prsV2 = result.data?.prs_detected_v2 ?? [];
+      const newlyUnlocked = result.data?.newly_unlocked_badges ?? [];
+      const gymPercentile = result.data?.gym_percentile ?? null;
+
       if (result.data?.workout?.ordinal_number === 1) {
         await requestPushPermission();
       }
 
-      if (prs.length > 0) {
-        // Use ' | ' as separator — PR strings can contain commas/dots so a
-        // simple comma split breaks. The celebrate screen knows to split on '|'.
-        router.replace({ pathname: '/workout/celebrate', params: { prs: prs.join(' | ') } } as any);
+      const hasAnyCelebration = prs.length > 0 || newlyUnlocked.length > 0;
+      if (hasAnyCelebration) {
+        // Structured payloads ride through expo-router params as
+        // URI-encoded JSON. Legacy `prs` string preserved as a
+        // fallback so even an out-of-date celebrate.tsx still renders
+        // something coherent.
+        const params: Record<string, string> = {};
+        if (prs.length > 0) params.prs = prs.join(' | ');
+        if (prsV2.length > 0) params.prs_v2 = encodeURIComponent(JSON.stringify(prsV2));
+        if (newlyUnlocked.length > 0) {
+          params.badges_v2 = encodeURIComponent(JSON.stringify(newlyUnlocked));
+        }
+        if (gymPercentile != null) params.gym_percentile = String(gymPercentile);
+        router.replace({ pathname: '/workout/celebrate', params } as any);
       } else {
         router.replace('/(tabs)/workouts');
       }
