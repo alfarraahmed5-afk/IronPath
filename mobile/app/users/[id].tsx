@@ -296,7 +296,7 @@ export default function UserProfileScreen() {
           />
           {/* Avatar + bio overlay */}
           <View style={styles.heroSection}>
-            <Avatar username={user.full_name || user.username} avatarUrl={user.avatar_url} size={88} />
+            <Avatar username={user.full_name || user.username} avatarUrl={user.avatar_url} size={80} />
             <Text variant="title2" color="textPrimary" style={styles.fullName}>{user.full_name}</Text>
             <Text variant="label" color="textTertiary">@{user.username}</Text>
             {user.bio ? (
