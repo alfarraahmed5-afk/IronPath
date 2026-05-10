@@ -26,6 +26,10 @@ export const AB_COOKIE = 'ab-pricing';
 /** Cookie name used by middleware to surface visitor city for personalization. */
 export const GEO_COOKIE = 'geo-city';
 
+/** ISO country code (EG, US, GB, etc.) — used to surface the Cairo banner
+ *  to Egyptian visitors and to fork the lead-form routing. */
+export const GEO_COUNTRY_COOKIE = 'geo-country';
+
 /** 90 days in seconds. */
 export const AB_COOKIE_MAX_AGE = 60 * 60 * 24 * 90;
 

@@ -21,6 +21,9 @@ interface Tier {
   accent?: boolean;
 }
 
+// Feature lists are intentionally trimmed to ONLY what's shipped today.
+// Aspirational items (class scheduling, churn dashboard, multi-location,
+// SSO, etc.) live on /roadmap with quarterly targets. Honesty over breadth.
 const TIERS: Tier[] = [
   {
     slug: 'starter',
@@ -30,7 +33,7 @@ const TIERS: Tier[] = [
     tagline: 'For the studio finding its rhythm.',
     features: [
       { text: 'Member roster & attendance' },
-      { text: 'Workout programming' },
+      { text: 'Workout programming, 600+ movements' },
       { text: 'QR poster forge' },
       { text: 'Email support' },
     ],
@@ -43,9 +46,9 @@ const TIERS: Tier[] = [
     tagline: 'For the gym hitting its stride.',
     features: [
       { text: 'Everything in Starter' },
-      { text: 'Subscription billing & receipts' },
-      { text: 'Live floor pulse' },
-      { text: 'Churn signals & weekly digest' },
+      { text: 'Subscription receipts in admin' },
+      { text: 'Trial-end retention emails (automated)' },
+      { text: 'Activation milestone celebrations' },
     ],
     accent: true,
   },
@@ -57,9 +60,9 @@ const TIERS: Tier[] = [
     tagline: 'For the box that keeps growing.',
     features: [
       { text: 'Everything in Growth' },
-      { text: 'Multi-coach roles & permissions' },
-      { text: 'Custom branding on member app' },
-      { text: 'Priority support, same-day' },
+      { text: 'Custom branding (logo + accent color)' },
+      { text: 'Founder onboarding call' },
+      { text: 'Priority email support' },
     ],
   },
 ];
@@ -105,6 +108,13 @@ export default function PricingScene() {
 
           <p className="mt-10 text-center text-sm text-ink-400">
             All tiers include the 30-day trial. Switch tiers anytime.
+            {' · '}
+            <a
+              href="/roadmap"
+              className="text-ink-300 hover:text-brand-400 transition-colors underline-offset-2 hover:underline"
+            >
+              See what&rsquo;s shipping next →
+            </a>
           </p>
         </div>
       </section>

@@ -31,6 +31,11 @@ interface Tier {
   accent?: boolean;
 }
 
+// Feature lists are trimmed to ONLY what's shipped today. Aspirational
+// items (class scheduling, churn dashboard, multi-location, SSO, API,
+// webhooks, mobile owner dashboard, etc.) live on /roadmap with quarterly
+// targets. Honesty over breadth — if a customer signs up and a feature
+// isn't there, the trust hit is worse than a sparser pricing page.
 const TIERS: Tier[] = [
   {
     slug: 'starter',
@@ -41,11 +46,9 @@ const TIERS: Tier[] = [
     features: [
       'Up to 50 active members',
       'Member app (iOS + Android)',
-      'Workout builder with library of 600+ movements',
-      'Front-desk check-in (QR + manual)',
-      'Stripe billing for memberships',
+      'Workout builder, 600+ movements',
+      'QR poster for the gym wall',
       'Email + push notifications',
-      'CSV member import',
       'Email support, 1 business day',
     ],
   },
@@ -54,19 +57,15 @@ const TIERS: Tier[] = [
     name: 'Growth',
     price: 99,
     cap: '200 members',
-    tagline: 'For gyms past the first plateau, scaling staff and class load.',
+    tagline: 'For gyms past the first plateau.',
     accent: true,
     features: [
       'Up to 200 active members',
       'Everything in Starter',
-      'Coach role with per-coach attendance',
-      'Class scheduling + waitlists',
-      'Custom branding (logo, accent color, app name)',
-      'Bulk member import from Mindbody / Glofox CSV',
-      'Churn risk dashboard',
-      'Member retention emails (drip + win-back)',
-      'Slack + email support, same-day',
-      'Owner mobile dashboard',
+      'Trial-end retention emails (automated)',
+      'Activation milestone celebrations',
+      'Subscription receipts in admin',
+      'Email support, same-day',
     ],
   },
   {
@@ -74,18 +73,14 @@ const TIERS: Tier[] = [
     name: 'Unlimited',
     price: 199,
     cap: 'No member cap',
-    tagline: 'For multi-location gyms and operators with their own stack.',
+    tagline: 'For the box that keeps growing.',
     features: [
       'Unlimited active members',
       'Everything in Growth',
-      'Multi-location support',
-      'Role-based permissions (owner, manager, coach, front-desk)',
-      'Read + write API access',
-      'Webhook events (member.created, attendance.logged, etc.)',
-      'SSO via Google Workspace',
-      'Audit log export (CSV / JSON)',
-      'Priority support — Slack channel + 1 hr response',
-      'Onboarding call with founder',
+      'Custom branding (logo + accent color)',
+      'Founder onboarding call',
+      'Direct line to founder for product feedback',
+      'Priority email support',
     ],
   },
 ];
@@ -97,22 +92,21 @@ interface ComparisonRow {
   unlimited: string;
 }
 
+// Comparison table — shipped features only. Anything marked "—" means
+// it isn't available in that tier today. The /roadmap page lists what's
+// coming and when.
 const COMPARISON: ComparisonRow[] = [
-  { label: 'Member cap',          starter: '50',          growth: '200',         unlimited: 'Unlimited' },
-  { label: 'Member app',          starter: 'Yes',         growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Workout builder',     starter: 'Yes',         growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Stripe billing',      starter: 'Yes',         growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Coach role',          starter: '—',           growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Class scheduling',    starter: '—',           growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Custom branding',     starter: '—',           growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Bulk member import',  starter: 'CSV only',    growth: 'Mindbody, Glofox, CSV', unlimited: 'Mindbody, Glofox, CSV, API' },
-  { label: 'Churn dashboard',     starter: '—',           growth: 'Yes',         unlimited: 'Yes' },
-  { label: 'Multi-location',      starter: '—',           growth: '—',           unlimited: 'Yes' },
-  { label: 'API access',          starter: '—',           growth: '—',           unlimited: 'Read + write' },
-  { label: 'Webhooks',            starter: '—',           growth: '—',           unlimited: 'Yes' },
-  { label: 'SSO (Google)',        starter: '—',           growth: '—',           unlimited: 'Yes' },
-  { label: 'Audit log export',    starter: '—',           growth: '—',           unlimited: 'Yes' },
-  { label: 'Support',             starter: 'Email · 1 day', growth: 'Slack + email · same day', unlimited: 'Priority · 1 hr' },
+  { label: 'Member cap',                  starter: '50',           growth: '200',           unlimited: 'Unlimited' },
+  { label: 'Member app (iOS + Android)',  starter: 'Yes',          growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Workout builder',             starter: 'Yes',          growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'QR poster forge',             starter: 'Yes',          growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Push + email notifications',  starter: 'Yes',          growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Trial-end retention emails',  starter: '—',            growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Activation milestones',       starter: '—',            growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Subscription receipts',       starter: '—',            growth: 'Yes',           unlimited: 'Yes' },
+  { label: 'Custom branding (logo + color)', starter: '—',         growth: '—',             unlimited: 'Yes' },
+  { label: 'Founder onboarding call',     starter: '—',            growth: '—',             unlimited: 'Yes' },
+  { label: 'Support',                     starter: 'Email · 1 day', growth: 'Email · same day', unlimited: 'Priority email' },
 ];
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
@@ -149,33 +143,40 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     ),
   },
   {
-    q: 'What about transaction fees?',
+    q: 'How does billing work today?',
     a: (
       <>
-        Stripe charges its standard processing fee (currently 2.9% + 30&cent;
-        in the US) directly to you. IronPath takes zero on top of that. We
-        are a software vendor, not a payment middleman.
+        Right now we invoice you directly via Stripe each month. Self-serve
+        card billing on the website is on the{' '}
+        <Link href="/roadmap" className="text-brand-400 hover:underline">
+          roadmap
+        </Link>{' '}
+        for late 2026. Until then, our finance flow is one email per month
+        with a paid-in-full receipt.
       </>
     ),
   },
   {
-    q: 'Is there an annual discount?',
+    q: 'Can I import members from Mindbody / Glofox / our spreadsheet?',
     a: (
       <>
-        Yes. Pay annually and you get two months free (~16.7% off). The
-        annual option is on the billing page after you sign up — we
-        intentionally don&rsquo;t complicate the marketing page with it.
+        Not self-serve yet — that&rsquo;s a Q3 2026 build. In the meantime,
+        send us your CSV (or Mindbody/Glofox export) and we&rsquo;ll do the
+        import for you on a screen-share call. Usually under an hour.
       </>
     ),
   },
   {
-    q: 'Can I import members from Mindbody / Glofox?',
+    q: 'What&rsquo;s on the roadmap that I&rsquo;d care about?',
     a: (
       <>
-        Yes. Growth and Unlimited include a guided importer that maps
-        Mindbody and Glofox export CSVs. On Unlimited we&rsquo;ll do the
-        first import for you on a screen-share call. We&rsquo;ve done dozens
-        of these &mdash; the longest one took 40 minutes.
+        Class scheduling + waitlists, churn dashboard, multi-location, and a
+        member-import wizard are all in the next two quarters. The full list
+        with target dates is on the{' '}
+        <Link href="/roadmap" className="text-brand-400 hover:underline">
+          roadmap
+        </Link>
+        .
       </>
     ),
   },

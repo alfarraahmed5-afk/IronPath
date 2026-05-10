@@ -24,6 +24,7 @@ import {
   AB_COOKIE_MAX_AGE,
   GEO_COOKIE,
   GEO_COOKIE_MAX_AGE,
+  GEO_COUNTRY_COOKIE,
   isABVariant,
   pickVariant,
 } from '@/lib/ab';
@@ -111,6 +112,21 @@ function applyCookies(req: NextRequest, res: NextResponse): void {
     res.cookies.set({
       name: GEO_COOKIE,
       value: decoded,
+      maxAge: GEO_COOKIE_MAX_AGE,
+      path: '/',
+      sameSite: 'lax',
+    });
+  }
+
+  // Geo country — refresh daily. Used to surface the Cairo banner to
+  // Egyptian visitors and to fork the lead-form routing. Vercel
+  // populates x-vercel-ip-country with ISO 3166-1 alpha-2 codes (EG, US,
+  // GB, ...). Two letters, no decoding needed.
+  const country = req.headers.get('x-vercel-ip-country');
+  if (country) {
+    res.cookies.set({
+      name: GEO_COUNTRY_COOKIE,
+      value: country.toUpperCase(),
       maxAge: GEO_COOKIE_MAX_AGE,
       path: '/',
       sameSite: 'lax',
