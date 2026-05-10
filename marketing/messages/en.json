@@ -173,7 +173,9 @@
             "f3": "QR poster for the gym wall",
             "f4": "Email support, 1 business day"
           },
-          "cta": "Start free trial"
+          "cta": "Start free trial",
+          "price": 49,
+          "currency": "$"
         },
         "growth": {
           "name": "Growth",
@@ -185,7 +187,9 @@
             "f3": "Trial-end retention emails (automated)",
             "f4": "Activation milestone celebrations"
           },
-          "cta": "Start free trial"
+          "cta": "Start free trial",
+          "price": 99,
+          "currency": "$"
         },
         "unlimited": {
           "name": "Unlimited",
@@ -197,7 +201,9 @@
             "f3": "Founder onboarding call",
             "f4": "Priority email support"
           },
-          "cta": "Start free trial"
+          "cta": "Start free trial",
+          "price": 199,
+          "currency": "$"
         }
       }
     },
@@ -296,7 +302,9 @@
           "QR poster for the gym wall",
           "Email + push notifications",
           "Email support, 1 business day"
-        ]
+        ],
+        "price": 49,
+        "currency": "$"
       },
       "growth": {
         "name": "Growth",
@@ -309,7 +317,9 @@
           "Activation milestone celebrations",
           "Subscription receipts in admin",
           "Email support, same-day"
-        ]
+        ],
+        "price": 99,
+        "currency": "$"
       },
       "unlimited": {
         "name": "Unlimited",
@@ -322,7 +332,9 @@
           "Founder onboarding call",
           "Direct line to founder for product feedback",
           "Priority email support"
-        ]
+        ],
+        "price": 199,
+        "currency": "$"
       }
     },
     "per_month": "/mo",

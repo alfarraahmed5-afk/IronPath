@@ -3,8 +3,9 @@
 // because the EN page is owned by another agent in this sprint -- the
 // duplication is intentional and avoids a cross-agent merge collision.
 //
-// USD pricing stays USD on this page (founder rule: USD only on /pricing,
-// EGP variant lives on /ar/eg).
+// AR locale renders EGP pricing (1,350 / 2,750 / 5,300 ج.م) per founder
+// direction. The earlier "USD only on /pricing" interpretation was wrong:
+// AR audience is Cairo-first, EGP is the natural currency.
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -25,14 +26,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 interface TierShape {
   slug: 'starter' | 'growth' | 'unlimited';
-  price: number;
   accent?: boolean;
 }
 
+// Tier prices live in messages/ar.json (1,350 / 2,750 / 5,300 ج.م) so EN
+// USD numbers can never leak into the AR pricing render. EN equivalent
+// reads from messages/en.json (49 / 99 / 199 $).
 const TIERS: TierShape[] = [
-  { slug: 'starter',   price: 49 },
-  { slug: 'growth',    price: 99,  accent: true },
-  { slug: 'unlimited', price: 199 },
+  { slug: 'starter' },
+  { slug: 'growth', accent: true },
+  { slug: 'unlimited' },
 ];
 
 export default async function ArabicPricingPage() {
@@ -138,14 +141,14 @@ export default async function ArabicPricingPage() {
                       {tt.name}
                     </p>
                     <p className="text-sm text-ink-300 mb-4">{tt.tagline}</p>
-                    <div className="flex items-baseline gap-1.5" dir="ltr">
-                      <span className="text-ink-400 text-2xl">$</span>
+                    <div className="flex items-baseline gap-1.5" dir="rtl">
                       <span
                         data-numeric
                         className="font-display text-5xl sm:text-6xl tracking-tight tabular-nums text-ink-50"
                       >
-                        {tier.price}
+                        {Number(tt.price).toLocaleString('en-US')}
                       </span>
+                      <span className="text-ink-400 text-2xl">{tt.currency}</span>
                       <span className="text-ink-400 text-sm">{t.per_month}</span>
                     </div>
                     <p className="mt-2 text-xs font-mono uppercase tracking-[0.14em] text-brand-400">

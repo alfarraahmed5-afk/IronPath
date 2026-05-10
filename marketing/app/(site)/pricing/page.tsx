@@ -33,16 +33,17 @@ const ADMIN_SIGNUP = '/start';
 
 interface TierShape {
   slug: 'starter' | 'growth' | 'unlimited';
-  price: number;
   accent?: boolean;
 }
 
-// Prices stay in code (founder rule: USD only on /pricing).
-// Names, taglines, features come from messages.
+// Tier slugs + accent flag are layout decisions (stay in code). Tier name,
+// tagline, features, PRICE, and CURRENCY all flow from the message catalog
+// per locale: EN visitors see $49/$99/$199, AR visitors see EGP
+// 1,350/2,750/5,300 ج.م. Same shape, locale-driven numbers.
 const TIERS: TierShape[] = [
-  { slug: 'starter',   price: 49 },
-  { slug: 'growth',    price: 99,  accent: true },
-  { slug: 'unlimited', price: 199 },
+  { slug: 'starter' },
+  { slug: 'growth', accent: true },
+  { slug: 'unlimited' },
 ];
 
 export default async function PricingPage() {
@@ -148,14 +149,19 @@ export default async function PricingPage() {
                       {tt.name}
                     </p>
                     <p className="text-sm text-ink-300 mb-4">{tt.tagline}</p>
-                    <div className="flex items-baseline gap-1.5" dir="ltr">
-                      <span className="text-ink-400 text-2xl">$</span>
+                    <div className="flex items-baseline gap-1.5" dir={isAr ? 'rtl' : 'ltr'}>
+                      {tt.currency && (tt.currency === '$' || !isAr) ? (
+                        <span className="text-ink-400 text-2xl">{tt.currency}</span>
+                      ) : null}
                       <span
                         data-numeric
                         className="font-display text-5xl sm:text-6xl tracking-tight tabular-nums text-ink-50"
                       >
-                        {tier.price}
+                        {Number(tt.price).toLocaleString(isAr ? 'en-US' : 'en-US')}
                       </span>
+                      {isAr && tt.currency ? (
+                        <span className="text-ink-400 text-2xl">{tt.currency}</span>
+                      ) : null}
                       <span className="text-ink-400 text-sm">{t.per_month}</span>
                     </div>
                     <p className="mt-2 text-xs font-mono uppercase tracking-[0.14em] text-brand-400">

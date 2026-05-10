@@ -14,21 +14,21 @@ import type { Feature } from './parts/FeatureList';
 
 interface TierSpec {
   slug: TierSlug;
-  price: number;
   accent?: boolean;
 }
 
-// Tier slugs + USD prices stay locale-agnostic in this file. Tier name,
-// cap, tagline, feature copy, and CTA all flow from the message catalog
-// (scenes.pricing.tiers.{slug}.{name|cap|tagline|features.f1..f4|cta}).
+// Tier slugs + accent flag are layout decisions and stay in code. Tier name,
+// cap, tagline, PRICE, currency, feature copy, and CTA all flow from the
+// message catalog (scenes.pricing.tiers.{slug}.*). Locale-driven price is
+// non-negotiable: EN visitors see $49/$99/$199, AR visitors see EGP
+// 1,350/2,750/5,300 ج.م. Same shape, different numbers per locale.
 //
-// Feature lists are intentionally trimmed to ONLY what's shipped today.
-// Aspirational items (class scheduling, churn dashboard, multi-location,
-// SSO, etc.) live on /roadmap with quarterly targets. Honesty over breadth.
+// Feature lists are trimmed to ONLY shipped items. Aspirational items live
+// on /roadmap with quarterly targets. Honesty over breadth.
 const TIER_SPECS: TierSpec[] = [
-  { slug: 'starter', price: 49 },
-  { slug: 'growth', price: 99, accent: true },
-  { slug: 'unlimited', price: 199 },
+  { slug: 'starter' },
+  { slug: 'growth', accent: true },
+  { slug: 'unlimited' },
 ];
 
 export default function PricingScene() {
@@ -39,6 +39,11 @@ export default function PricingScene() {
     cap: t(`tiers.${spec.slug}.cap`),
     tagline: t(`tiers.${spec.slug}.tagline`),
     cta: t(`tiers.${spec.slug}.cta`),
+    // Price is locale-driven via the message catalog. next-intl returns
+    // numeric values from JSON as strings via t.raw; cast to number for
+    // NumberFlow inside TierCard.
+    price: Number(t(`tiers.${spec.slug}.price`)),
+    currency: t(`tiers.${spec.slug}.currency`),
     features: [
       { text: t(`tiers.${spec.slug}.features.f1`) },
       { text: t(`tiers.${spec.slug}.features.f2`) },
@@ -83,7 +88,7 @@ export default function PricingScene() {
                 accent={tier.accent}
                 ctaLabel={tier.cta}
                 perMonthLabel={t('perMonth')}
-                currencySymbol={t('currencySymbol')}
+                currencySymbol={tier.currency}
               />
             ))}
           </div>

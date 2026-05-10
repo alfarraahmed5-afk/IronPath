@@ -68,6 +68,8 @@ const PROBES: SchemaProbe[] = [
   { migration: '045', description: 'trial_emails_sent table', run: probeTable('trial_emails_sent') },
   { migration: '046', description: 'gym_milestones table', run: probeTable('gym_milestones') },
   { migration: '047', description: 'cancellation_log table', run: probeTable('cancellation_log') },
+  { migration: '048', description: 'demo_sessions table', run: probeTable('demo_sessions') },
+  { migration: '049', description: 'leads.member_count column', run: probeColumn('leads', 'member_count') },
 ];
 
 export interface SchemaCheckResult {
