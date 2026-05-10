@@ -34,6 +34,7 @@ import {
   cancelAnimation,
 } from 'react-native-reanimated';
 import { useTheme } from '../theme/useTheme';
+import { colors as tokenColors } from '../../theme/tokens';
 
 export interface LivePulseStripProps {
   /** Total strip width in px. Defaults to filling parent via onLayout. */
@@ -77,9 +78,8 @@ export function LivePulseStrip({
   sliverColor,
   style,
 }: LivePulseStripProps) {
-  const { reduceMotion, tokens } = useTheme();
-  const colors: any = (tokens as any)?.colors?.colors ?? (tokens as any)?.colors ?? {};
-  const brand: string = colors.brand ?? '#C8102E';
+  const { reduceMotion } = useTheme();
+  const brand: string = tokenColors.brand ?? '#C8102E';
   const hairline = hairlineColor ?? brand;
   const sliver = sliverColor ?? brand;
 
