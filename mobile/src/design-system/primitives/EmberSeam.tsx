@@ -26,10 +26,16 @@ import {
   vec,
   Group,
   BlurMask,
-  useClock,
-  useDerivedValue,
-  interpolate,
 } from '@shopify/react-native-skia';
+import {
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+  interpolate,
+} from 'react-native-reanimated';
+import { useEffect } from 'react';
 import { useReduceMotion } from '../motion/primitives';
 
 export interface EmberSeamProps {
@@ -72,20 +78,29 @@ export function EmberSeam({
   const startY = vertical ? 0 : height / 2;
   const endY   = vertical ? height : height / 2;
 
-  // Breathing: shift the gradient center stop on an 8s loop.
-  // Reduce-motion: lock the value at 0.5.
-  const clock = useClock();
-  const phase = useDerivedValue(() => {
-    'worklet';
-    if (reduce) return 0.5;
-    return ((clock.value % BREATHE_PERIOD_MS) / BREATHE_PERIOD_MS);
-  });
+  // Breathing: drive a sharedValue 0->1->0 on an 8s loop.
+  // Reduce-motion: phase locked at 0.5 (no-op effect path below).
+  const phase = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduce) {
+      phase.value = 0.5;
+      return;
+    }
+    phase.value = 0;
+    phase.value = withRepeat(
+      withTiming(1, { duration: BREATHE_PERIOD_MS, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [reduce, phase]);
 
   // Three-stop gradient with the middle stop slowly drifting in
-  // [0.4, 0.6]. Express via per-frame derived stops.
+  // [0.4, 0.6]. Skia LinearGradient consumes a SkSharedValue<number[]>
+  // for `positions` when wrapped in useDerivedValue.
   const stops = useDerivedValue(() => {
     'worklet';
-    const mid = interpolate(phase.value, [0, 0.5, 1], [0.4, 0.6, 0.4]);
+    const mid = interpolate(phase.value, [0, 1], [0.4, 0.6]);
     return [0, mid, 1];
   });
 
