@@ -15,6 +15,8 @@ import { Text } from '../../src/components/Text';
 import { Header } from '../../src/components/Header';
 import { EmptyState } from '../../src/components/EmptyState';
 import { colors, spacing, radii } from '../../src/theme/tokens';
+import { routeFromNotificationData } from '../../src/lib/notificationRouter';
+import { haptic } from '../../src/lib/haptics';
 
 interface Notification {
   id: string;
@@ -27,32 +29,12 @@ interface Notification {
 }
 
 // Deep-link a notification's data payload to its target screen.
-function routeForNotification(n: Notification) {
-  const d = (n.data ?? {}) as Record<string, any>;
-  switch (n.type) {
-    case 'like':
-    case 'comment':
-    case 'pr':
-    case 'mention':
-      if (d.workout_id) return `/workouts/${d.workout_id}`;
-      break;
-    case 'follow':
-    case 'follow_request':
-    case 'follow_request_approved':
-      if (d.actor_user_id) return `/users/${d.actor_user_id}`;
-      break;
-    case 'challenge_started':
-    case 'challenge_ended':
-      if (d.challenge_id) return `/challenges/${d.challenge_id}`;
-      break;
-    case 'duel_invite':
-    case 'duel_accepted':
-    case 'duel_won':
-    case 'duel_lost':
-      if (d.duel_id) return `/duels/${d.duel_id}`;
-      break;
-  }
-  return null;
+// Both the in-app handler (here) and the cold-start handler in
+// _layout.tsx route through `routeFromNotificationData` -- one source
+// of truth per lens 5 P0.
+function routeForNotification(n: Notification): string | null {
+  const data = { ...(n.data ?? {}), type: n.type } as Record<string, unknown>;
+  return routeFromNotificationData(data);
 }
 
 function formatRelative(iso: string): string {

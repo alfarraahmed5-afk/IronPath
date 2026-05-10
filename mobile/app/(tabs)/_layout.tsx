@@ -61,11 +61,11 @@ const TABS: ReadonlyArray<{
 
 const HIDDEN_ROUTES = new Set<string>([
   // Legacy file kept for backwards compat; not shown in tab bar.
+  // Trainer collapses into Train as a sub-route.
   'trainer',
-  // Legacy files absorbed into community sub-tabs.
-  'leaderboard',
+  // Legacy profile.tsx file kept as a body for me.tsx re-export until
+  // C-1's full Me redesign lands; then this entry can be removed.
   'profile',
-  'workouts',
 ]);
 
 const TAB_HEIGHT = 56;

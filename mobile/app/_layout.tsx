@@ -23,6 +23,7 @@ import { ThemeProvider } from '../src/design-system/theme/ThemeProvider';
 import { colors } from '../src/design-system/tokens';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/queryClient';
+import { routeFromNotificationData } from '../src/lib/notificationRouter';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -117,24 +118,10 @@ async function registerNotificationChannels() {
   }
 }
 
-// Deep-link helper used by notification taps.
-function routeFromNotificationData(data: any): string | null {
-  if (!data || typeof data !== 'object') return null;
-  const t = String(data.type || '');
-  // Comments and mentions belong to the feed (comments live in a feed-tab modal,
-  // not on the workout detail screen).
-  if (data.workout_id && (t === 'comment' || t === 'mention')) {
-    return '/(tabs)/index';
-  }
-  // Likes and PRs navigate to the specific workout for context.
-  if (data.workout_id && (t === 'like' || t === 'pr' || !t)) {
-    return `/workouts/${data.workout_id}`;
-  }
-  if (data.duel_id) return `/duels/${data.duel_id}`;
-  if (data.challenge_id) return `/challenges/${data.challenge_id}`;
-  if (data.actor_user_id && /follow/.test(t)) return `/users/${data.actor_user_id}`;
-  return null;
-}
+// Notification deep-link routing now lives in
+// `src/lib/notificationRouter.ts` so the cold-start handler in this
+// file and the in-app handler in `notifications/index.tsx` share one
+// map. Lens 5 P0 unify-router task.
 
 // Silently register push token if permission is already granted.
 // Does NOT prompt the user -- that's handled in finish.tsx.
