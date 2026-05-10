@@ -80,69 +80,77 @@ export function Hero({
     return { transform: [{ scale: scale.value }] };
   });
 
+  // Compute the gradient mask coords based on the requested direction.
+  // The mask LinearGradient runs from `maskStart` to `maskEnd` and the
+  // `colors` are [transparent, dark]; `maskLocations` controls how
+  // much of the band is dark vs. transparent.
   const maskColors: [string, string] = ['rgba(10,10,11,0)', 'rgba(10,10,11,0.85)'];
-  let maskStart = { x: 0.5, y: 0 };
-  let maskEnd   = { x: 0.5, y: 1 };
-  let maskLocations: [number, number] = [1 - maskCoverage, 1];
-  if (maskDirection === 'top') {
-    // Dark at top, fading down.
-    maskStart = { x: 0.5, y: 0 };
-    maskEnd   = { x: 0.5, y: 1 };
-    maskLocations = [0, maskCoverage];
-    return renderHero();
-  }
-  if (maskDirection === 'left') {
-    maskStart = { x: 0, y: 0.5 };
-    maskEnd   = { x: 1, y: 0.5 };
-    maskLocations = [0, maskCoverage];
-  } else if (maskDirection === 'right') {
-    maskStart = { x: 0, y: 0.5 };
-    maskEnd   = { x: 1, y: 0.5 };
-    maskLocations = [1 - maskCoverage, 1];
+  let maskStart: { x: number; y: number };
+  let maskEnd: { x: number; y: number };
+  let maskLocations: [number, number];
+  switch (maskDirection) {
+    case 'top':
+      // Dark at top, fading down.
+      maskStart = { x: 0.5, y: 1 };
+      maskEnd   = { x: 0.5, y: 0 };
+      maskLocations = [1 - maskCoverage, 1];
+      break;
+    case 'left':
+      maskStart = { x: 1, y: 0.5 };
+      maskEnd   = { x: 0, y: 0.5 };
+      maskLocations = [1 - maskCoverage, 1];
+      break;
+    case 'right':
+      maskStart = { x: 0, y: 0.5 };
+      maskEnd   = { x: 1, y: 0.5 };
+      maskLocations = [1 - maskCoverage, 1];
+      break;
+    case 'bottom':
+    default:
+      // Default: dark at bottom, fading up. Used by photo-hero scrims.
+      maskStart = { x: 0.5, y: 0 };
+      maskEnd   = { x: 0.5, y: 1 };
+      maskLocations = [1 - maskCoverage, 1];
   }
 
-  return renderHero();
-
-  function renderHero() {
-    return (
-      <View style={[{ height, overflow: 'hidden' }, style]}>
-        {source ? (
-          <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
-            <ExpoImage
-              source={source}
-              placeholder={blurhash ? { blurhash } : undefined}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              transition={240}
-            />
-          </Animated.View>
-        ) : null}
+  return (
+    <View style={[{ height, overflow: 'hidden' }, style]}>
+      {source ? (
+        <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
+          <ExpoImage
+            source={source}
+            placeholder={blurhash ? { blurhash } : undefined}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={240}
+          />
+        </Animated.View>
+      ) : null}
+      <LinearGradient
+        colors={maskColors}
+        locations={maskLocations}
+        start={maskStart}
+        end={maskEnd}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      {ember ? (
         <LinearGradient
-          colors={maskColors}
-          locations={maskLocations}
-          start={maskStart}
-          end={maskEnd}
+          colors={['rgba(200,16,46,0)', 'rgba(200,16,46,0.08)']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
-        {ember ? (
-          <LinearGradient
-            colors={['rgba(200,16,46,0)', 'rgba(200,16,46,0.08)']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-        ) : null}
-        {children}
-        {closingSeam ? (
-          <View style={styles.closingSeam}>
-            <EmberSeam intensity="subtle" length={1080} />
-          </View>
-        ) : null}
-      </View>
-    );
-  }
+      ) : null}
+      {children}
+      {closingSeam ? (
+        <View style={styles.closingSeam}>
+          <EmberSeam intensity="subtle" length={1080} />
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
