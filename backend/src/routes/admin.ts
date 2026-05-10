@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 import { requireGymOwner } from '../middleware/roles';
+import { enforceTierCap } from '../middleware/tierCap';
 import { generatePoster, slugifyGymName, type PosterSize } from '../lib/posterPdf';
 import { logger } from '../lib/logger';
+import { checkAndRecordMilestones } from '../lib/activationCheck';
 
 const router = Router();
 
@@ -27,11 +29,37 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
       .single();
     if (error || !user) return next(new AppError('NOT_FOUND', 404, 'User record not found'));
     let gym_name: string | null = null;
+    let onboarding_completed = true;
+    let subscription_status: string | null = null;
+    let subscription_tier: string | null = null;
+    let subscription_expires_at: string | null = null;
+    let trial_started_at: string | null = null;
     if (user.gym_id) {
-      const { data: gym } = await supabase.from('gyms').select('name').eq('id', user.gym_id).single();
+      const { data: gym } = await supabase
+        .from('gyms')
+        .select('name, onboarding_completed_at, subscription_status, subscription_tier, subscription_expires_at, trial_started_at')
+        .eq('id', user.gym_id)
+        .single();
       gym_name = gym?.name ?? null;
+      onboarding_completed = gym?.onboarding_completed_at != null;
+      subscription_status = gym?.subscription_status ?? null;
+      subscription_tier = gym?.subscription_tier ?? null;
+      subscription_expires_at = gym?.subscription_expires_at ?? null;
+      trial_started_at = gym?.trial_started_at ?? null;
     }
-    res.json({ data: { user: { ...user, gym_name } } });
+    res.json({
+      data: {
+        user: {
+          ...user,
+          gym_name,
+          onboarding_completed,
+          subscription_status,
+          subscription_tier,
+          subscription_expires_at,
+          trial_started_at,
+        },
+      },
+    });
   } catch (err) { next(err); }
 });
 
@@ -330,7 +358,7 @@ router.get('/invites', async (req: Request, res: Response, next: NextFunction) =
 
 // ─── POST /admin/invites — generate a new invite code with optional constraints
 
-router.post('/invites', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/invites', enforceTierCap, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const gymId = req.user!.gym_id!;
     const code = generateInviteCode();
@@ -445,6 +473,11 @@ router.post('/announcements', async (req: Request, res: Response, next: NextFunc
       .single();
 
     if (error) throw new AppError('INSERT_FAILED', 500, `Failed to create announcement: ${error.message}`);
+
+    // Activation milestone check — fire-and-forget. Posting an announcement
+    // is one of the three legs of the "activated" gate (10 members + 1
+    // announcement + 25 workouts in first 14 days). Best-effort by design.
+    void checkAndRecordMilestones(gymId);
 
     return res.json({ data: { announcement: { ...data, body: data.content } } });
   } catch (err) {

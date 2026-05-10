@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 import { computeGymLeaderboards, resolveLeaderboardExercises } from '../lib/leaderboardCompute';
+import { runTrialEmailsJob } from './trialEmailsJob';
 
 export async function initJobs(): Promise<void> {
   await resolveLeaderboardExercises();
@@ -513,6 +514,19 @@ export function startJobs(): void {
       await supabase.from('leaderboard_challenges').update({ status: 'active' }).eq('status', 'upcoming').lte('starts_at', now);
       await supabase.from('leaderboard_challenges').update({ status: 'completed' }).eq('status', 'active').lt('ends_at', now);
     } catch (err) { logger.error({ err }, 'Challenge update job failed'); }
+  }, { timezone: 'UTC' });
+
+  // Trial-expiry email funnel — Daily 09:00 UTC (mid-morning for NA/EU
+  // operators). Walks all subscription_status='trial' gyms, derives days-
+  // until-expiry, sends the next-due email per gym, gates on the
+  // trial_emails_sent log so a (gym, milestone) pair never re-fires.
+  // Phase C.5.
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      logger.info('Trial emails job started');
+      const { scanned, sent } = await runTrialEmailsJob();
+      logger.info({ scanned, sent }, 'Trial emails job complete');
+    } catch (err) { logger.error({ err }, 'Trial emails job failed'); }
   }, { timezone: 'UTC' });
 
   // Orphaned auth-user reconciliation — Daily 03:30

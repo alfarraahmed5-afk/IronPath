@@ -260,6 +260,18 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
     const { data: updatedWorkout, error: upErr } = await supabase.from('workouts').update({ is_completed: true, finished_at: new Date().toISOString(), duration_seconds: body.duration_seconds, total_volume_kg: Math.round(totalVolumeKg * 100) / 100, total_sets: totalSets, ordinal_number }).eq('id', workout.id).select().single();
     if (upErr) throw upErr;
 
+    // Activation milestone check — fire-and-forget. Workout completion is one
+    // of the legs of the "activated" + "sticky" gates. Best-effort by design;
+    // never blocks the response. Only fires when the workout has a gym_id.
+    if (req.user.gym_id) {
+      void (async () => {
+        try {
+          const { checkAndRecordMilestones } = await import('../lib/activationCheck');
+          await checkAndRecordMilestones(req.user!.gym_id!);
+        } catch { /* best-effort */ }
+      })();
+    }
+
     // Move media (post-commit)
     let media_failed = false;
     if (body.client_upload_uuid && body.media_filenames.length > 0) {

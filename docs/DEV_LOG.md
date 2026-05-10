@@ -75,14 +75,14 @@ Single source of truth for development progress on the platform plan. Read this 
 - [x] Amend plan §3.7 ("gray-600 32px" → `ink-400`) and §6.4 migration table renumbering (041 = `gyms_last_modified_by`, coupons → 043+). *(Phase B Tier 2 polish)*
 
 ### Phase B — Super Admin Console v1 (in flight)
-### Phase C — Onboarding & retention (in flight)
-- [x] **C.1 — QR poster PDF generator + /grow page** *(landed 2026-05-10. Server-side `pdf-lib` poster, A4 + A3 sizes, branded with gym logo + accent. Owner downloads from new `/grow` page in admin.)*
-- [ ] **C.2 — 4-step onboarding wizard** (gates dashboard until done; reuses C.1's poster generator in step 2)
-- [ ] **C.3 — Trial banner** (day count + member/workout stats in admin header)
-- [ ] **C.4 — Tier-cap soft warning at 80% + hard block at 100%**
-- [ ] **C.5 — Trial-expiry email sequence** (Resend templates + cron, day 21/25/28/30/31/37 per plan §4.4)
-- [ ] **C.6 — Cancellation save flow** (reason picker → contextual offer → confirm)
-- [ ] **C.7 — Activation milestone celebrations** (per plan §4.8)
+### Phase C — Onboarding & retention (COMPLETE)
+- [x] **C.1 — QR poster PDF generator + /grow page** *(landed 2026-05-10)*
+- [x] **C.2 — 4-step onboarding wizard** *(landed 2026-05-10. /onboarding route + 4 step components + backend, gym-owner-scoped, gates dashboard via ProtectedRoute. Existing gyms backfilled as complete.)*
+- [x] **C.3 — Trial banner** *(landed 2026-05-10. Persistent header strip with day count + member/workout stats; color tier shifts as days dwindle.)*
+- [x] **C.4 — Tier-cap soft warning at 80% + hard block at 100%** *(landed 2026-05-10. Backend `enforceTierCap` middleware + frontend TierCapWarning + UpgradePromptModal wired on Members + Invites pages.)*
+- [x] **C.5 — Trial-expiry email sequence** *(landed 2026-05-10. Resend templates for day 21/25/28/30/31/37 + daily cron at 09:00 UTC, gated by `trial_emails_sent` log + TrialLockout overlay.)*
+- [x] **C.6 — Cancellation save flow** *(landed 2026-05-10. ReasonPicker → SaveOffer (pause/free_month/downgrade) → ConfirmCancel; backend reason→offer mapping + audit in `cancellation_log`; reactivate endpoint included.)*
+- [x] **C.7 — Activation milestone celebrations** *(landed 2026-05-10. `gym_milestones` table + activationCheck library + ActivationToast UI; "activated" and "sticky" gates wired on announcement-create and workout-complete.)*
 ### Phase D — Sales acceleration (not started)
 ### Phase E — Analytics (not started)
 ### Phase F — Polish & scale prep (not started)
@@ -91,6 +91,50 @@ Single source of truth for development progress on the platform plan. Read this 
 
 ## Activity log
 *Reverse chronological — newest at top.*
+
+### 2026-05-10 · Phase C complete — 12-agent parallel sprint (3 teams × 4 agents)
+
+User asked to "deploy 3 teams of 4 top experts to finish this phase." Pre-staged 5 stub files for cross-team imports (4 onboarding step components — Step1Brand/Step2Poster/Step3Announcement/Step4Trainer/StepIndicator), then spawned 12 worktree-isolated agents in parallel for the remaining Phase C scope.
+
+**Team Alpha — onboarding wizard (C.2):**
+- α1 (`5ba749f`) — backend `routes/onboarding.ts` + migration 044 (`gyms.onboarding_completed_at`, backfilled all existing gyms as complete so no operator gets surprised)
+- α2 (`cdea81e`) — `OnboardingPage.tsx` shell + `Step1Brand.tsx` (RHF + zod, color picker, drag-or-click logo upload using existing 3-step Supabase Storage pattern)
+- α3 (`21d5b22`) — `Step2Poster.tsx` (invite code display + A4/A3 download buttons that reuse the C.1 PDF generator + explicit "I've posted it" commitment) + `Step3Announcement.tsx` (RHF form with pre-filled welcome template)
+- α4 (`9fcff03`) — `Step4Trainer.tsx` (optional teammate invite via existing /gyms/:id/invite-email) + `StepIndicator.tsx` (animated chip transitions with shared `layoutId` connector lines)
+
+**Team Beta — trial mechanics (C.3 + C.4 + C.7):**
+- β1 (`4d86af6`) — `TrialBanner.tsx` with 4-tier urgency color treatment (safe/warn/urgent/expired) + day count + stats; mounted in Layout
+- β2 (`dcffff6`) — `TierCapWarning.tsx` (inline banner at ≥80%, crimson at ≥100%) + `UpgradePromptModal.tsx` (focus-trapped portal modal); wired into MembersPage + InvitesPage
+- β3 (`6aa22f8`) — backend `middleware/tierCap.ts` (`enforceTierCap` + `getTierCapState`); applied to POST /admin/invites
+- β4 (`d378c70`) — migration 046 + `lib/activationCheck.ts` (idempotent best-effort) + `routes/milestones.ts` + `ActivationToast.tsx` (slide-up celebration); milestone checks fire on announcement-create + workout-complete
+
+**Team Gamma — trial-end & retention (C.5 + C.6):**
+- γ1 (`d7a7f22`) — migration 045 + `lib/trialEmails.ts` (6 Resend templates: day_21/25/28/30/31_locked/37_member, brand crimson CTAs) + `jobs/trialEmailsJob.ts` (daily cron at 09:00 UTC with `trial_emails_sent` idempotency gate)
+- γ2 (`bf42eb6`) — 4 cancellation components (`CancellationFlow` orchestrator + `ReasonPicker` + `SaveOffer` + `ConfirmCancel`); modal mounts on SubscriptionPage from existing "Cancel" button
+- γ3 (`09e8ba8`) — migration 047 + `routes/cancellation.ts` (start/accept-offer/confirm/reactivate). **Notable: relaxes `gyms_subscription_status_check` to add `'paused'` to the allowlist** since the pause offer needs that status.
+- γ4 (`c2c0a0e`) — `TrialLockout.tsx` full-screen overlay for expired/cancelled gyms; lets `/subscription` through; refetches every 60s so payment auto-dismisses
+
+**Pre-stage commit:** `2621e08` (5 stub files); all 12 worktree-isolated agents forked from that base. 1 of 12 agents (α1) had its branch reaped; merged from the bare commit hash. Several other agents tripped the worktree absolute-path leak again — caught + cleaned up (`admin/src/components/cancellation` directory) at integration.
+
+**Integration this commit:**
+- `backend/src/index.ts` — mounts `onboardingRouter`, `milestonesRouter`, `cancellationRouter` BEFORE `adminRouter` (prefix-greedy short-circuit) at `/api/v1/admin/{onboarding,milestones,cancellation}`.
+- `backend/src/jobs/index.ts` — registers `runTrialEmailsJob` cron (`0 9 * * *` UTC).
+- `backend/src/lib/schemaProbes.ts` — extended with probes for migrations 044/045/046/047 so the boot-time gate fails the deploy if any of them haven't been applied.
+- `backend/src/routes/admin.ts` — `/admin/me` now returns `onboarding_completed`, `subscription_status`, `subscription_tier`, `subscription_expires_at`, `trial_started_at` so the frontend route guard + TrialBanner + TierCapWarning can read them. POST `/admin/invites` gets `enforceTierCap` middleware. POST `/admin/announcements` fires `void checkAndRecordMilestones(gymId)` on success.
+- `backend/src/routes/workouts.ts` — workout-complete handler fires `void checkAndRecordMilestones(gym_id)` on success (dynamic import to avoid load-order coupling).
+- `admin/src/lib/session.ts` — `StoredUser` extended with `onboarding_completed`, `subscription_*`, `trial_started_at`. New `needsOnboarding(user)` helper (treats `undefined` as complete to avoid bouncing legacy sessions).
+- `admin/src/App.tsx` — `/onboarding` route via new `EnrolledRoute` (auth-gated, bypasses Layout, redirects already-complete operators back to `/dashboard`). `ProtectedRoute` redirects incomplete onboarding to `/onboarding`.
+- `admin/src/pages/LoginPage.tsx` — after login success, fetches `/admin/me` once and merges the gym fields into stored user so the route guard sees the right state on first render.
+- `admin/src/components/Layout.tsx` — mounts `<TrialBanner />` between LivePulseStrip and topbar; mounts `<ActivationToast />` and `<TrialLockout />` as overlay siblings.
+- `admin/src/pages/MembersPage.tsx` — `<TierCapWarning>` rendered above the filter row, reading tier from stored user.
+- `admin/src/pages/InvitesPage.tsx` — `<TierCapWarning>` + `<UpgradePromptModal>`; modal opens when POST `/admin/invites` returns `TIER_CAP_REACHED`.
+- `admin/src/pages/SubscriptionPage.tsx` — replaces the mailto-cancellation placeholder with the real `<CancellationFlow>` modal; reloads subscription on successful confirmation.
+
+**Verified:** `npm run -w backend build` clean. `npm run -w admin build` clean. Bundle 950 → 1010 kB pre-gzip (+60) / 282 → 299 kB gz (+17 kB) — within budget for 12 agents' worth of features.
+
+**Deploy notes:** **migrations 044, 045, 046, 047 must be applied in Supabase BEFORE this push lands**. The boot-time schema gate will refuse to start the backend otherwise. Apply in order via Supabase SQL Editor → Authentication → URL Configuration unaffected. After deploy: trial-email cron fires daily at 09:00 UTC. Existing gyms are pre-marked onboarding-complete so the operator won't be pushed through the wizard.
+
+**Phase C status:** all 7 items shipped. Phase D (sales acceleration: full impersonation, demo gym, broadcast email, coupons), E (analytics: events instrumentation, MRR snapshot, real-data live pulse counter), and F (polish & scale prep: coach role, CSV upload, in-app help, marketing site, Stripe checkout) remain.
 
 ### 2026-05-10 · "Make It Alive" sprint — 8-agent parallel build (2 teams × 4 worktrees)
 

@@ -64,6 +64,10 @@ const PROBES: SchemaProbe[] = [
   { migration: '043', description: 'users.totp_enabled_at column', run: probeColumn('users', 'totp_enabled_at') },
   { migration: '043', description: 'super_admin_recovery_codes table', run: probeTable('super_admin_recovery_codes') },
   { migration: '043', description: 'super_admin_2fa_challenges table', run: probeTable('super_admin_2fa_challenges') },
+  { migration: '044', description: 'gyms.onboarding_completed_at column', run: probeColumn('gyms', 'onboarding_completed_at') },
+  { migration: '045', description: 'trial_emails_sent table', run: probeTable('trial_emails_sent') },
+  { migration: '046', description: 'gym_milestones table', run: probeTable('gym_milestones') },
+  { migration: '047', description: 'cancellation_log table', run: probeTable('cancellation_log') },
 ];
 
 export interface SchemaCheckResult {

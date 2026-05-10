@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { extractError, getStoredGymId } from '../lib/forms';
 import { EmberSeam } from '@/components/EmberSeam';
 import { cn } from '@/lib/utils';
+import CancellationFlow from '@/components/cancellation/CancellationFlow';
 
 // ---------- types ----------
 
@@ -509,10 +510,15 @@ export default function SubscriptionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gymId]);
 
+  // Phase C.6 cancellation flow — opens the multi-step modal (reason →
+  // contextual save offer → final confirm). On confirmed cancellation we
+  // reload the subscription so the receipt + status pill update.
+  const [cancelOpen, setCancelOpen] = useState(false);
   function handleCancel() {
-    // v1 placeholder — keep parity with mailto upgrade flow.
-    window.location.href =
-      'mailto:sales@ironpath.app?subject=Cancel%20subscription';
+    setCancelOpen(true);
+  }
+  function handleCancelled() {
+    if (gymId) load(gymId);
   }
 
   return (
@@ -554,6 +560,12 @@ export default function SubscriptionPage() {
           </div>
         ) : null}
       </div>
+
+      <CancellationFlow
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        onCancelled={handleCancelled}
+      />
     </div>
   );
 }

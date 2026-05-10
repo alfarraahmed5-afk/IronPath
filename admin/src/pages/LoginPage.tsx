@@ -122,6 +122,22 @@ export default function LoginPage() {
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
       localStorage.setItem('user', JSON.stringify(user));
+
+      // Phase C: fetch /admin/me to learn whether onboarding is complete + the
+      // gym name + trial status. Best-effort — if it fails, the route guard
+      // treats `onboarding_completed === undefined` as already-complete and
+      // existing UI degrades gracefully. The fetch happens BEFORE navigate so
+      // the route guard sees the merged data on first render.
+      try {
+        const meRes = await api.get('/admin/me');
+        const me = meRes.data?.data?.user ?? null;
+        if (me) {
+          localStorage.setItem('user', JSON.stringify({ ...user, ...me }));
+        }
+      } catch {
+        // /admin/me failure is non-fatal — the user has a valid session already.
+      }
+
       navigate(next, { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error?.message || 'Login failed. Check your credentials.');

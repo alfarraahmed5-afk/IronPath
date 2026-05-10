@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
+import TierCapWarning from '@/components/TierCapWarning';
+import UpgradePromptModal from '@/components/UpgradePromptModal';
+import { readStoredUser } from '../lib/session';
 
 interface Invite {
   id: string;
@@ -19,10 +22,22 @@ export default function InvitesPage() {
   const [maxUses, setMaxUses] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Phase C.4 — open the UpgradePromptModal when invite generation fails
+  // because the gym is at member cap (backend returns TIER_CAP_REACHED).
+  const [capModalOpen, setCapModalOpen] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
 
   useEffect(() => {
     fetchInvites();
+    // Best-effort fetch the member count so TierCapWarning + the modal know
+    // where the gym sits. Reuses /admin/stats which is already cached on
+    // many pages — cheap.
+    api.get('/admin/stats')
+      .then(r => setMemberCount(r.data?.data?.active_members ?? 0))
+      .catch(() => { /* silent — TierCapWarning just won't render */ });
   }, []);
+
+  const tier = (readStoredUser()?.subscription_tier as 'starter' | 'growth' | 'unlimited' | null | undefined) ?? null;
 
   function extractError(err: unknown, fallback: string): string {
     const e = err as any;
@@ -55,7 +70,13 @@ export default function InvitesPage() {
       setMaxUses('');
       setExpiresAt('');
     } catch (err) {
-      setError(extractError(err, 'Failed to create invite code.'));
+      const e = err as { response?: { data?: { error?: { code?: string } } } };
+      // Tier cap hit — open the upgrade prompt instead of an inline error.
+      if (e?.response?.data?.error?.code === 'TIER_CAP_REACHED') {
+        setCapModalOpen(true);
+      } else {
+        setError(extractError(err, 'Failed to create invite code.'));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +113,20 @@ export default function InvitesPage() {
           Generate New
         </button>
       </div>
+
+      {/* Phase C.4 — soft tier-cap warning at ≥80%, hard at 100%. Component
+          returns null when below threshold or for unlimited tier. */}
+      <div className="mb-6">
+        <TierCapWarning memberCount={memberCount} tier={tier} />
+      </div>
+
+      <UpgradePromptModal
+        open={capModalOpen}
+        onClose={() => setCapModalOpen(false)}
+        tier={tier}
+        memberCount={memberCount}
+        reason="You've hit your plan's member limit, so we can't issue another invite code."
+      />
 
       {/* Inline form */}
       {showForm && (

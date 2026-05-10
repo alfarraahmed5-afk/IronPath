@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import api from '../lib/api';
 import { EmberSeam } from '@/components/EmberSeam';
+import TierCapWarning from '@/components/TierCapWarning';
 import { listStagger, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { readStoredUser } from '../lib/session';
 
 interface Member {
   id: string;
@@ -444,6 +446,16 @@ export default function MembersPage() {
       </div>
 
       <EmberSeam className="mb-6 h-px bg-gradient-to-r from-transparent via-brand-500/40 to-transparent" />
+
+      {/* Phase C.4 tier-cap warning — renders only at ≥80% of plan cap.
+          tier comes from /admin/me; total comes from the existing /admin/members
+          fetch. Component returns null when below threshold. */}
+      <div className="mb-6">
+        <TierCapWarning
+          memberCount={total}
+          tier={(readStoredUser()?.subscription_tier as 'starter' | 'growth' | 'unlimited' | null | undefined) ?? null}
+        />
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">

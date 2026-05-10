@@ -21,6 +21,9 @@ import feedRouter from './routes/feed';
 import notificationsRouter from './routes/notifications';
 import pushTokensRouter from './routes/pushTokens';
 import adminRouter from './routes/admin';
+import onboardingRouter from './routes/onboarding';
+import milestonesRouter from './routes/milestones';
+import cancellationRouter from './routes/cancellation';
 import trainerRouter from './routes/trainer';
 import duelsRouter from './routes/duels';
 import superAdminRouter from './routes/superAdmin';
@@ -89,6 +92,13 @@ app.use('/api/v1/feed', feedRouter);
 app.use('/api/v1/follow-requests', followRequestsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/push-tokens', pushTokensRouter);
+// Phase C sub-routers — mount BEFORE adminRouter so Express short-circuits
+// to them rather than letting adminRouter try to match a non-existent route
+// inside its own tree first. All three are gym-owner-scoped via their own
+// internal `requireActiveUser + requireGymOwner` middleware.
+app.use('/api/v1/admin/onboarding', onboardingRouter);
+app.use('/api/v1/admin/milestones', milestonesRouter);
+app.use('/api/v1/admin/cancellation', cancellationRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/super-admin/2fa', superAdminTwoFactorRouter);
 app.use('/api/v1/super-admin', superAdminRouter);

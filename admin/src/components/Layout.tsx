@@ -15,6 +15,9 @@ import { LayoutGroup, motion } from 'framer-motion';
 import { Logomark } from './Logomark';
 import { LivePulseStrip } from '@/components/LivePulseStrip';
 import { EmberSeam } from '@/components/EmberSeam';
+import TrialBanner from '@/components/TrialBanner';
+import TrialLockout from '@/components/TrialLockout';
+import ActivationToast from '@/components/ActivationToast';
 import { readStoredUser, signOut } from '../lib/session';
 import { cn } from '@/lib/utils';
 import { springModal } from '@/lib/motion';
@@ -149,6 +152,11 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main column. bg-ink-900 (#111114) — one elevation up from the rail. */}
       <div className="ml-64 flex-1 flex flex-col min-h-screen bg-ink-900">
+        {/* Phase C trial banner — only renders for trial gyms; null otherwise.
+            Sits between the LivePulseStrip (z-50) and the topbar so it's
+            always visible across every page. */}
+        <TrialBanner />
+
         {/* Topbar */}
         <header className="relative h-14 flex items-center justify-end px-6 gap-4 border-b border-ink-800 bg-ink-900">
           <span className="text-ink-400 text-sm">{user.gym_name ?? user.email ?? ''}</span>
@@ -167,6 +175,14 @@ export default function Layout({ children }: LayoutProps) {
         {/* Page content */}
         <main className="flex-1 p-8">{children}</main>
       </div>
+
+      {/* Phase C overlays — each is null-when-not-applicable.
+          ActivationToast: bottom-center celebration when a gym crosses the
+            "activated" or "sticky" threshold.
+          TrialLockout: full-screen overlay when subscription is expired/
+            cancelled (lets /subscription through so the operator can pay). */}
+      <ActivationToast />
+      <TrialLockout />
     </div>
   );
 }
