@@ -86,6 +86,128 @@ router.post('/me/avatar', requireActiveUser, async (req: Request, res: Response,
   } catch (err) { next(err); }
 });
 
+// GET /users/me/aggregate — BE-K consolidated profile bundle
+//
+// Returns profile + stats + follower/following counts + showcase
+// (top 3 PRs) + recent badges + pinned challenge exercise in ONE
+// round trip. Replaces the 6-call fan-out previously made by the
+// Profile screen on focus (Lens 6 perf finding).
+//
+// Fields are non-overlapping with /users/me + /users/:id/stats so
+// existing logic stays single-source. We Promise.all over the same
+// queries those endpoints make, then merge the JSON.
+router.get('/me/aggregate', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
+    const userId = req.user.id;
+    const gymId  = req.user.gym_id;
+
+    const [
+      profileRes,
+      workoutsRes,
+      streakRes,
+      prsRes,
+      recentRes,
+      followerRes,
+      followingRes,
+      badgesRes,
+    ] = await Promise.all([
+      supabase.from('users')
+        .select('id, username, full_name, avatar_url, bio, role, sex, date_of_birth, bodyweight_kg, is_profile_private, gym_id, created_at, showcase_pr_ids, pinned_challenge_exercise_id, challenge_wins, challenge_losses')
+        .eq('id', userId).single(),
+      supabase.from('workouts').select('total_volume_kg').eq('user_id', userId).eq('is_completed', true),
+      supabase.from('streaks')
+        .select('current_streak_weeks, longest_streak_weeks, current_streak_days, longest_streak_days, last_workout_at')
+        .eq('user_id', userId).maybeSingle(),
+      supabase.from('personal_records')
+        .select('exercise_id, record_type, value, exercises!inner(name, wger_id)')
+        .eq('user_id', userId).eq('record_type', 'projected_1rm'),
+      supabase.from('workouts')
+        .select('id, name, started_at, total_volume_kg')
+        .eq('user_id', userId).eq('is_completed', true)
+        .order('started_at', { ascending: false }).limit(5),
+      supabase.from('follows').select('*', { count: 'exact', head: true })
+        .eq('following_id', userId).eq('status', 'active'),
+      supabase.from('follows').select('*', { count: 'exact', head: true })
+        .eq('follower_id', userId).eq('status', 'active'),
+      supabase.from('user_badges').select('id, badge_key, awarded_at')
+        .eq('user_id', userId).order('awarded_at', { ascending: false }).limit(10),
+    ]);
+
+    if (profileRes.error || !profileRes.data) {
+      return next(new AppError('NOT_FOUND', 404, 'Profile not found'));
+    }
+    const user = profileRes.data;
+
+    // Stats (mirrors /users/:id/stats minus heavy strength-standards
+    // computation which is its own concern).
+    const total_workouts = (workoutsRes.data ?? []).length;
+    const total_volume_kg = (workoutsRes.data ?? []).reduce((s, w: any) => s + (w.total_volume_kg ?? 0), 0);
+    const current_streak_weeks = streakRes.data?.current_streak_weeks ?? 0;
+    const longest_streak_weeks = (streakRes.data as any)?.longest_streak_weeks ?? 0;
+    const current_streak_days  = (streakRes.data as any)?.current_streak_days ?? 0;
+    const longest_streak_days  = (streakRes.data as any)?.longest_streak_days ?? 0;
+    const last_workout_at      = (streakRes.data as any)?.last_workout_at ?? null;
+
+    const recent_workouts = (recentRes.data ?? []).map((w: any) => ({
+      id: w.id,
+      workout_name: w.name,
+      started_at: w.started_at,
+      total_volume_kg: w.total_volume_kg,
+    }));
+
+    // Showcase: fetch the user's selected PRs by id, preserving the
+    // ordering in showcase_pr_ids. If the array is empty we skip the
+    // PR fetch entirely.
+    const showcaseIds: string[] = Array.isArray(user.showcase_pr_ids) ? user.showcase_pr_ids : [];
+    let showcase: any[] = [];
+    if (showcaseIds.length > 0) {
+      const { data: prs } = await supabase.from('personal_records')
+        .select('id, exercise_id, record_type, value, achieved_at, exercises(id, name, image_url)')
+        .in('id', showcaseIds);
+      const orderMap = new Map(showcaseIds.map((id, i) => [id, i]));
+      showcase = (prs || []).sort((a: any, b: any) =>
+        (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999),
+      );
+    }
+
+    const badges = (badgesRes.data ?? []).map((b: any) => ({
+      id: b.id,
+      badge_type: b.badge_key,
+      awarded_at: b.awarded_at,
+    }));
+
+    res.json({
+      data: {
+        profile: user,
+        stats: {
+          total_workouts,
+          total_volume_kg,
+          current_streak_weeks,
+          longest_streak_weeks,
+          current_streak_days,
+          longest_streak_days,
+          last_workout_at,
+          recent_workouts,
+          // Note: strength_levels is intentionally omitted from the
+          // aggregate -- the heavy strength-standards computation
+          // remains a separate /users/:id/stats fetch when the user
+          // opens the strength panel. Aggregate optimises for the
+          // Profile-on-focus warm path.
+          projected_1rms: (prsRes.data ?? []).length,
+        },
+        followers: {
+          follower_count: followerRes.count ?? 0,
+          following_count: followingRes.count ?? 0,
+        },
+        showcase,
+        badges,
+        pinned_challenge_exercise_id: user.pinned_challenge_exercise_id ?? null,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /users/me/settings
 router.get('/me/settings', async (req: Request, res: Response, next: NextFunction) => {
   try {
