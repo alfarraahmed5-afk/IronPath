@@ -1,41 +1,68 @@
+/**
+ * Help screen -- founder-rule fixes per lens 5 P0.
+ *
+ * Founder rule 10: WhatsApp is the only support channel.
+ *   +20 10 3659 6238 -- https://wa.me/201036596238
+ * Founder domain: ironpath.health (NOT ironpath.app).
+ *
+ * Previously this screen had mailto:support@ironpath.app links plus
+ * https://ironpath.app/{privacy,terms} URLs. Both were direct rule
+ * violations. Now: WhatsApp CTAs + .health domain everywhere.
+ */
+import React from 'react';
 import { View, ScrollView, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
-import { Mail, Bug, Shield, FileText, ChevronRight } from 'lucide-react-native';
+import { MessageCircle, Bug, Shield, FileText, ChevronRight, Award } from 'lucide-react-native';
 import { Header } from '../../src/components/Header';
 import { Surface } from '../../src/components/Surface';
 import { Text } from '../../src/components/Text';
-import { Pressable } from '../../src/components/Pressable';
+import { Pressable } from '../../src/design-system/primitives/Pressable';
 import { Icon } from '../../src/components/Icon';
 import { colors, spacing, radii } from '../../src/theme/tokens';
 
 interface HelpLink {
   icon: any;
   label: string;
+  description?: string;
   url: string;
+  accent?: 'whatsapp' | 'default';
 }
+
+// Single source of truth for the support contact.
+const WHATSAPP_NUMBER = '201036596238';
+const WHATSAPP_BASE = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export default function HelpScreen() {
   const links: HelpLink[] = [
     {
-      icon: Mail,
-      label: 'Email support',
-      url: 'mailto:support@ironpath.app?subject=IronPath Support',
+      icon: MessageCircle,
+      label: 'Message us on WhatsApp',
+      description: '+20 10 3659 6238',
+      url: WHATSAPP_BASE,
+      accent: 'whatsapp',
     },
     {
       icon: Bug,
       label: 'Report a bug',
-      url: 'mailto:support@ironpath.app?subject=IronPath Bug Report',
+      description: 'Opens WhatsApp with a prefilled report',
+      url: `${WHATSAPP_BASE}?text=${encodeURIComponent('Bug report: ')}`,
+      accent: 'whatsapp',
     },
     {
       icon: Shield,
       label: 'Privacy policy',
-      url: 'https://ironpath.app/privacy',
+      url: 'https://ironpath.health/privacy',
     },
     {
       icon: FileText,
       label: 'Terms of service',
-      url: 'https://ironpath.app/terms',
+      url: 'https://ironpath.health/terms',
+    },
+    {
+      icon: Award,
+      label: 'Acknowledgments',
+      url: 'https://ironpath.health/credits',
     },
   ];
 
@@ -46,7 +73,7 @@ export default function HelpScreen() {
         await Linking.openURL(url);
       }
     } catch (err) {
-      console.error('Failed to open URL:', err);
+      // Swallow -- non-critical; the lens 5 P0 fix is the WhatsApp + domain.
     }
   };
 
@@ -72,12 +99,27 @@ export default function HelpScreen() {
                   },
                 ]}
               >
-                <View style={[styles.rowIcon, { backgroundColor: colors.surface3 }]}>
-                  <Icon icon={link.icon} size={16} color={colors.textSecondary} />
+                <View
+                  style={[
+                    styles.rowIcon,
+                    {
+                      backgroundColor:
+                        link.accent === 'whatsapp' ? colors.successDim : colors.surface3,
+                    },
+                  ]}
+                >
+                  <Icon
+                    icon={link.icon}
+                    size={16}
+                    color={link.accent === 'whatsapp' ? colors.success : colors.textSecondary}
+                  />
                 </View>
-                <Text variant="body" color="textPrimary" style={{ flex: 1 }}>
-                  {link.label}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" color="textPrimary">{link.label}</Text>
+                  {link.description ? (
+                    <Text variant="caption" color="textTertiary">{link.description}</Text>
+                  ) : null}
+                </View>
                 <Icon icon={ChevronRight} size={16} color={colors.textTertiary} />
               </Pressable>
             ))}
@@ -87,6 +129,13 @@ export default function HelpScreen() {
         <View style={styles.versionSection}>
           <Text variant="caption" color="textTertiary" style={{ textAlign: 'center' }}>
             App version {appVersion}
+          </Text>
+          <Text
+            variant="caption"
+            color="textTertiary"
+            style={{ textAlign: 'center', marginTop: spacing.xs }}
+          >
+            ironpath.health
           </Text>
         </View>
       </ScrollView>
@@ -110,6 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.md,
     gap: spacing.md,
+    minHeight: 48,
   },
   rowIcon: {
     width: 32,
