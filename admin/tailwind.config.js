@@ -41,9 +41,31 @@ module.exports = {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        // Brand artifact: slow horizontal slide of the radial ember
+        // gradient, paired with a gentle opacity breathe. Mirrors the
+        // .ember-seam definition in src/index.css.
+        'ember-breathe': {
+          '0%, 100%': { backgroundPosition: '0% 0', opacity: '0.85' },
+          '50%': { backgroundPosition: '100% 0', opacity: '1' },
+        },
+        // LivePulseStrip traveler — a 12%-wide ember sliver sweeping
+        // across the parent. Mirrors the .pulse-travel definition in
+        // src/index.css.
+        'pulse-travel': {
+          '0%': { left: '-12%' },
+          '100%': { left: '100%' },
+        },
+        // Slow Ken Burns photo zoom for hero/marketing imagery — alternate
+        // direction so the photo gently inhales/exhales without snapping
+        // back to the start each loop.
+        'ken-burns': {
+          '0%': { transform: 'scale(1)' },
+          '100%': { transform: 'scale(1.04)' },
+        },
       },
       animation: {
         shimmer: 'shimmer 1.5s linear infinite',
+        'ken-burns': 'ken-burns 12s ease-in-out infinite alternate',
       },
     },
   },

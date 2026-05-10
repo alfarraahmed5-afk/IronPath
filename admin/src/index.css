@@ -66,4 +66,116 @@
   @keyframes shimmer {
     100% { transform: translateX(100%); }
   }
+
+  /* ============================================================
+   * Brand artifact: the Ember Seam.
+   *
+   * A 1px horizontal ribbon with a radial-style ember gradient that
+   * "breathes" by sliding its background-position back and forth.
+   * Used as the signature divider between hero/header bands and the
+   * page body — the visual equivalent of the brand's heartbeat.
+   * ============================================================ */
+  .ember-seam {
+    height: 1px;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 107, 53, 0.04) 18%,
+      rgba(255, 107, 53, 0.45) 50%,
+      rgba(255, 107, 53, 0.04) 82%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-position: 0% 0;
+    animation: ember-breathe 8s ease-in-out infinite;
+    filter: drop-shadow(0 0 12px rgba(255, 107, 53, 0.18));
+  }
+
+  @keyframes ember-breathe {
+    0%, 100% { background-position: 0% 0; opacity: 0.85; }
+    50% { background-position: 100% 0; opacity: 1; }
+  }
+
+  /* ============================================================
+   * Hover language — the standard set of micro-interactions that
+   * make the admin feel responsive without being noisy. Pair with
+   * .surface-card / primary buttons / inline anchors as appropriate.
+   * ============================================================ */
+
+  /* Subtle card lift on hover. Honors the brand's easing curve
+     (cubic-bezier(0.32, 0.72, 0, 1) — borrowed from iOS Human Interface
+     spring-out) and tightens the border to ink-700 so the card feels
+     selected without changing its silhouette. */
+  .hover-lift {
+    transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1),
+                box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1),
+                border-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+    border-color: theme('colors.ink.700');
+  }
+
+  /* Tactile button press — 60ms is just enough to register without
+     feeling laggy. Use on any clickable primary/secondary surface. */
+  .press-compress {
+    transition: transform 60ms ease-out;
+  }
+  .press-compress:active {
+    transform: scale(0.97);
+  }
+
+  /* Inline link underline that draws in left-to-right on hover. Uses
+     a 1px linear-gradient as the background image so the underline
+     can animate via background-size without affecting layout. */
+  .link-underline-draw {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .link-underline-draw:hover {
+    background-size: 100% 1px;
+  }
+
+  /* ============================================================
+   * LivePulseStrip traveler — a 12%-wide ember sliver that sweeps
+   * across its parent container once per heartbeat. The component
+   * is responsible for adding/removing the element to retrigger
+   * the animation; the class itself just defines the look + path.
+   * ============================================================ */
+  .pulse-travel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 12%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 107, 53, 0.6) 50%,
+      transparent 100%
+    );
+    filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.5));
+    animation: pulse-travel 1.2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+  @keyframes pulse-travel {
+    0% { left: -12%; }
+    100% { left: 100%; }
+  }
+
+  /* Respect the user's motion preferences. Hover transitions and
+     looping ember/pulse animations are silenced; the underlying
+     visual state is preserved (no layout shift). */
+  @media (prefers-reduced-motion: reduce) {
+    .ember-seam,
+    .pulse-travel {
+      animation: none;
+    }
+    .hover-lift {
+      transition: none;
+    }
+  }
 }
