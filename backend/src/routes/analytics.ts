@@ -299,6 +299,23 @@ router.get('/stats', cacheControl(60), async (req: Request, res: Response, next:
     // --- Volume comparison (all-time) ---
     const volume_comparison = getVolumeComparison(overview.total_volume_kg);
 
+    // --- Gym volume percentile (BE-H) ---
+    // Calls the SQL function added in migration 051. Failure is
+    // non-fatal: we'd rather serve the rest of the stats payload than
+    // 500 the endpoint just because the percentile RPC misbehaved.
+    let gym_volume_percentile: number | null = null;
+    try {
+      const { data: percentileRow, error: percentileErr } = await supabase.rpc(
+        'gym_volume_percentile',
+        { p_user_id: userId }
+      );
+      if (!percentileErr && typeof percentileRow === 'number') {
+        gym_volume_percentile = percentileRow;
+      }
+    } catch {
+      // Swallow; gym_volume_percentile stays null.
+    }
+
     return res.json({
       data: {
         overview,
@@ -308,6 +325,7 @@ router.get('/stats', cacheControl(60), async (req: Request, res: Response, next:
         strength_levels,
         current_streak_weeks,
         volume_comparison,
+        gym_volume_percentile,
       },
     });
   } catch (err: any) {

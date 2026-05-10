@@ -50,6 +50,28 @@ function probeTable(table: string) {
   };
 }
 
+/**
+ * Probe a SQL function by RPC. Used for migrations that ship a function
+ * (not a column or table). The function must accept whatever args we
+ * pass and return without 42883 (undefined function) -- we don't care
+ * about the result, only that PostgREST can resolve the symbol.
+ */
+function probeFunction(fnName: string, args: Record<string, unknown>) {
+  return async (): Promise<{ ok: true } | { ok: false; reason: string }> => {
+    const { error } = await supabase.rpc(fnName, args);
+    if (!error) return { ok: true };
+    const code = (error as { code?: string }).code ?? 'ERROR';
+    // 42883 = undefined_function. PGRST202 = function not found in
+    // PostgREST schema cache. Both mean the migration is missing.
+    // Anything else (e.g. a runtime data error) means the function
+    // exists, which is all this probe checks for.
+    if (code === '42883' || code === 'PGRST202') {
+      return { ok: false, reason: `${code}: ${error.message}` };
+    }
+    return { ok: true };
+  };
+}
+
 const PROBES: SchemaProbe[] = [
   { migration: '036', description: 'gyms.mrr_cents column', run: probeColumn('gyms', 'mrr_cents') },
   { migration: '036', description: 'gyms.timezone column', run: probeColumn('gyms', 'timezone') },
@@ -70,6 +92,19 @@ const PROBES: SchemaProbe[] = [
   { migration: '047', description: 'cancellation_log table', run: probeTable('cancellation_log') },
   { migration: '048', description: 'demo_sessions table', run: probeTable('demo_sessions') },
   { migration: '049', description: 'leads.member_count column', run: probeColumn('leads', 'member_count') },
+  // BE-D (cinematic overhaul) -- streak day fields.
+  { migration: '050', description: 'streaks.current_streak_days column', run: probeColumn('streaks', 'current_streak_days') },
+  { migration: '050', description: 'streaks.longest_streak_days column', run: probeColumn('streaks', 'longest_streak_days') },
+  { migration: '050', description: 'streaks.last_workout_at column', run: probeColumn('streaks', 'last_workout_at') },
+  // BE-H (cinematic overhaul) -- gym_volume_percentile SQL function.
+  // Probed with the all-zero UUID; the function returns NULL for
+  // unknown users which is fine -- we only care that the symbol
+  // resolves at boot.
+  {
+    migration: '051',
+    description: 'gym_volume_percentile() function',
+    run: probeFunction('gym_volume_percentile', { p_user_id: '00000000-0000-0000-0000-000000000000' }),
+  },
 ];
 
 export interface SchemaCheckResult {
