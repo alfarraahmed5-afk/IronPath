@@ -166,13 +166,32 @@
     100% { left: 100%; }
   }
 
+  /* ============================================================
+   * Active-nav breathe — the active sidebar item gets a slow
+   * 3s ember-tint pulse so something on screen is always moving,
+   * even when the user is just sitting on a page. Tuned to be
+   * subliminal: the opacity shift is small enough to read as
+   * "alive," not "blinking."
+   * ============================================================ */
+  .nav-active-breathe {
+    animation: nav-active-breathe 3s ease-in-out infinite;
+  }
+  @keyframes nav-active-breathe {
+    0%, 100% { background-color: rgba(200, 16, 46, 0.06); }
+    50% { background-color: rgba(200, 16, 46, 0.14); }
+  }
+
   /* Respect the user's motion preferences. Hover transitions and
      looping ember/pulse animations are silenced; the underlying
      visual state is preserved (no layout shift). */
   @media (prefers-reduced-motion: reduce) {
     .ember-seam,
-    .pulse-travel {
+    .pulse-travel,
+    .nav-active-breathe {
       animation: none;
+    }
+    .nav-active-breathe {
+      background-color: rgba(200, 16, 46, 0.10);
     }
     .hover-lift {
       transition: none;

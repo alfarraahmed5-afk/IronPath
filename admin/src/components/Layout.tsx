@@ -79,7 +79,7 @@ export default function Layout({ children }: LayoutProps) {
                   cn(
                     'group relative flex items-center gap-3 pl-4 pr-3 py-2 rounded-md text-sm transition-colors',
                     isActive
-                      ? 'text-ink-50 bg-brand-500/[0.08]'
+                      ? 'text-ink-50 nav-active-breathe'
                       : 'text-ink-400 hover:text-ink-50 hover:bg-ink-850/60'
                   )
                 }

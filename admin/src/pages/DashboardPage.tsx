@@ -43,32 +43,21 @@ const HERO_PHOTO_URL =
 interface StatCardProps {
   label: string;
   value: number;
-  /** Optional delta chip text, e.g. "+12 vs last week". */
-  delta?: string;
 }
 
-function StatCard({ label, value, delta }: StatCardProps) {
+function StatCard({ label, value }: StatCardProps) {
   return (
     <motion.div
       {...listItem}
       className={cn(
-        'surface-card p-5',
-        // hover-lift: subtle 1px rise + shadow glow on hover. The component
-        // class doesn't exist in index.css yet, so spell it out with utilities
-        // — alpha agents will fold this into a single .hover-lift later.
-        'transition-transform duration-200 ease-out',
-        'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40'
+        'surface-card hover-lift p-5',
+        'transition-transform duration-200 ease-out'
       )}
     >
       <p className="text-xs uppercase tracking-wider text-ink-400">{label}</p>
       <p className="font-mono text-4xl font-medium text-ink-50 mt-2" data-numeric>
         <NumberFlow value={value} />
       </p>
-      {delta && (
-        <p className="mt-3 inline-block bg-emerald-500/10 text-emerald-400 text-xs font-mono px-2 py-0.5 rounded">
-          {delta}
-        </p>
-      )}
     </motion.div>
   );
 }
@@ -84,9 +73,8 @@ function VolumeStatCard({ valueKg }: { valueKg: number }) {
     <motion.div
       {...listItem}
       className={cn(
-        'surface-card p-5',
-        'transition-transform duration-200 ease-out',
-        'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40'
+        'surface-card hover-lift p-5',
+        'transition-transform duration-200 ease-out'
       )}
     >
       <p className="text-xs uppercase tracking-wider text-ink-400">Volume This Month</p>
@@ -122,37 +110,9 @@ function ChartTooltip({ active, payload }: ChartTooltipProps) {
   );
 }
 
-/**
- * Live "lifting now" pulse — small ember dot inside a breathing ring.
- * Honors prefers-reduced-motion: when reduced, the ring is a static
- * 1px outline.
- */
-function LivePulse({ count, reducedMotion }: { count: number; reducedMotion: boolean }) {
-  return (
-    <div className="flex items-center gap-2 text-ink-50 font-mono text-sm">
-      <span className="relative flex items-center justify-center w-3 h-3">
-        {!reducedMotion && (
-          <motion.span
-            className="absolute inset-0 rounded-full border border-brand-500"
-            animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            aria-hidden="true"
-          />
-        )}
-        {reducedMotion && (
-          <span
-            className="absolute inset-0 rounded-full border border-brand-500/40"
-            aria-hidden="true"
-          />
-        )}
-        <span className="w-1.5 h-1.5 rounded-full bg-brand-500" aria-hidden="true" />
-      </span>
-      <span>
-        <span className="font-semibold">{count}</span> lifting now
-      </span>
-    </div>
-  );
-}
+// LivePulse component removed — the "N lifting now" counter was placeholder
+// data, not real workout-event-wired. Will return in Phase E once the
+// backend exposes a live-workout SSE / poll endpoint and the count is real.
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -223,19 +183,25 @@ export default function DashboardPage() {
 
       {/* Hero band — full-bleed (within the 8-padding main column) 280px-tall
           B&W gym macro. Multiply-blend ember gradient bottom-up; mask carves
-          out clean negative space on the right where KPIs sit. */}
+          out clean negative space on the right where copy sits. The image
+          slow-zooms via Ken Burns so the hero is always alive even when
+          nothing else on the page moves. */}
       <div className="relative h-[280px] w-full rounded-xl overflow-hidden mb-8 surface-card">
         <img
           src={HERO_PHOTO_URL}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
+          className={cn(
+            'absolute inset-0 w-full h-full object-cover',
+            !reducedMotion && 'animate-ken-burns'
+          )}
           style={{
             filter: 'grayscale(100%) contrast(1.1) brightness(0.9)',
             WebkitMaskImage:
               'linear-gradient(to right, black 40%, transparent 100%)',
             maskImage:
               'linear-gradient(to right, black 40%, transparent 100%)',
+            transformOrigin: 'center',
           }}
         />
         {/* Ember gradient overlay — bottom-up, multiply blend, capped at 8% */}
@@ -248,10 +214,6 @@ export default function DashboardPage() {
           }}
           aria-hidden="true"
         />
-        {/* Live pulse — bottom-left of hero */}
-        <div className="absolute bottom-4 left-4 z-10">
-          <LivePulse count={3} reducedMotion={reducedMotion} />
-        </div>
         {/* Optional copy slot — top-left, reinforces the "First Light" mood */}
         <div className="absolute top-4 left-4 z-10">
           <p className="font-mono text-xs uppercase tracking-widest text-ink-400">
@@ -268,11 +230,7 @@ export default function DashboardPage() {
         {...staggerProps}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
       >
-        <StatCard
-          label="Active Members"
-          value={stats.active_members}
-          delta="+12 vs last week"
-        />
+        <StatCard label="Active Members" value={stats.active_members} />
         <StatCard label="New This Month" value={stats.new_members_this_month} />
         <StatCard
           label="Workouts This Month"
