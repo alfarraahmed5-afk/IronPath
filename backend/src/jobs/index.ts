@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 import { computeGymLeaderboards, resolveLeaderboardExercises } from '../lib/leaderboardCompute';
 import { runTrialEmailsJob } from './trialEmailsJob';
+import { runStreakTierCheck } from './streakTierCheck';
 
 export async function initJobs(): Promise<void> {
   await resolveLeaderboardExercises();
@@ -678,6 +679,20 @@ export function startJobs(): void {
       }
       logger.info({ awarded: awards.length }, 'Badge award job complete');
     } catch (err) { logger.error({ err }, 'Badge award job failed'); }
+  }, { timezone: 'UTC' });
+
+  // BE-N (cinematic overhaul) -- streak tier ladder check.
+  // Runs nightly at 02:00 UTC. Awards iron_streak_2w / 1m / 3m / 6m
+  // / 1y / 2y / 5y badges to users who crossed a threshold in the
+  // last 24h (and back-fills any tier the cron previously missed).
+  // Inserts gym_milestones rows + sends push on the
+  // pr-and-streak channel.
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      logger.info('Streak tier check started');
+      const result = await runStreakTierCheck();
+      logger.info(result, 'Streak tier check complete');
+    } catch (err) { logger.error({ err }, 'Streak tier check failed'); }
   }, { timezone: 'UTC' });
 
   logger.info('All background jobs registered');

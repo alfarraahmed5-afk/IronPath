@@ -64,6 +64,211 @@ function classifyStrengthLevel(
 // Endpoint 1: GET /analytics/stats
 // ---------------------------------------------------------------------------
 
+/**
+ * Compute the stats payload for a given user + period. Factored out
+ * so /analytics/stats AND /analytics/all (BE-L) call it identically.
+ *
+ * Throws on validation errors; the caller wraps in next(...).
+ */
+async function computeStatsPayload(userId: string, period: string): Promise<{
+  overview: { total_workouts: number; total_volume_kg: number; total_duration_seconds: number; total_sets: number };
+  last_7_days: { date: string; workout_ids: string[]; muscles: string[] }[];
+  muscle_sets: { muscle: string; sets: number }[];
+  top_exercises: { exercise_id: string; exercise_name: string; times_logged: number }[];
+  strength_levels: { exercise_name: string; wger_id: number; projected_1rm_kg: number | null; level: string | null }[];
+  current_streak_weeks: number;
+  current_streak_days: number;
+  longest_streak_days: number;
+  last_workout_at: string | null;
+  volume_comparison: { label: string; kg: number } | null;
+  gym_volume_percentile: number | null;
+}> {
+  const validPeriods = ['30d', '3m', '1y', 'all'];
+  if (!validPeriods.includes(period)) {
+    throw new AppError('VALIDATION_ERROR', 422, 'period must be one of: 30d, 3m, 1y, all');
+  }
+  // Body of the original /stats handler is inlined below via a thin
+  // wrapper (so we don't have two divergent copies). Look for the
+  // matching closing block at "// END computeStatsPayload".
+  // -------------------------------------------------------------
+  // Re-implementation that mirrors /stats verbatim, returning the
+  // payload object. We do NOT optimize across calls; this is a
+  // straight extraction.
+  // -------------------------------------------------------------
+  const { data: workoutsAll, error: workoutsAllErr } = await supabase
+    .from('workouts')
+    .select('is_completed, total_volume_kg, duration_seconds, total_sets')
+    .eq('user_id', userId);
+  if (workoutsAllErr) throw new AppError('DB_ERROR', 500, workoutsAllErr.message);
+
+  const completed = (workoutsAll ?? []).filter((w: any) => w.is_completed);
+  const overview = {
+    total_workouts: completed.length,
+    total_volume_kg: completed.reduce((s: number, w: any) => s + (w.total_volume_kg ?? 0), 0),
+    total_duration_seconds: completed.reduce((s: number, w: any) => s + (w.duration_seconds ?? 0), 0),
+    total_sets: completed.reduce((s: number, w: any) => s + (w.total_sets ?? 0), 0),
+  };
+
+  const todayUTC = new Date();
+  todayUTC.setUTCHours(0, 0, 0, 0);
+  const last_7_days: { date: string; workout_ids: string[]; muscles: string[] }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(todayUTC);
+    day.setUTCDate(todayUTC.getUTCDate() - i);
+    const dateStr = day.toISOString().split('T')[0];
+    const dayStart = `${dateStr}T00:00:00.000Z`;
+    const dayEnd = `${dateStr}T23:59:59.999Z`;
+    const { data: dayWorkouts } = await supabase
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_completed', true)
+      .gte('started_at', dayStart)
+      .lte('started_at', dayEnd);
+    const workoutIds = (dayWorkouts ?? []).map((w: any) => w.id);
+    let muscles: string[] = [];
+    if (workoutIds.length > 0) {
+      const { data: weRows } = await supabase
+        .from('workout_exercises')
+        .select('exercise_id')
+        .in('workout_id', workoutIds);
+      const exerciseIds = [...new Set((weRows ?? []).map((r: any) => r.exercise_id))];
+      if (exerciseIds.length > 0) {
+        const { data: exRows } = await supabase
+          .from('exercises')
+          .select('primary_muscles')
+          .in('id', exerciseIds);
+        const muscleSet = new Set<string>();
+        for (const ex of exRows ?? []) {
+          for (const m of (ex as any).primary_muscles ?? []) muscleSet.add(m);
+        }
+        muscles = [...muscleSet];
+      }
+    }
+    last_7_days.push({ date: dateStr, workout_ids: workoutIds, muscles });
+  }
+
+  const cutoff = getPeriodCutoff(period);
+  let muscleQuery = supabase
+    .from('workout_sets')
+    .select(`id, workout_exercises!inner ( exercise_id, workouts!inner ( id, user_id, is_completed, started_at ), exercises!inner ( primary_muscles ) )`)
+    .eq('is_completed', true)
+    .neq('set_type', 'warmup')
+    .eq('workout_exercises.workouts.user_id', userId)
+    .eq('workout_exercises.workouts.is_completed', true);
+  if (cutoff) muscleQuery = muscleQuery.gte('workout_exercises.workouts.started_at', cutoff);
+  const { data: muscleSetRows, error: muscleSetErr } = await muscleQuery;
+  const muscleCounts: Record<string, number> = {};
+  if (!muscleSetErr) {
+    for (const row of muscleSetRows ?? []) {
+      const we = (row as any).workout_exercises;
+      const primaryMuscles: string[] = we?.exercises?.primary_muscles ?? [];
+      for (const m of primaryMuscles) muscleCounts[m] = (muscleCounts[m] ?? 0) + 1;
+    }
+  }
+  const muscle_sets = Object.entries(muscleCounts).map(([muscle, sets]) => ({ muscle, sets })).sort((a, b) => b.sets - a.sets);
+
+  const { data: completedWorkoutIds } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_completed', true);
+  const cWIds = (completedWorkoutIds ?? []).map((w: any) => w.id);
+  let top_exercises: { exercise_id: string; exercise_name: string; times_logged: number }[] = [];
+  if (cWIds.length > 0) {
+    const { data: weAll } = await supabase
+      .from('workout_exercises')
+      .select('exercise_id, exercises!inner(name)')
+      .in('workout_id', cWIds);
+    const exCountMap: Record<string, { name: string; count: number }> = {};
+    for (const row of weAll ?? []) {
+      const eid = (row as any).exercise_id;
+      const name = (row as any).exercises?.name ?? '';
+      if (!exCountMap[eid]) exCountMap[eid] = { name, count: 0 };
+      exCountMap[eid].count++;
+    }
+    top_exercises = Object.entries(exCountMap)
+      .map(([exercise_id, { name, count }]) => ({ exercise_id, exercise_name: name, times_logged: count }))
+      .sort((a, b) => b.times_logged - a.times_logged)
+      .slice(0, 5);
+  }
+
+  const { data: exRows } = await supabase
+    .from('exercises')
+    .select('id, wger_id')
+    .in('wger_id', WGER_IDS)
+    .is('gym_id', null);
+  const wgerToUuid: Record<number, string> = {};
+  for (const ex of exRows ?? []) wgerToUuid[(ex as any).wger_id] = (ex as any).id;
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('bodyweight_kg, sex')
+    .eq('id', userId)
+    .single();
+  const bodyweightKg: number | null = (userRow as any)?.bodyweight_kg ?? null;
+  const userSex: string | null = (userRow as any)?.sex ?? null;
+  const internalUuids = Object.values(wgerToUuid);
+  const prMap: Record<string, number> = {};
+  if (internalUuids.length > 0) {
+    const { data: prRows } = await supabase
+      .from('personal_records')
+      .select('exercise_id, value')
+      .eq('user_id', userId)
+      .eq('record_type', 'projected_1rm')
+      .in('exercise_id', internalUuids);
+    for (const pr of prRows ?? []) {
+      const eid = (pr as any).exercise_id;
+      const v = Number((pr as any).value);
+      if (!prMap[eid] || v > prMap[eid]) prMap[eid] = v;
+    }
+  }
+  const strength_levels = WGER_IDS.map((wgerId) => {
+    const standard = strengthStandards.exercises[wgerId];
+    const uuid = wgerToUuid[wgerId];
+    const projected1rm = uuid ? (prMap[uuid] ?? null) : null;
+    let level: string | null = null;
+    if (projected1rm !== null && bodyweightKg !== null && bodyweightKg > 0) {
+      level = classifyStrengthLevel(projected1rm, bodyweightKg, userSex, standard);
+    }
+    return { exercise_name: standard.name, wger_id: wgerId, projected_1rm_kg: projected1rm, level };
+  });
+
+  const { data: streakRow } = await supabase
+    .from('streaks')
+    .select('current_streak_weeks, current_streak_days, longest_streak_days, last_workout_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const current_streak_weeks: number = (streakRow as any)?.current_streak_weeks ?? 0;
+  const current_streak_days: number = (streakRow as any)?.current_streak_days ?? 0;
+  const longest_streak_days: number = (streakRow as any)?.longest_streak_days ?? 0;
+  const last_workout_at: string | null = (streakRow as any)?.last_workout_at ?? null;
+
+  const volume_comparison = getVolumeComparison(overview.total_volume_kg);
+
+  let gym_volume_percentile: number | null = null;
+  try {
+    const { data: percentileRow, error: percentileErr } = await supabase.rpc('gym_volume_percentile', { p_user_id: userId });
+    if (!percentileErr && typeof percentileRow === 'number') gym_volume_percentile = percentileRow as number;
+  } catch {
+    // swallow
+  }
+
+  return {
+    overview,
+    last_7_days,
+    muscle_sets,
+    top_exercises,
+    strength_levels,
+    current_streak_weeks,
+    current_streak_days,
+    longest_streak_days,
+    last_workout_at,
+    volume_comparison,
+    gym_volume_percentile,
+  };
+}
+// END computeStatsPayload
+
 router.get('/stats', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
@@ -941,44 +1146,47 @@ router.get('/reports/:id', async (req: Request, res: Response, next: NextFunctio
 // ?period=30d|3m|1y|all  &granularity=day|week|month
 // ---------------------------------------------------------------------------
 
+/**
+ * Volume-over-time helper. Used by /analytics/volume-over-time AND
+ * /analytics/all (BE-L).
+ */
+async function computeVolumeOverTime(userId: string, period: string, granularity: string): Promise<{ date: string; volume_kg: number }[]> {
+  const cutoff = getPeriodCutoff(period);
+  let q = supabase.from('workouts')
+    .select('started_at, total_volume_kg')
+    .eq('user_id', userId)
+    .eq('is_completed', true)
+    .order('started_at', { ascending: true });
+  if (cutoff) q = q.gte('started_at', cutoff);
+  const { data: rows } = await q;
+  const buckets = new Map<string, number>();
+  for (const w of rows || []) {
+    const d = new Date((w as any).started_at);
+    let key: string;
+    if (granularity === 'day') {
+      key = d.toISOString().slice(0, 10);
+    } else if (granularity === 'month') {
+      key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    } else {
+      const day = d.getUTCDay();
+      const diff = (day + 6) % 7;
+      const monday = new Date(d);
+      monday.setUTCDate(d.getUTCDate() - diff);
+      key = monday.toISOString().slice(0, 10);
+    }
+    buckets.set(key, (buckets.get(key) ?? 0) + Number((w as any).total_volume_kg ?? 0));
+  }
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, volume_kg]) => ({ date, volume_kg: Math.round(volume_kg * 10) / 10 }));
+}
+
 router.get('/volume-over-time', cacheControl(120), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
     const period = (req.query.period as string) || '30d';
     const granularity = (req.query.granularity as string) || 'week';
-    const cutoff = getPeriodCutoff(period);
-
-    let q = supabase.from('workouts')
-      .select('started_at, total_volume_kg')
-      .eq('user_id', userId)
-      .eq('is_completed', true)
-      .order('started_at', { ascending: true });
-    if (cutoff) q = q.gte('started_at', cutoff);
-    const { data: rows } = await q;
-
-    const buckets = new Map<string, number>();
-    for (const w of rows || []) {
-      const d = new Date(w.started_at);
-      let key: string;
-      if (granularity === 'day') {
-        key = d.toISOString().slice(0, 10);
-      } else if (granularity === 'month') {
-        key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
-      } else {
-        // week: ISO Monday
-        const day = d.getUTCDay();
-        const diff = (day + 6) % 7;
-        const monday = new Date(d);
-        monday.setUTCDate(d.getUTCDate() - diff);
-        key = monday.toISOString().slice(0, 10);
-      }
-      buckets.set(key, (buckets.get(key) ?? 0) + Number(w.total_volume_kg ?? 0));
-    }
-
-    const points = [...buckets.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, volume_kg]) => ({ date, volume_kg: Math.round(volume_kg * 10) / 10 }));
-
+    const points = await computeVolumeOverTime(userId, period, granularity);
     res.json({ data: { points } });
   } catch (err: any) {
     return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
@@ -989,25 +1197,74 @@ router.get('/volume-over-time', cacheControl(120), async (req: Request, res: Res
 // Endpoint: GET /analytics/bodyweight-history?period=...
 // ---------------------------------------------------------------------------
 
+/**
+ * Bodyweight-history helper. Shared by /analytics/bodyweight-history
+ * AND /analytics/all (BE-L).
+ */
+async function computeBodyweightHistory(userId: string, period: string): Promise<{ date: string; bodyweight_kg: number }[]> {
+  const cutoff = getPeriodCutoff(period);
+  let q = supabase.from('body_measurements')
+    .select('measured_at, bodyweight_kg')
+    .eq('user_id', userId)
+    .not('bodyweight_kg', 'is', null)
+    .order('measured_at', { ascending: true });
+  if (cutoff) q = q.gte('measured_at', cutoff);
+  const { data: rows } = await q;
+  return (rows || []).map((r: any) => ({
+    date: String(r.measured_at).slice(0, 10),
+    bodyweight_kg: Number(r.bodyweight_kg),
+  }));
+}
+
 router.get('/bodyweight-history', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
     const period = (req.query.period as string) || '3m';
-    const cutoff = getPeriodCutoff(period);
-
-    let q = supabase.from('body_measurements')
-      .select('measured_at, bodyweight_kg')
-      .eq('user_id', userId)
-      .not('bodyweight_kg', 'is', null)
-      .order('measured_at', { ascending: true });
-    if (cutoff) q = q.gte('measured_at', cutoff);
-    const { data: rows } = await q;
-    const points = (rows || []).map((r: any) => ({
-      date: String(r.measured_at).slice(0, 10),
-      bodyweight_kg: Number(r.bodyweight_kg),
-    }));
+    const points = await computeBodyweightHistory(userId, period);
     res.json({ data: { points } });
   } catch (err: any) {
+    return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Endpoint: GET /analytics/all (BE-L)
+//
+// Lens 6 perf fix: Profile + Progress today fan out 6+ requests on
+// focus. /analytics/all bundles the period summary into one payload
+// so React Query mounts once. Caches at 60s aligned with /stats.
+// ---------------------------------------------------------------------------
+
+router.get('/all', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const period = (req.query.period as string) || '30d';
+    const validPeriods = ['30d', '3m', '1y', 'all'];
+    if (!validPeriods.includes(period)) {
+      return next(new AppError('VALIDATION_ERROR', 422, 'period must be one of: 30d, 3m, 1y, all'));
+    }
+    const granularity =
+      (req.query.granularity as string) ||
+      (period === '30d' ? 'day' : period === '3m' ? 'week' : 'month');
+    const bwPeriod = (req.query.bw_period as string) || period;
+
+    const [stats, volume_over_time, bodyweight_history] = await Promise.all([
+      computeStatsPayload(userId, period),
+      computeVolumeOverTime(userId, period, granularity),
+      computeBodyweightHistory(userId, bwPeriod),
+    ]);
+
+    res.json({
+      data: {
+        period,
+        granularity,
+        ...stats,
+        volume_over_time,
+        bodyweight_history,
+      },
+    });
+  } catch (err: any) {
+    if (err instanceof AppError) return next(err);
     return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
   }
 });

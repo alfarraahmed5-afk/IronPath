@@ -21,6 +21,8 @@ import { initDB } from '../src/lib/db';
 import { ToastProvider } from '../src/components/Toast';
 import { ThemeProvider } from '../src/design-system/theme/ThemeProvider';
 import { colors } from '../src/design-system/tokens';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/lib/queryClient';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -240,18 +242,20 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <ToastProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                // ink-950 (warm-shifted, NOT pure black). Founder rule.
-                contentStyle: { backgroundColor: colors.bg },
-              }}
-            >
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </ToastProvider>
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  // ink-950 (warm-shifted, NOT pure black). Founder rule.
+                  contentStyle: { backgroundColor: colors.bg },
+                }}
+              >
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </ToastProvider>
+          </QueryClientProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

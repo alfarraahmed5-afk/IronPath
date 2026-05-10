@@ -21,19 +21,47 @@ function getISOWeekMonday(dateStr: string): string {
   return monday.toISOString().split('T')[0];
 }
 
+// BE-J (cinematic overhaul) -- structured PR record for the celebrate
+// screen. The legacy `prs_detected: string[]` is preserved for
+// backwards-compat with older clients; new clients read
+// `prs_detected_v2[]` for the structured shape.
+export interface DetectedPR {
+  /** Human-readable label, same shape as the legacy string. */
+  label: string;
+  /** UUID of the exercise involved. */
+  exercise_id: string;
+  /** Exercise name (already on the label, here for ergonomic access). */
+  exercise_name: string;
+  /** Record type (heaviest_weight, projected_1rm, etc). */
+  record_type: string;
+  /** New PR value (kg, reps, seconds, or meters depending on record_type). */
+  value: number;
+  /** The previous best value for the same (exercise, record_type), if any. */
+  previous_best: number | null;
+  /**
+   * Delta as a percentage above the previous best, rounded to 1
+   * decimal. NULL when no previous best exists (first-ever PR).
+   * Drives the "+5.2% over previous best" line on celebrate.
+   */
+  delta_pct: number | null;
+  /** Source workout_set id, when applicable. */
+  set_id: string | null;
+}
+
 // Helper: PR detection — bulk version
 // 1. Build all candidates locally (no DB roundtrip).
 // 2. Fetch ALL existing PRs for these (exercise_id, record_type) tuples in ONE query.
 // 3. Filter to actual new records.
 // 4. Bulk insert in ONE query.
-// Returns descriptive strings like "Bench Press · 100 kg" so the celebrate
-// screen can render them directly without an extra fetch.
+// Returns BOTH the legacy descriptive strings (for older clients) and
+// a structured DetectedPR[] for the celebrate screen so it can render
+// "% over previous best" deltas without an extra fetch.
 async function detectPRs(
   workoutId: string, userId: string, gymId: string,
   exercises: Array<{ exercise_id: string; exercise_name: string; sets: Array<{ id?: string; set_type: string; weight_kg?: number|null; reps?: number|null; duration_seconds?: number|null; distance_meters?: number|null; is_completed: boolean }> }>,
   loggingTypes: Record<string, string>,
   bodyweightKg: number | null
-): Promise<string[]> {
+): Promise<{ labels: string[]; structured: DetectedPR[] }> {
   type Candidate = {
     exercise_id: string;
     exercise_name: string;
@@ -98,7 +126,7 @@ async function detectPRs(
     }
   }
 
-  if (!candidates.length) return [];
+  if (!candidates.length) return { labels: [], structured: [] };
 
   // Fetch existing PRs in ONE query: max value per (exercise_id, record_type)
   const exerciseIds = [...new Set(candidates.map(c => c.exercise_id))];
@@ -109,9 +137,15 @@ async function detectPRs(
     .in('exercise_id', exerciseIds)
     .in('record_type', recordTypes);
 
+  // Two maps so we can return BOTH "is this a PR" (max) and "what was
+  // the previous best" (also max prior to this insert -- same value).
   const existingMap = new Map<string, number>();
+  // We track whether an entry existed at all -- distinguishes "no
+  // previous best" (null) from "previous best was 0" (0).
+  const existingHas = new Set<string>();
   for (const r of existingPRs || []) {
     const key = `${r.exercise_id}::${r.record_type}`;
+    existingHas.add(key);
     const cur = existingMap.get(key) ?? 0;
     if (Number(r.value) > cur) existingMap.set(key, Number(r.value));
   }
@@ -122,7 +156,7 @@ async function detectPRs(
     return c.value > existing && c.value > 0;
   });
 
-  if (!newPRs.length) return [];
+  if (!newPRs.length) return { labels: [], structured: [] };
 
   // Bulk insert
   const now = new Date().toISOString();
@@ -131,7 +165,26 @@ async function detectPRs(
     workout_set_id: c.set_id, record_type: c.record_type, value: c.value, achieved_at: now,
   })));
 
-  return newPRs.map(c => c.label);
+  const structured: DetectedPR[] = newPRs.map(c => {
+    const key = `${c.exercise_id}::${c.record_type}`;
+    const previous_best = existingHas.has(key) ? (existingMap.get(key) ?? 0) : null;
+    let delta_pct: number | null = null;
+    if (previous_best !== null && previous_best > 0) {
+      delta_pct = Math.round(((c.value - previous_best) / previous_best) * 1000) / 10;
+    }
+    return {
+      label: c.label,
+      exercise_id: c.exercise_id,
+      exercise_name: c.exercise_name,
+      record_type: c.record_type,
+      value: c.value,
+      previous_best,
+      delta_pct,
+      set_id: c.set_id,
+    };
+  });
+
+  return { labels: newPRs.map(c => c.label), structured };
 }
 
 const workoutSchema = z.object({
@@ -174,7 +227,7 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
 
     // Idempotency check
     const { data: existing } = await supabase.from('workouts').select('id,name,started_at,finished_at,duration_seconds,total_volume_kg,total_sets,ordinal_number,is_completed,visibility').eq('user_id', req.user.id).eq('idempotency_key', body.idempotency_key).single();
-    if (existing) return res.json({ data: { workout: existing, prs_detected: [], media_failed: false } });
+    if (existing) return res.json({ data: { workout: existing, prs_detected: [], prs_detected_v2: [], gym_percentile: null, newly_unlocked_badges: [], media_failed: false } });
 
     // User settings + bodyweight
     const { data: settings } = await supabase.from('user_settings').select('warm_up_sets_in_stats').eq('user_id', req.user.id).single();
@@ -295,8 +348,13 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
       }
     }
 
-    // PR detection (async, non-blocking to response)
-    const prIds = await detectPRs(workout.id, req.user.id, req.user.gym_id!, exercisesForPR, loggingTypes, bodyweightKg);
+    // PR detection -- BE-J returns both legacy labels + structured
+    // records with previous_best + delta_pct so the celebrate screen
+    // can render "+5.2% over previous best" without a follow-up
+    // fetch.
+    const prResult = await detectPRs(workout.id, req.user.id, req.user.gym_id!, exercisesForPR, loggingTypes, bodyweightKg);
+    const prIds = prResult.labels;
+    const prsStructured = prResult.structured;
 
     // Streak update -- maintains BOTH the legacy weekly fields and the
     // new day fields (BE-D). Both ladders run in parallel: the weekly
@@ -360,19 +418,45 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
       }
     }
 
-    // Progression engine + badge check (non-blocking)
+    // Progression engine -- still non-blocking, doesn't affect the
+    // celebrate response.
     setImmediate(() => {
       runProgressionEngine(req.user!.id, workout.id, body.started_at);
-      checkAndAwardBadges({
-        workoutId: workout.id,
-        userId: req.user!.id,
-        gymId: req.user!.gym_id!,
-        ordinalNumber: ordinal_number,
-        startedAt: body.started_at,
-      });
     });
 
-    res.status(201).json({ data: { workout: updatedWorkout, prs_detected: prIds, media_failed } });
+    // BE-J: badge check is now synchronous so the celebrate screen
+    // can render newly-unlocked badge stamps in the same beat as the
+    // PR cards. The function is bounded (handful of inserts at most).
+    const newlyUnlockedBadges = await checkAndAwardBadges({
+      workoutId: workout.id,
+      userId: req.user.id,
+      gymId: req.user.gym_id!,
+      ordinalNumber: ordinal_number,
+      startedAt: body.started_at,
+    });
+
+    // BE-J + lens 7: gym_volume_percentile call. Failure is
+    // non-fatal -- we'd rather ship the response with `null` than
+    // 500 the workout-create just because the percentile RPC
+    // misbehaved.
+    let gymPercentile: number | null = null;
+    try {
+      const { data: pcRow, error: pcErr } = await supabase.rpc('gym_volume_percentile', { p_user_id: req.user.id });
+      if (!pcErr && typeof pcRow === 'number') gymPercentile = pcRow;
+    } catch {
+      // swallow
+    }
+
+    res.status(201).json({
+      data: {
+        workout: updatedWorkout,
+        prs_detected: prIds,
+        prs_detected_v2: prsStructured,
+        gym_percentile: gymPercentile,
+        newly_unlocked_badges: newlyUnlockedBadges,
+        media_failed,
+      },
+    });
   } catch (err) { next(err); }
 });
 

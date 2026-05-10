@@ -1,9 +1,31 @@
 /**
- * STUB -- replaced by Team B (B-2) in PR B.
+ * Motion transitions barrel.
  *
- * Stack screen transitions: page push/pop, modal presentation, shared
- * element pairs. Cite from `Stack.Screen options` per route.
+ * Re-exports the page / modal / shared-element transition helpers so
+ * consumers have one import path:
+ *
+ *   import { pageTransition, modalTransition, useSharedTag } from
+ *     '@/design-system/motion/transitions';
  */
-export const pageTransition = { animation: 'slide_from_right' as const };
-export const modalTransition = { animation: 'slide_from_bottom' as const };
-export const fadeTransition = { animation: 'fade' as const };
+export {
+  pageTransition,
+  pageTransitionReduced,
+  fadeTransition,
+  PAGE_ENTRY_MS,
+  PAGE_EXIT_MS,
+} from './page';
+
+export {
+  modalTransition,
+  bottomSheetModal,
+  modalTransitionReduced,
+  MODAL_DURATION_MS,
+} from './modal';
+
+export {
+  useSharedTag,
+  sharedTag,
+  SHARED_TAG_PREFIXES,
+  SHARED_TAG_PAIRS,
+  type SharedTagPrefix,
+} from './shared-element';
