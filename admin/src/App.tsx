@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PreviewPage from './pages/PreviewPage';
@@ -12,6 +13,7 @@ import SettingsPage from './pages/SettingsPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import Layout from './components/Layout';
 import { clearSession, isAllowedRole, readStoredUser } from './lib/session';
+import { VERCEL_EASE } from '@/lib/motion';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -30,47 +32,85 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <Layout>{children}</Layout>;
 }
 
-export default function App() {
+// PageShell — every routed page lives inside one of these so framer-motion
+// can stage entrance/exit. Keeping the in/out timings asymmetric (180ms exit,
+// 240ms entry with a 60ms delay) gives nav a "the next page is arriving"
+// rhythm rather than a hard cut. AnimatePresence above swaps them in `wait`
+// mode so the outgoing page finishes leaving before the incoming one mounts.
+function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/preview" element={<PreviewPage />} />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.24, ease: VERCEL_EASE, delay: 0.06 },
+      }}
+      exit={{
+        opacity: 0,
+        y: -8,
+        transition: { duration: 0.18, ease: VERCEL_EASE },
+      }}
+      style={{ minHeight: '100%' }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// AnimatedRoutes — must live INSIDE <BrowserRouter> so useLocation() works.
+// We pass `location` + `key` to <Routes> so AnimatePresence can detect the
+// swap and run exit/enter on the wrapper divs.
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <Routes location={location} key={location.pathname}>
+        <Route path="/login" element={<PageShell><LoginPage /></PageShell>} />
+        <Route path="/reset-password" element={<PageShell><ResetPasswordPage /></PageShell>} />
+        <Route path="/preview" element={<PageShell><PreviewPage /></PageShell>} />
         <Route
           path="/dashboard"
-          element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><DashboardPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/members"
-          element={<ProtectedRoute><MembersPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><MembersPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/invites"
-          element={<ProtectedRoute><InvitesPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><InvitesPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/announcements"
-          element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><AnnouncementsPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/challenges"
-          element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><ChallengesPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/grow"
-          element={<ProtectedRoute><GrowPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><GrowPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/settings"
-          element={<ProtectedRoute><SettingsPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><SettingsPage /></PageShell></ProtectedRoute>}
         />
         <Route
           path="/subscription"
-          element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>}
+          element={<ProtectedRoute><PageShell><SubscriptionPage /></PageShell></ProtectedRoute>}
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+    </AnimatePresence>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AnimatedRoutes />
     </BrowserRouter>
   );
 }
