@@ -19,7 +19,10 @@ export const metadata: Metadata = buildMetadata({
   path: '/pricing',
 });
 
-const ADMIN_SIGNUP = 'https://admin.ironpath.health/signup';
+// Repointed from admin.ironpath.health/signup (which doesn't exist yet)
+// to the marketing-side /start page that has a working lead form +
+// WhatsApp fallback. Will swap back when admin self-serve ships.
+const ADMIN_SIGNUP = '/start';
 
 interface Tier {
   slug: 'starter' | 'growth' | 'unlimited';

@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react';
 import { VERCEL_EASE, springMagnetic } from '@/lib/motion';
 import { useReducedMotion } from '@/lib/preferences';
 
-const SIGNUP_URL = 'https://admin.ironpath.health/signup';
+const SIGNUP_URL = '/start';
 
 // Performance hard-rule: defer CTA interactivity until LCP+1500ms so the
 // click handler + nav prefetch can't contend with the LCP frame budget.

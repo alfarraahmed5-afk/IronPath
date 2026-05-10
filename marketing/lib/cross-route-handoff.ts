@@ -39,7 +39,7 @@
 export const TRIAL_CTA_LAYOUT_ID = 'trialCta';
 
 /** Admin signup endpoint. */
-export const ADMIN_SIGNUP_URL = 'https://admin.ironpath.health/signup';
+export const ADMIN_SIGNUP_URL = '/start';
 
 /** Duration (ms) of the marketing-side scale-out before navigation fires. */
 export const HANDOFF_SCALE_OUT_MS = 480;

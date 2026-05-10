@@ -15,7 +15,7 @@ export const metadata: Metadata = buildMetadata({
   path: '/for-gyms',
 });
 
-const ADMIN_SIGNUP = 'https://admin.ironpath.health/signup';
+const ADMIN_SIGNUP = '/start';
 
 export default function ForGymsPage() {
   return (

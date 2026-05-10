@@ -23,7 +23,7 @@ import { buildMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
 
-const ADMIN_SIGNUP = 'https://admin.ironpath.health/signup';
+const ADMIN_SIGNUP = '/start';
 
 type Params = { slug: string };
 

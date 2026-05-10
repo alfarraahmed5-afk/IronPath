@@ -18,7 +18,7 @@ export const metadata: Metadata = buildMetadata({
   path: '/blog',
 });
 
-const ADMIN_SIGNUP = 'https://admin.ironpath.health/signup';
+const ADMIN_SIGNUP = '/start';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);

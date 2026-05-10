@@ -32,7 +32,7 @@ export interface TierCardProps {
   accent?: boolean;
 }
 
-const ADMIN_SIGNUP = 'https://admin.ironpath.health/signup';
+const ADMIN_SIGNUP = '/start';
 
 export function TierCard({
   slug,
