@@ -76,3 +76,9 @@ specs/
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Marketing council skills — local-only artifacts (28+ skill files,
+# installed + authored by the 10-lens planning council on 2026-05-10).
+# Reusable for future cinematic / a11y / motion work; intentionally
+# not pushed to GitHub per founder direction.
+skills/
