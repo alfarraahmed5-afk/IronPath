@@ -298,20 +298,55 @@ router.post('/', requireActiveUser, async (req: Request, res: Response, next: Ne
     // PR detection (async, non-blocking to response)
     const prIds = await detectPRs(workout.id, req.user.id, req.user.gym_id!, exercisesForPR, loggingTypes, bodyweightKg);
 
-    // Streak update
+    // Streak update -- maintains BOTH the legacy weekly fields and the
+    // new day fields (BE-D). Both ladders run in parallel: the weekly
+    // value still feeds older clients + the existing badge logic, the
+    // daily value feeds the cinematic-overhaul UI + BE-N tier ladder.
     const workoutWeek = getISOWeekMonday(body.started_at);
+    const workoutDateUtc = new Date(body.started_at);
+    workoutDateUtc.setUTCHours(0, 0, 0, 0);
     const { data: streak } = await supabase.from('streaks').select('*').eq('user_id', req.user.id).single();
-    let newCurrent = 1;
-    const longest = streak?.longest_streak_weeks || 0;
+
+    // Weekly streak (legacy).
+    let newCurrentWeeks = 1;
+    const longestWeeks = streak?.longest_streak_weeks || 0;
     if (streak?.last_workout_week) {
       const prevWeek = new Date(streak.last_workout_week);
       const currWeek = new Date(workoutWeek);
       const diffDays = (currWeek.getTime() - prevWeek.getTime()) / (1000 * 60 * 60 * 24);
-      if (diffDays === 0) { newCurrent = streak.current_streak_weeks; }
-      else if (diffDays === 7) { newCurrent = (streak.current_streak_weeks || 0) + 1; }
-      else { newCurrent = 1; }
+      if (diffDays === 0) { newCurrentWeeks = streak.current_streak_weeks; }
+      else if (diffDays === 7) { newCurrentWeeks = (streak.current_streak_weeks || 0) + 1; }
+      else { newCurrentWeeks = 1; }
     }
-    await supabase.from('streaks').upsert({ user_id: req.user.id, gym_id: req.user.gym_id, current_streak_weeks: newCurrent, longest_streak_weeks: Math.max(longest, newCurrent), last_workout_week: workoutWeek }, { onConflict: 'user_id' });
+
+    // Daily streak (new). A new workout on the same UTC day as the
+    // last one keeps the streak unchanged. A workout on the very next
+    // UTC day extends. Anything older resets to 1.
+    let newCurrentDays = 1;
+    const longestDays = streak?.longest_streak_days || 0;
+    if (streak?.last_workout_at) {
+      const prevDayUtc = new Date(streak.last_workout_at);
+      prevDayUtc.setUTCHours(0, 0, 0, 0);
+      const diffDays = (workoutDateUtc.getTime() - prevDayUtc.getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays === 0) { newCurrentDays = streak.current_streak_days || 1; }
+      else if (diffDays === 1) { newCurrentDays = (streak.current_streak_days || 0) + 1; }
+      else if (diffDays > 1) { newCurrentDays = 1; }
+      // diffDays < 0 (the new workout is older than last_workout_at)
+      // => keep what we have. Ordering correctness is the cron's
+      // responsibility, not this hot path.
+      else { newCurrentDays = streak.current_streak_days || 1; }
+    }
+
+    await supabase.from('streaks').upsert({
+      user_id: req.user.id,
+      gym_id: req.user.gym_id,
+      current_streak_weeks: newCurrentWeeks,
+      longest_streak_weeks: Math.max(longestWeeks, newCurrentWeeks),
+      last_workout_week: workoutWeek,
+      current_streak_days: newCurrentDays,
+      longest_streak_days: Math.max(longestDays, newCurrentDays),
+      last_workout_at: body.started_at,
+    }, { onConflict: 'user_id' });
 
     // @mention notifications
     if (body.description) {

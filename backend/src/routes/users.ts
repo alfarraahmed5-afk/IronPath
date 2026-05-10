@@ -361,7 +361,13 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
 
     const [workoutsRes, streakRes, prsRes, recentRes, targetUserRes] = await Promise.all([
       supabase.from('workouts').select('total_volume_kg').eq('user_id', targetId).eq('is_completed', true),
-      supabase.from('streaks').select('current_streak_weeks, longest_streak_weeks').eq('user_id', targetId).maybeSingle(),
+      supabase
+        .from('streaks')
+        .select(
+          'current_streak_weeks, longest_streak_weeks, current_streak_days, longest_streak_days, last_workout_at'
+        )
+        .eq('user_id', targetId)
+        .maybeSingle(),
       supabase.from('personal_records').select('exercise_id, record_type, value, exercises!inner(name, wger_id)').eq('user_id', targetId).eq('record_type', 'projected_1rm'),
       supabase.from('workouts').select('id, name, started_at, total_volume_kg').eq('user_id', targetId).eq('is_completed', true).order('started_at', { ascending: false }).limit(5),
       supabase.from('users').select('bodyweight_kg, sex').eq('id', targetId).maybeSingle(),
@@ -369,8 +375,22 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
 
     const total_workouts = (workoutsRes.data ?? []).length;
     const total_volume_kg = (workoutsRes.data ?? []).reduce((s, w) => s + (w.total_volume_kg ?? 0), 0);
+    // Legacy fields (still served for backward compat with older mobile
+    // clients on app version 1.0.x). The cinematic-overhaul (1.1.0)
+    // mobile reads current_streak_days / longest_streak / last_workout_at.
     const current_streak = streakRes.data?.current_streak_weeks ?? 0;
-    const longest_streak = (streakRes.data as any)?.longest_streak_weeks ?? 0;
+    const current_streak_weeks = streakRes.data?.current_streak_weeks ?? 0;
+    const longest_streak_weeks = (streakRes.data as any)?.longest_streak_weeks ?? 0;
+    // BE-D additions: day-cadence streak fields. `longest_streak` is the
+    // canonical longest (max of weekly converted to days vs. the new
+    // day-streak field) so the new UI never shows a regression vs. the
+    // legacy weekly badge thresholds.
+    const current_streak_days: number = (streakRes.data as any)?.current_streak_days ?? 0;
+    const longest_streak_days: number = (streakRes.data as any)?.longest_streak_days ?? 0;
+    const last_workout_at: string | null = (streakRes.data as any)?.last_workout_at ?? null;
+    // Legacy `longest_streak` aliases longest_streak_weeks for older
+    // clients that read the field by name without the _weeks suffix.
+    const longest_streak = longest_streak_weeks;
 
     // Strength level classification
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -402,7 +422,21 @@ router.get('/:id/stats', requireActiveUser, async (req: Request, res: Response, 
       total_volume_kg: w.total_volume_kg,
     }));
 
-    res.json({ data: { total_workouts, total_volume_kg, current_streak, longest_streak, strength_levels, recent_workouts } });
+    res.json({
+      data: {
+        total_workouts,
+        total_volume_kg,
+        current_streak,
+        longest_streak,
+        current_streak_weeks,
+        longest_streak_weeks,
+        current_streak_days,
+        longest_streak_days,
+        last_workout_at,
+        strength_levels,
+        recent_workouts,
+      },
+    });
   } catch (err) { next(err); }
 });
 
