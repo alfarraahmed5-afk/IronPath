@@ -73,7 +73,7 @@ export interface ThemeContextValue {
   isRTL: boolean;
 }
 
-const noopAsync = async () => {};
+const noopAsync = async (_v: boolean | null) => {};
 
 const defaultValue: ThemeContextValue = {
   tokens,
