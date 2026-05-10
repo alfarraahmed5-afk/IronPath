@@ -10,8 +10,8 @@
 
 We're building two web properties on top of the existing backend to make IronPath sellable at scale:
 
-1. **Super Admin Console** (NEW) — `console.ironpath.app` — internal tool for the founder/sales team to manage every gym, run the sales pipeline, edit subscriptions, capture leads, and impersonate gym owners for support.
-2. **Gym Owner Panel** (EXISTING, enhance) — `admin.ironpath.app` — paying customer experience: enhanced with Gym Settings, Subscription view, Onboarding wizard, Coach role, member acquisition kit (QR poster, email/SMS templates), trial-expiry sequence, cancellation save flow.
+1. **Super Admin Console** (NEW) — `console.ironpath.health` — internal tool for the founder/sales team to manage every gym, run the sales pipeline, edit subscriptions, capture leads, and impersonate gym owners for support.
+2. **Gym Owner Panel** (EXISTING, enhance) — `admin.ironpath.health` — paying customer experience: enhanced with Gym Settings, Subscription view, Onboarding wizard, Coach role, member acquisition kit (QR poster, email/SMS templates), trial-expiry sequence, cancellation save flow.
 
 The mobile app is unchanged in scope; it consumes the same backend APIs.
 
@@ -42,7 +42,7 @@ The mobile app is unchanged in scope; it consumes the same backend APIs.
 
 ```
 ┌───────────────────────┐    ┌────────────────────────────┐
-│  ironpath.app         │    │  console.ironpath.app      │
+│  ironpath.health         │    │  console.ironpath.health      │
 │  (marketing — later)  │    │  (super admin, NEW)        │
 │  Vite/Next, Vercel    │    │  Vite + React, Vercel      │
 └───────────┬───────────┘    └─────────────┬──────────────┘
@@ -51,13 +51,13 @@ The mobile app is unchanged in scope; it consumes the same backend APIs.
             │                              │   /admin/*  (impersonation hand-off)
             ▼                              ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Backend  api.ironpath.app  (Node 18 + Express + TS)    │
+│  Backend  api.ironpath.health  (Node 18 + Express + TS)    │
 │  Railway Hobby. Same backend serves all clients.        │
 └─────────────────────────────────────────────────────────┘
             ▲                              ▲
             │                              │
 ┌───────────┴───────────┐    ┌─────────────┴──────────────┐
-│  admin.ironpath.app   │    │  Mobile app (RN + Expo)    │
+│  admin.ironpath.health   │    │  Mobile app (RN + Expo)    │
 │  (gym owner, EXISTS)  │    │  Members; gym_owner self-  │
 │  Vite + React, Vercel │    │  test; super_admin n/a     │
 └───────────────────────┘    └────────────────────────────┘
@@ -141,7 +141,7 @@ Direct, operator-grade. Verbs first ("Add member," not "Click here to add"). Num
 
 ---
 
-## 4. Feature catalog — Gym Owner Panel (`admin.ironpath.app`)
+## 4. Feature catalog — Gym Owner Panel (`admin.ironpath.health`)
 
 > Existing pages: Dashboard, Members, Invites, Announcements, Challenges. Everything below is **new** unless noted.
 
@@ -237,7 +237,7 @@ Backend: extend role enum, update `requireGymOwner` middleware to optionally acc
 
 ---
 
-## 5. Feature catalog — Super Admin Console (`console.ironpath.app`)
+## 5. Feature catalog — Super Admin Console (`console.ironpath.health`)
 
 > Audience: 1–3 internal users (founder, optional SDR/CSM later). Login is `super_admin` only. Cyan accent, near-black shell.
 
@@ -312,7 +312,7 @@ For sales calls where you onboard the customer yourself. Mirrors `POST /gyms` bu
 `POST /super-admin/impersonate/:userId` issues a 15-minute scoped JWT. UI flow:
 1. Super admin clicks "View as owner" on gym detail.
 2. Confirms with their own password (re-auth gate).
-3. New tab opens at `admin.ironpath.app/?impersonation_token=...`.
+3. New tab opens at `admin.ironpath.health/?impersonation_token=...`.
 4. Owner panel renders **with persistent banner** "You are viewing ACME Gym as Sarah — Exit (14:53)".
 5. **Exit** clears the impersonation token; super_admin's own session is untouched.
 
@@ -500,7 +500,7 @@ Console:
 Impersonation (super_admin → owner panel):
 1. Console: `POST /super-admin/impersonate/:userId` with password_confirm.
 2. Backend returns short-lived owner-scoped token.
-3. Console opens `admin.ironpath.app/?impersonation_token=...` in new tab.
+3. Console opens `admin.ironpath.health/?impersonation_token=...` in new tab.
 4. Owner panel reads `impersonation_token` from query, stores in `ip_console_impersonation_*`, sets `X-Impersonated-By` header on every request.
 5. Persistent banner renders with countdown + Exit button.
 6. Exit → clears the impersonation slot only; original session untouched.
@@ -556,8 +556,8 @@ refreshing = null;
 
 ```
 allowlist = [
-  'https://admin.ironpath.app',
-  'https://console.ironpath.app',
+  'https://admin.ironpath.health',
+  'https://console.ironpath.health',
   'http://localhost:5173',  // dev
   'http://localhost:5174',  // dev console
 ]
@@ -610,9 +610,9 @@ Reflect matched origin into `Access-Control-Allow-Origin`. Set `Vary: Origin`. N
 
 ### 9.4 Domains
 
-- `admin.ironpath.app` → CNAME `cname.vercel-dns.com` (admin project)
-- `console.ironpath.app` → CNAME `cname.vercel-dns.com` (console project)
-- `ironpath.app` apex + `www` → marketing project (later); 301 redirect `www` → apex.
+- `admin.ironpath.health` → CNAME `cname.vercel-dns.com` (admin project)
+- `console.ironpath.health` → CNAME `cname.vercel-dns.com` (console project)
+- `ironpath.health` apex + `www` → marketing project (later); 301 redirect `www` → apex.
 - Add CAA record allowing `letsencrypt.org` if registrar enforces CAA.
 
 ### 9.5 SPA fallback
@@ -642,9 +642,9 @@ Reflect matched origin into `Access-Control-Allow-Origin`. Set `Vary: Origin`. N
 5. Add Ignored Build Step.
 6. Trigger first production build from `master`; verify `*.vercel.app` URL works.
 7. Add Sentry SDK with console-specific DSN.
-8. Update Railway CORS allowlist: add `https://console.ironpath.app` + preview regex.
+8. Update Railway CORS allowlist: add `https://console.ironpath.health` + preview regex.
 9. DNS: CNAME `console` → `cname.vercel-dns.com`.
-10. Add `console.ironpath.app` in Vercel project Domains; confirm cert.
+10. Add `console.ironpath.health` in Vercel project Domains; confirm cert.
 11. Smoke test: login, API call, error reporting, 404 fallback (SPA rewrite).
 12. Enable branch protection.
 13. Document rollback procedure; tag first prod deploy in Sentry.
@@ -770,7 +770,7 @@ red    if owner hasn't logged in 7+ days mid-trial
 - [ ] Coach role + permissions
 - [ ] Bulk member CSV invite
 - [ ] In-app help (Loom embeds, tooltips, Intercom widget)
-- [ ] Marketing site at `ironpath.app` with pricing page + Calendly + lead form
+- [ ] Marketing site at `ironpath.health` with pricing page + Calendly + lead form
 - [ ] Stripe checkout integration (replace manual invoicing)
 - [ ] 2-year audit retention policy + cold-storage archive
 
@@ -803,9 +803,9 @@ red    if owner hasn't logged in 7+ days mid-trial
 
 1. **Token refresh race in `admin/src/lib/api.ts:20-36`** — concurrent 401s each kick off their own `/auth/refresh`. Add a single in-flight refresh promise. **Mandatory before TanStack Query rollout.**
 2. **`localStorage` for tokens is XSS-readable.** Acceptable for v1 but **namespace per app** (`ip_owner_*`, `ip_console_*`) and plan a path to httpOnly refresh cookies later.
-3. **`ProtectedRoute` only checks token presence**, not role (`admin/src/App.tsx:11`). A gym_owner who lands on `console.ironpath.app` with any token will pass. **Gate on role from stored user; redirect role-mismatches.**
+3. **`ProtectedRoute` only checks token presence**, not role (`admin/src/App.tsx:11`). A gym_owner who lands on `console.ironpath.health` with any token will pass. **Gate on role from stored user; redirect role-mismatches.**
 4. **`window.location.href = '/login'`** in the 401 handler hard-reloads and discards in-memory state. Once impersonation lands, replace with a `navigate('/login')` via an event-bus pattern so impersonation state can be cleaned up first.
-5. **`BrowserRouter` + subdomains:** localStorage doesn't bleed across origins (good). Cookies set on `.ironpath.app` would (decide deliberately whether refresh tokens are per-app or shared).
+5. **`BrowserRouter` + subdomains:** localStorage doesn't bleed across origins (good). Cookies set on `.ironpath.health` would (decide deliberately whether refresh tokens are per-app or shared).
 6. **Vite env vars must be `VITE_`-prefixed.** Document in `console/.env.example` so nobody adds `API_URL=` and silently falls back to localhost in production.
 7. **`recharts` is installed but unused** (`admin/package.json`). Migrate `DashboardPage` first; it's dead-weight bundle until then.
 8. **`useNavigate` imported in `admin/src/components/Layout.tsx` but unused.** Sign-out uses `window.location` — see #4.

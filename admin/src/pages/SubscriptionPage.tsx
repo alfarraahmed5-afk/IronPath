@@ -365,7 +365,7 @@ function UpgradePicker({ sub, reduceMotion }: UpgradePickerProps) {
           const current = t.key === sub.tier;
           const recommended = t.recommended && !current;
           // v1: mailto placeholder. Phase C will replace with a real upgrade flow.
-          const mailto = `mailto:sales@ironpath.app?subject=Upgrade%20to%20${encodeURIComponent(t.name)}`;
+          const mailto = `mailto:sales@ironpath.health?subject=Upgrade%20to%20${encodeURIComponent(t.name)}`;
           return (
             <div
               key={t.key}

@@ -30,7 +30,7 @@ export interface PosterInput {
   accentColor?: string | null;     // '#RRGGBB'
   logoBytes?: Uint8Array | null;   // PNG or JPEG bytes; null/undefined = use accent band
   size: PosterSize;
-  joinUrlBase?: string;            // default 'https://ironpath.app/join'
+  joinUrlBase?: string;            // default 'https://ironpath.health/join'
 }
 
 interface RGB { r: number; g: number; b: number; }
@@ -51,7 +51,7 @@ const PAGE_DIMENSIONS_PT: Record<PosterSize, { w: number; h: number }> = {
 
 export async function generatePoster(input: PosterInput): Promise<Uint8Array> {
   const { gymName, inviteCode, accentColor, logoBytes, size } = input;
-  const joinUrlBase = (input.joinUrlBase ?? 'https://ironpath.app/join').replace(/\/+$/, '');
+  const joinUrlBase = (input.joinUrlBase ?? 'https://ironpath.health/join').replace(/\/+$/, '');
   const joinUrl = `${joinUrlBase}/${encodeURIComponent(inviteCode)}`;
 
   const { w, h } = PAGE_DIMENSIONS_PT[size];
@@ -188,7 +188,7 @@ export async function generatePoster(input: PosterInput): Promise<Uint8Array> {
 
   // ── Footer ──────────────────────────────────────────────────────────────
   const footerSize = w * 0.014;
-  const footer = 'ironpath.app';
+  const footer = 'ironpath.health';
   const footerWidth = mono.widthOfTextAtSize(footer, footerSize);
   page.drawText(footer, {
     x: (w - footerWidth) / 2,

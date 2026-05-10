@@ -422,7 +422,7 @@ router.post('/gyms', async (req: Request, res: Response, next: NextFunction) => 
         to: owner_email,
         gymName: name,
         inviteCode,
-        appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.app/download',
+        appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.health/download',
         setupUrl,
         posterTeaserUrl: setupUrl ? `${adminBaseUrl}/grow` : undefined,
       }).catch((err: unknown) => logger.warn({ err }, 'Welcome email failed'));

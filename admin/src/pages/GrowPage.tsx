@@ -111,7 +111,7 @@ export default function GrowPage() {
 
   const qrSrc = useMemo(() => {
     if (!inviteCode) return null;
-    const url = `https://ironpath.app/join/${encodeURIComponent(inviteCode)}`;
+    const url = `https://ironpath.health/join/${encodeURIComponent(inviteCode)}`;
     return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=0&data=${encodeURIComponent(url)}`;
   }, [inviteCode]);
 

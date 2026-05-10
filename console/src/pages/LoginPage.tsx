@@ -120,7 +120,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputCls}
-                placeholder="operator@ironpath.app"
+                placeholder="operator@ironpath.health"
                 autoComplete="email"
                 required
               />

@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { logger } from './logger';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@ironpath.app';
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@ironpath.health';
 
 export const TRIAL_EMAIL_KEYS = [
   'day_21',

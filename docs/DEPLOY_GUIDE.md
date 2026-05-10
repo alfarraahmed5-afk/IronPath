@@ -167,11 +167,11 @@ PORT=3000
 NODE_ENV=development
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 RESEND_API_KEY=re_your_resend_api_key
-RESEND_FROM_EMAIL=noreply@ironpath.app
+RESEND_FROM_EMAIL=noreply@ironpath.health
 SUPER_ADMIN_EMAIL=your-email@example.com
 SUPER_ADMIN_PASSWORD=choose-a-strong-password
 ADMIN_PANEL_URL=http://localhost:5173
-APP_DOWNLOAD_URL=https://ironpath.app/download
+APP_DOWNLOAD_URL=https://ironpath.health/download
 ```
 
 For `RESEND_API_KEY`: log in to https://resend.com, go to API Keys, create one, paste it in.
@@ -488,8 +488,8 @@ Fill out:
 - **Keywords:** `gym,workout,tracker,strength,training,lifting,fitness,barbell`
 - **Category:** Health & Fitness
 - **Age Rating:** 4+
-- **Privacy Policy URL:** https://ironpath.app/privacy *(you need to publish this — see below)*
-- **Support URL:** https://ironpath.app/support
+- **Privacy Policy URL:** https://ironpath.health/privacy *(you need to publish this — see below)*
+- **Support URL:** https://ironpath.health/support
 
 **Screenshots required:**
 - iPhone 6.7" (1290×2796px) — minimum 3 screenshots
@@ -501,7 +501,7 @@ Take screenshots on a simulator or physical device with test data.
 ```
 Test account for App Review:
 Invite code: [your gym's invite code from Step 5]
-Email: reviewer@ironpath.app
+Email: reviewer@ironpath.health
 Password: ReviewPassword123!
 
 Please create this account using the invite code on the registration screen, then log in normally.
@@ -517,7 +517,7 @@ Fill out:
 - **Category:** Health & Fitness
 - **Content rating:** complete the questionnaire (answer "no" to everything — this is a fitness app)
 - **Data safety:** fill out the questionnaire (yes to collecting name/email, no to selling data)
-- **Privacy policy URL:** https://ironpath.app/privacy
+- **Privacy policy URL:** https://ironpath.health/privacy
 
 ---
 
@@ -526,7 +526,7 @@ Fill out:
 You need a domain and privacy policy before the App Store will approve your app.
 
 ### 8a. Buy a domain
-Go to https://namecheap.com or https://porkbun.com and search for `ironpath.app`.  
+Go to https://namecheap.com or https://porkbun.com and search for `ironpath.health`.  
 If it's taken, try `getironpath.com` or `ironpathapp.com`.
 
 Costs ~$10-15/year.
@@ -546,9 +546,9 @@ Publish the privacy policy at `https://yourdomain.com/privacy`.
 The cheapest way to host it: create a free GitHub Pages site. Go to GitHub → New Repository → name it `yourusername.github.io` → upload an `index.html` with your privacy policy → enable Pages in Settings.
 
 ### 8c. Configure DNS for admin panel (optional but professional)
-If you want your admin panel at `admin.ironpath.app` instead of `ironpath-admin.vercel.app`:
+If you want your admin panel at `admin.ironpath.health` instead of `ironpath-admin.vercel.app`:
 
-1. In Vercel, go to your admin project → Settings → Domains → Add `admin.ironpath.app`
+1. In Vercel, go to your admin project → Settings → Domains → Add `admin.ironpath.health`
 2. Vercel gives you DNS records to add
 3. In your domain registrar (Namecheap/Porkbun), add those DNS records
 4. Wait 10-30 minutes for it to propagate

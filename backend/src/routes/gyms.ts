@@ -106,7 +106,7 @@ router.post('/', gymRegistrationLimiter, async (req: Request, res: Response, nex
       supabase.from('user_settings').insert({ user_id: authUserId }),
       supabase.from('streaks').insert({ user_id: authUserId, gym_id: gym.id }),
     ]);
-    sendWelcomeEmail({ to: email, gymName: name, inviteCode, appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.app/download' }).catch(() => {});
+    sendWelcomeEmail({ to: email, gymName: name, inviteCode, appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.health/download' }).catch(() => {});
     const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
     res.status(201).json({
       data: {
@@ -345,7 +345,7 @@ router.post('/:id/invite-email', requireActiveUser, async (req: Request, res: Re
     if (!parsed.success) return next(new AppError('VALIDATION_ERROR', 422, 'Valid email required', [{ field: 'email', message: 'Valid email required' }]));
     const { data: gym } = await supabase.from('gyms').select('name, invite_code').eq('id', req.params.id).single();
     if (!gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
-    await sendInviteEmail({ to: parsed.data.email, gymName: gym.name, inviteCode: gym.invite_code, appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.app/download' });
+    await sendInviteEmail({ to: parsed.data.email, gymName: gym.name, inviteCode: gym.invite_code, appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://ironpath.health/download' });
     res.json({ data: { message: 'Invite email sent' } });
   } catch (err) { next(err); }
 });
