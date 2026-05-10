@@ -352,12 +352,12 @@ integration to run the actual audits against the rebuilt codebase.
 
 | Script | Hits | Notes |
 |---|---|---|
-| `audit:em-dashes` | TBD | legacy hits in `app/`, `src/`, `metro.config.js` |
-| `audit:banned` | TBD | `ironpath.app` in `settings/help.tsx` + `app.json` |
-| `audit:contrast` | TBD | 4 FAIL: textTertiary, textDisabled, border, borderSubtle |
-| `audit:rtl` | TBD | marginLeft/Right migration pending |
-| `audit:touch` | TBD | 8 sites flagged in Lens 9 |
-| `audit:a11y` | TBD | most TouchableOpacity callsites missing role+label |
+| `audit:em-dashes` | 48 (in 108 files) | legacy hits in `app/`, `src/`, `metro.config.js` |
+| `audit:banned` | 6 (in 108 files) | `ironpath.app` in `settings/help.tsx` (4) + `app.json` (2) |
+| `audit:contrast` | 4 FAIL, 5 WARN, 15 PASS | FAIL: textTertiary 3.18:1, textDisabled 1.95:1, border 1.40:1, borderSubtle 1.28:1 |
+| `audit:rtl` | 72 HARD, 2 SOFT (89 files) | marginLeft/Right migration pending; 2 left/right reviews |
+| `audit:touch` | 44 (70 files) | 8 sites flagged in Lens 9; rest are legacy icons |
+| `audit:a11y` | 54 HARD, 41 WARN | most TouchableOpacity callsites missing role+label |
 
 ### Integration baseline (run after A+B+C merge)
 

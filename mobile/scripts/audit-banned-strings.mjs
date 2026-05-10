@@ -50,6 +50,16 @@ const BANNED = [
 
 const SELF_PATH = fileURLToPath(import.meta.url);
 
+/**
+ * Files that are allowed to mention banned strings because they DOCUMENT the
+ * ban rather than violate it. Keep this list tight; every entry is a hand
+ * audit.
+ */
+const DOC_ALLOWLIST = new Set([
+  // Manual a11y release checklist explains what the ban catches.
+  'docs/A11Y_CHECKLIST.md',
+]);
+
 /** @type {{file:string,line:number,col:number,needle:string,why:string,snippet:string}[]} */
 const hits = [];
 
@@ -76,6 +86,8 @@ function walk(dir, out) {
 
 function scanFile(file) {
   if (file === SELF_PATH) return; // never flag this script itself
+  const rel = relative(ROOT, file).replace(/\\/g, '/');
+  if (DOC_ALLOWLIST.has(rel)) return;
   let content;
   try {
     content = readFileSync(file, 'utf8');

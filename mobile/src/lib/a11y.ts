@@ -76,18 +76,15 @@ export function useReduceTransparency(): boolean {
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     let cancelled = false;
-    // @ts-expect-error: isReduceTransparencyEnabled exists at runtime on iOS
     const probe = AccessibilityInfo.isReduceTransparencyEnabled;
     if (typeof probe === 'function') {
       probe().then((v: boolean) => {
         if (!cancelled) setEnabled(v);
       });
     }
-    // @ts-expect-error: 'reduceTransparencyChanged' exists at runtime on iOS
     const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setEnabled);
     return () => {
       cancelled = true;
-      // @ts-expect-error
       sub.remove();
     };
   }, []);
@@ -195,7 +192,6 @@ export function useHighContrast(): boolean {
   useEffect(() => {
     let cancelled = false;
     if (Platform.OS === 'android') {
-      // @ts-expect-error: isHighTextContrastEnabled exists at runtime on Android
       const probe = AccessibilityInfo.isHighTextContrastEnabled;
       if (typeof probe === 'function') {
         probe().then((v: boolean) => {
