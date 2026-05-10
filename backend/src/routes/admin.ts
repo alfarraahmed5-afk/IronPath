@@ -16,10 +16,23 @@ router.use(requireActiveUser);
 // `/admin/me` is a thin diagnostic; gym_owner without a gym yet can call it to
 // see their own JWT-scoped user record. super_admin is intentionally NOT in the
 // allowlist here — they operate via /super-admin/* (plan §6.1, §8.1 #3).
-router.get('/me', (req: Request, res: Response, next: NextFunction) => {
+router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) return next(new AppError('UNAUTHORIZED', 401, 'Authentication required'));
   if (req.user.role !== 'gym_owner') return next(new AppError('FORBIDDEN', 403, 'Gym owner required'));
-  res.json({ data: { user: req.user } });
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, username, full_name, avatar_url, role, gym_id')
+      .eq('id', req.user.id)
+      .single();
+    if (error || !user) return next(new AppError('NOT_FOUND', 404, 'User record not found'));
+    let gym_name: string | null = null;
+    if (user.gym_id) {
+      const { data: gym } = await supabase.from('gyms').select('name').eq('id', user.gym_id).single();
+      gym_name = gym?.name ?? null;
+    }
+    res.json({ data: { user: { ...user, gym_name } } });
+  } catch (err) { next(err); }
 });
 
 // All routes below additionally require the user to have a linked gym AND, when

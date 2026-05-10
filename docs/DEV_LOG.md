@@ -92,6 +92,29 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · PR-Q2 — console "preview as owner" mint + admin /preview page
+
+Council Q2 vote (4-agent panel): Engineering + UX both voted **C** (lightweight test-mode in console); Product/GTM voted A (allow direct super_admin login on admin); Security voted B (strict §6.1 — no admin access without full Phase D impersonation). Reconciled to **C, with Security's audit-on-issuance compromise folded in**: super_admin clicks "Preview as owner" in the console → backend mints a Supabase magic link bound to the gym's owner → opens admin in a fresh tab as a gym_owner-scoped session → audit row written on issuance. Plan §6.1 stays intact (the session is gym_owner, never super_admin bleeding into /admin/*). Phase D §5.9 (15-min JWT, persistent banner, audit on issue + first-use, deny chained, deny super↔super, optional read-only) lands as the proper successor when sales ops scale.
+
+**Backend changes:**
+- `backend/src/routes/superAdmin.ts` — new `POST /super-admin/preview/:gymId` endpoint. Reads gym → finds the active gym_owner user (gym_id match, role='gym_owner', not deleted, is_active) → calls `supabase.auth.admin.generateLink({type: 'magiclink', email: owner.email, options: {redirectTo: '${ADMIN_URL}/preview'}})` → writes `preview.issue` audit row (action, target_type='gym', target_id=gym_id, after={gym_name, owner_id, owner_email}) → returns `{preview_url, gym, owner}`. Uses the existing `isNotFoundError` helper from yesterday's PostgREST cleanup so a missing-table read surfaces as 500, not 404.
+- `backend/src/routes/admin.ts` — extended `GET /admin/me` to fetch the full `public.users` record (`email, username, full_name, avatar_url`) plus the linked `gyms.name` so the admin Layout's sidebar/topbar can render gym name + email immediately. Backwards-compatible: previously returned `{user: req.user}` (just `id, gym_id, role`); now returns those PLUS the additional fields. Existing destructures still work.
+
+**Console changes:**
+- `console/src/pages/gyms/OverviewTab.tsx` — added a **"Preview as owner"** button at the bottom of the Owner card, brand-tinted (`bg-brand-500/10 hover:bg-brand-500/20`, with `ExternalLink` Lucide icon, spinner during request). Clicking POSTs `/super-admin/preview/:gymId`, opens the returned URL in a new tab via `window.open(url, '_blank', 'noopener,noreferrer')`. Per-button error display + loading spinner. Below the button: a one-line caption explaining "Audited; no persistent banner yet — close the tab when done" so the operator knows what kind of session they're starting.
+
+**Admin changes:**
+- New `admin/src/pages/PreviewPage.tsx` — landing page for the magic-link redirect. Parses URL hash for `access_token` + `refresh_token`, stores them in localStorage, calls `/admin/me` to fetch the full owner profile (using the new fields from the extended `/admin/me` above), stores the user, clears the hash via `history.replaceState`, navigates to `/dashboard`. Error states cover expired link, missing token, and non-gym_owner-scoped session. Uses PR1 design tokens (`surface-card`, `Logomark`, `bg-ink-900`).
+- `admin/src/App.tsx` — `/preview` route mounted alongside `/login` and `/reset-password` (public — no normal session yet at landing).
+
+**Critical deploy step (must do before next push):** add `https://iron-path-admin.vercel.app/preview` to Supabase's **Redirect URLs** allowlist (Authentication → URL Configuration). Without this, `generateLink` will mint URLs that fail when clicked. Local dev: also add `http://localhost:5173/preview`.
+
+**Phase D §5.9 alignment notes (deferred to follow-up):** this lightweight preview deliberately omits (a) the persistent "You are viewing X as Y — Exit (14:53)" banner, (b) audit on first-use (only on issuance), (c) the re-auth gate before issue, (d) the `actor_id, on_behalf_of` request tagging, (e) read-only mode header, (f) deny-chained and deny-super↔super (these are no-ops today since only one super_admin exists and we never preview FROM a previewed session). All are tracked as Phase D scope.
+
+**Verified:** `npm run -w backend build` clean, `npm run -w admin build` clean (776 → 778 kB pre-gzip / 226 → 227 kB gz — +2 kB pre-gzip for PreviewPage), `npm run -w console build` clean (455 → 457 kB pre-gzip / 137 → 138 kB gz — +2 kB pre-gzip for the button).
+
+**Phase B Tier 2 backlog item (Phase D §5.9 impersonation full flow) — partially satisfied.** This commit ships ~70% of D's capability without the banner + first-use audit. The full Phase D version stays on the backlog until sales ops scale beyond solo-founder.
+
 ### 2026-05-10 · PR-Q1 — magic-link-on-create + admin /reset-password page (4-agent council outcome)
 
 User asked the 4-agent council (Product/GTM, UX, Engineering, Security) to vote on two related onboarding/auth questions. **Q1 unanimous (4-0): magic-link-on-create.** Plan §5.7 already specified this; current code drifted to a never-returned `Tmp_${csprng}` password that left owners with no way to log in (the gap founder hit on 2026-05-10). Plaintext-in-email (B), hand-off URL (C), and console-show-once (D) were all rejected on threat-model grounds (plaintext leaks, operator-as-bearer-channel, no audit trail). This commit closes the gap.

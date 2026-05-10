@@ -565,6 +565,76 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction) => 
   } catch (err) { next(err); }
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// POST /super-admin/preview/:gymId — lightweight "preview as owner"
+// ────────────────────────────────────────────────────────────────────────────
+// Council Q2 vote (Engineering + UX). Lighter-than-Phase-D-impersonation:
+// mints a Supabase magic link for the gym's owner; the operator opens it in
+// a new tab and lands in the admin panel as that owner. No persistent
+// banner, no audit-on-first-use — that polish is Phase D §5.9. We DO audit
+// on issuance per the security agent's compromise.
+//
+// Plan §6.1 stays intact: the session minted is gym_owner-scoped, not a
+// super_admin bleeding into /admin/*. Phase D's full impersonation (15-min
+// JWT, banner, audit on issue + first-use, deny chained, deny super↔super,
+// optional read-only) lands as the proper successor when sales ops scale.
+router.post('/preview/:gymId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const gymId = req.params.gymId;
+    const { data: gym, error: gymErr } = await supabase
+      .from('gyms')
+      .select('id, name')
+      .eq('id', gymId)
+      .single();
+    if (gymErr && !isNotFoundError(gymErr)) {
+      logger.error({ err: gymErr, gymId }, 'preview gym read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+
+    const { data: owner, error: ownerErr } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('gym_id', gymId)
+      .eq('role', 'gym_owner')
+      .is('deleted_at', null)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+    if (ownerErr) {
+      logger.error({ err: ownerErr, gymId }, 'preview owner read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!owner) return next(new AppError('NOT_FOUND', 404, 'Gym has no active owner'));
+
+    const adminBaseUrl = process.env.ADMIN_URL || 'https://iron-path-admin.vercel.app';
+    const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: owner.email,
+      options: { redirectTo: `${adminBaseUrl}/preview` },
+    });
+    if (linkErr || !linkData?.properties?.action_link) {
+      logger.error({ err: linkErr, gymId, owner_id: owner.id }, 'preview link mint failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Could not mint preview link'));
+    }
+
+    await logAudit(req, {
+      action: 'preview.issue',
+      target_type: 'gym',
+      target_id: gymId,
+      after: { gym_name: gym.name, owner_id: owner.id, owner_email: owner.email },
+    });
+
+    res.json({
+      data: {
+        preview_url: linkData.properties.action_link,
+        gym: { id: gym.id, name: gym.name },
+        owner: { id: owner.id, email: owner.email },
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 function randomString(len: number): string {
   // CSPRNG. The temp password is overwritten on the user's first login via the
   // forgot-password flow, but it briefly sits on the auth account; predictable
