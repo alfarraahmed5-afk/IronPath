@@ -101,7 +101,7 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!email.trim() || !password) {
-      toast.show({ tone: 'error', text: 'enter your email and password.' });
+      toast.show('enter your email and password.', 'error');
       return;
     }
     setLoading(true);
@@ -113,10 +113,7 @@ export default function LoginScreen() {
       await login(res.data.user, res.data.access_token, res.data.refresh_token);
       router.replace('/(tabs)');
     } catch (err: any) {
-      toast.show({
-        tone: 'error',
-        text: err?.error?.message || 'sign-in failed. try again.',
-      });
+      toast.show(err?.error?.message || 'sign-in failed. try again.', 'error');
     } finally {
       setLoading(false);
     }

@@ -48,7 +48,7 @@ export default function RegisterScreen() {
 
   async function validateInvite() {
     if (!inviteCode.trim()) {
-      toast.show({ tone: 'error', text: 'enter your invite code.' });
+      toast.show('enter your invite code.', 'error');
       return;
     }
     setLoading(true);
@@ -57,7 +57,7 @@ export default function RegisterScreen() {
       setGymInfo(res.data);
       setStep('details');
     } catch {
-      toast.show({ tone: 'error', text: 'code not found. check with your gym.' });
+      toast.show('code not found. check with your gym.', 'error');
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!email.trim() || !password || !username.trim()) {
-      toast.show({ tone: 'error', text: 'fill in email, username, and password.' });
+      toast.show('fill in email, username, and password.', 'error');
       return;
     }
     setLoading(true);
@@ -82,12 +82,9 @@ export default function RegisterScreen() {
     } catch (err: any) {
       const fields = err?.error?.fields;
       if (fields?.length) {
-        toast.show({
-          tone: 'error',
-          text: fields.map((f: any) => `${f.field}: ${f.message}`).join('\n'),
-        });
+        toast.show(fields.map((f: any) => `${f.field}: ${f.message}`).join('\n'), 'error');
       } else {
-        toast.show({ tone: 'error', text: err?.error?.message || 'sign-up failed. try again.' });
+        toast.show(err?.error?.message || 'sign-up failed. try again.', 'error');
       }
     } finally {
       setLoading(false);
