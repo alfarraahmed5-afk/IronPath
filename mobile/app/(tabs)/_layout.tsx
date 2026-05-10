@@ -1,7 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Newspaper, Dumbbell, Trophy, Sparkles, User } from 'lucide-react-native';
+import { Newspaper, Dumbbell, Trophy, Sparkles, User, LineChart, UserCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TabBarIcon } from '../../src/components/TabBarIcon';
@@ -79,6 +79,28 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ focused }) => <TabBarIcon icon={User} focused={focused} />,
+          // C-1 followup: legacy profile is retained while C-2 reconciles
+          // the full Option B tab restructure. C-2's _layout.tsx will hide
+          // or remove this entry; me.tsx + progress.tsx are the new homes.
+          href: null,
+        }}
+      />
+      {/* C-1 -- new Progress tab (founder Q1 Option B). C-2 will fold
+          this into the full _layout restructure; the additive entries
+          let founder side-load smoke-test the screen before the
+          tab-bar overhaul merges. */}
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={LineChart} focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="me"
+        options={{
+          title: 'Me',
+          tabBarIcon: ({ focused }) => <TabBarIcon icon={UserCircle2} focused={focused} />,
         }}
       />
     </Tabs>
