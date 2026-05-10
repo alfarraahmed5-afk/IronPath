@@ -8,6 +8,8 @@ dist/
 build/
 .expo/
 .expo-shared/
+.next/
+out/
 
 # Environment variables — NEVER commit real secrets
 .env

@@ -92,6 +92,48 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Marketing workspace pre-stage (foundation for 12-agent sprint)
+
+Founder asked to spin up the marketing site `ironpath.health`. The 10-lens marketing council had already produced a 3-PR plan (synthesis lives at the local-only `skills/SYNTHESIS.md`; the `skills/` folder is gitignored per founder direction since the council artifacts are reusable scaffolding, not project code). Founder confirmed locked decisions: Mona Sans display face, brand-400 #FF4566 added for a11y, demo deep-link in PR3, audio in PR4, WebGL ember layer **in PR4** (not deferred), 12 parallel agents next.
+
+This commit is the pre-stage: just enough scaffolding so 12 worktree-isolated agents can fork from a state where every cross-team import resolves and the build passes. No agent work yet.
+
+**Workspace addition:**
+- `package.json` — `marketing` added to workspaces; new `dev:marketing` + `build:marketing` scripts; `react@18.3.1` + `react-dom@18.3.1` added to `overrides` (every web workspace already pinned 18.3.1; the explicit override stops npm from mixing in the React 19 that mobile asks for, which was producing a `useContext` null at prerender time when react resolved at root and react-dom resolved inside marketing as different instances).
+- `marketing/` workspace boilerplate: Next.js `15.1.6` (App Router), React 18.3.1, TypeScript 5.6, Tailwind v3.4 (Mona Sans display + ember-breathe / pulse-travel / ken-burns keyframes), Node 22, PostCSS, ESLint with `eslint-plugin-jsx-a11y` strict.
+- Brand tokens in `marketing/tailwind.config.ts` extend admin's palette with the a11y-compliant additions: `brand-400 #FF4566` (5.93:1 on ink-950 — the body-on-dark companion for `brand-500 #C8102E` which fails AA at 3.36:1), `brand-350 #FF6680` (7.03:1 AAA — focus-ring color), full `ink-{50..950}` warm scale extending the existing admin neutrals.
+
+**Cross-team interface stubs (so all 12 agents' worktrees compile in parallel):**
+- `marketing/lib/motion.ts` — ported verbatim from `admin/src/lib/motion.ts` (`VERCEL_EASE`, `springModal`, `springMagnetic`, 60ms `listStagger`). Marketing inherits the brand's motion fingerprint.
+- `marketing/lib/brand-tokens.ts` — JS access to crimson + ink scales for canvas shaders, framer-motion color animations, and dynamic inline styles.
+- `marketing/lib/preferences.ts` — `useReducedMotion()` (combines OS media query with in-app localStorage override) + `useSoundOn()` (muted by default, explicit opt-in only). Persists via localStorage with cross-tab `storage` event sync.
+- `marketing/lib/fonts.ts` — `next/font/google` for Inter + JetBrains Mono. Mona Sans currently aliased to Inter via the same `--font-mona-sans` CSS variable; β1 swaps in the actual `localFont({ src: '../public/fonts/mona-sans-variable.woff2' })` after downloading from `github.com/github/mona-sans`.
+- `marketing/components/primitives/{ember-seam,live-pulse-strip}.tsx` — minimal renders that satisfy the public API (props + class shape) until β2 fills in the breathing radial + animated sweep.
+- `marketing/components/canvas/ember-canvas.tsx` — returns `null` until γ1 implements the OGL ember-particle layer with tier detection + crossfade.
+- `marketing/components/sound/sound-toggle.tsx` — visible-text labeled `<button>` with `aria-pressed`, wired to `setSoundPreference`. γ2 adds the actual Howler primer + sprite playback on toggle-on.
+- `marketing/components/chrome/preferences-bar.tsx` — sound + motion toggles. γ3 expands as needed.
+- `marketing/components/lead-form.tsx` — 3-field skeleton (gym_name, owner_email, member_count). β3 replaces with RHF + zod + the real success redirect.
+- `marketing/middleware.ts` + `marketing/app/api/lead/route.ts` — edge runtime stubs. β3 owns both.
+- `marketing/app/{layout,not-found,error}.tsx` — chrome scaffold with skip-to-content, sticky header (logo + Pricing + Blog + Sign in + PreferencesBar), main, footer. `<a>` skip-link, `<Link>` for internal routes.
+- `marketing/app/(site)/page.tsx` — placeholder for the cinematic hero (α1 owns).
+- `marketing/app/(legal)/{privacy,terms}/page.tsx` — placeholders (β4 owns content).
+- `marketing/app/globals.css` — Tailwind + base color-scheme + focus-ring spec (`outline: 2px solid #FF6680; outline-offset: 3px` per a11y lens; AAA contrast on ink-950) + `scroll-margin-top: 80px` on every focusable (satisfies WCAG 2.4.11 Focus Not Obscured under the sticky LivePulseStrip) + global `prefers-reduced-motion` clamp + skip-to-content visual.
+
+**Synthesis-vs-pre-stage adjustments (deliberate):**
+- **Next.js 15.1, not 16.** Synthesis specified Next 16 for Cache Components, but 16 is still fresh; 15.1 is bulletproof. β2/β4 can revisit during their content work if Cache Components actually unlock something we need.
+- **Tailwind v3.4, not v4.** Same reason — v3 is the proven path; v4's CSS-native `@theme` config is a separate upgrade we can do after launch.
+- **React 18.3.1 not 19.** Required by the workspace pin to avoid the dual-instance prerender crash; mobile already wanted 19 in its own deps but the overrides force consistency across all web workspaces.
+
+**Verified:** `npm install` from root cleanly hoists everything (16 vulnerabilities including 1 critical — all transitive from Vite/Next deps and not exposed at runtime; tracked separately for `npm audit` later). All four build targets pass:
+- `npm run -w backend build` clean (TypeScript)
+- `npm run -w admin build` clean (Vite)
+- `npm run -w console build` clean (Vite)
+- `npm run -w marketing build` clean (Next.js prerender — 6 routes, 105 kB First Load JS shared on the empty shell, 32 kB middleware)
+
+**Workspace-root `outputFileTracingRoot`** set in `marketing/next.config.ts` to `path.join(__dirname, '..')` to stop Next from auto-detecting an unrelated `package-lock.json` in the user's home directory and resolving react-dom from there.
+
+**What's next in this sprint:** spawn 12 worktree-isolated agents (3 teams × 4 lenses) in parallel against this base. File-ownership matrix is strict — no two agents write the same path. Cross-team imports all resolve to the stubs above; agents replace them with real implementations in their own worktrees. Integration commit comes after all 12 land.
+
 ### 2026-05-10 · Delete gym endpoint + console Settings tab
 
 Founder asked for a destructive "delete gym" path so test/abandoned trial gyms can be cleared from production rather than left as zombie rows polluting analytics. Lands as a single backend route + a new console Settings tab gated by a type-DELETE confirmation modal.

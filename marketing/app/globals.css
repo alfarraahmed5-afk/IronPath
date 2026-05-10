@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: theme(colors.ink.950);
+    color: theme(colors.ink.50);
+  }
+
+  body {
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme(colors.brand.350);
+    outline-offset: 3px;
+  }
+
+  *:focus-visible {
+    scroll-margin-top: 80px;
+  }
+
+  [data-numeric] {
+    font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .ember-seam {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(200, 16, 46, 0.6) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: ember-breathe 8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 9999;
+}
+
+.skip-to-content:focus {
+  left: 1rem;
+  top: 1rem;
+  background: theme(colors.brand.500);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
