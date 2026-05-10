@@ -1,6 +1,6 @@
 'use client';
 
-// EmberCanvasBootstrap — the public mount point that the cold-open scene
+// EmberCanvasBootstrap -- the public mount point that the cold-open scene
 // imports. Three responsibilities:
 //
 //   1. SSR-safe device-tier check. Tier C → permanent null; nothing else

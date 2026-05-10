@@ -1,6 +1,6 @@
 'use client';
 
-// "Before" frame 3 — a phone showing a clean home screen with NO notifications.
+// "Before" frame 3 -- a phone showing a clean home screen with NO notifications.
 // The owner checked. There's nothing there. CSS-rendered phone shell so we
 // don't ship an image; the saturation filter on the parent reduces it to grey
 // regardless.
@@ -18,7 +18,7 @@ export const SilentPhone = forwardRef<HTMLDivElement>(function SilentPhone(_, re
           <span>11:47</span>
           <span className="opacity-50">5G</span>
         </div>
-        {/* Screen body — empty */}
+        {/* Screen body -- empty */}
         <div className="absolute inset-x-0 top-12 bottom-16 px-5 flex flex-col">
           {/* Big clock */}
           <div className="text-center mt-4">

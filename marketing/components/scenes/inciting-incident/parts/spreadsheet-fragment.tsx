@@ -1,6 +1,6 @@
 'use client';
 
-// "Before" frame 1 — a dim, blurry abstract spreadsheet. Intentionally NOT a
+// "Before" frame 1 -- a dim, blurry abstract spreadsheet. Intentionally NOT a
 // real screenshot: the cinematic point is the *feeling* of staring into a grid
 // of numbers that mean nothing. Pure CSS/SVG so it has zero asset weight and
 // inherits the scene's monochrome saturation filter.
@@ -9,7 +9,7 @@ import { forwardRef } from 'react';
 
 export const SpreadsheetFragment = forwardRef<HTMLDivElement>(function SpreadsheetFragment(_, ref) {
   // Build a 12-col x 14-row faint grid with random-looking glyph fragments.
-  // The values are static so SSR === CSR — no hydration mismatch.
+  // The values are static so SSR === CSR -- no hydration mismatch.
   const cols = 12;
   const rows = 14;
   const cells = Array.from({ length: cols * rows }, (_, i) => i);
@@ -34,7 +34,7 @@ export const SpreadsheetFragment = forwardRef<HTMLDivElement>(function Spreadshe
         className="relative w-[min(92vw,720px)] aspect-[12/9] overflow-hidden rounded-md border border-ink-800/60"
         style={{ filter: 'blur(0.6px)' }}
       >
-        {/* Header row — column letters, the way every owner-built tracker looks */}
+        {/* Header row -- column letters, the way every owner-built tracker looks */}
         <div
           className="absolute inset-x-0 top-0 grid border-b border-ink-800/70 bg-ink-900/60 text-[9px] font-mono text-ink-500"
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}

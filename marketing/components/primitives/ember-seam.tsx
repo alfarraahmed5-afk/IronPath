@@ -1,15 +1,15 @@
-// EmberSeam — a thin breathing crimson hairline.
+// EmberSeam -- a thin breathing crimson hairline.
 //
-// The brand's "seam" — a 1px crimson gradient hairline that subtly breathes.
+// The brand's "seam" -- a 1px crimson gradient hairline that subtly breathes.
 // Used as a visual separator/seam between dark surfaces. Pairs with the
 // `.ember-seam` CSS class in app/globals.css for the keyframed breathe.
 //
 // Props:
-//   vertical — rotates the gradient 90deg for vertical 1px seams
+//   vertical -- rotates the gradient 90deg for vertical 1px seams
 //              (sidebar dividers, etc.)
-//   glow     — adds a 12px crimson drop-shadow halo around the seam
-//              (use sparingly — for hero-section transitions)
-//   className — escape hatch for sizing / margin overrides
+//   glow     -- adds a 12px crimson drop-shadow halo around the seam
+//              (use sparingly -- for hero-section transitions)
+//   className -- escape hatch for sizing / margin overrides
 
 import type { CSSProperties } from 'react';
 

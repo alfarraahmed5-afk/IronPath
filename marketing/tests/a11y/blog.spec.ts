@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-// Team Gamma γ3 — Blog a11y scan.
+// Team Gamma γ3 -- Blog a11y scan.
 //
 // /blog is owned by content team. Scan is conditional (skip on 404) so the
 // gate enables itself the moment the route ships.
@@ -12,7 +12,7 @@ test.describe('blog index a11y', () => {
   test('axe finds no serious or critical violations', async ({ page }) => {
     const response = await page.goto('/blog', { waitUntil: 'networkidle' });
     if (!response || response.status() === 404) {
-      test.skip(true, '/blog not yet implemented — skipping a11y scan');
+      test.skip(true, '/blog not yet implemented -- skipping a11y scan');
     }
 
     const results = await new AxeBuilder({ page })

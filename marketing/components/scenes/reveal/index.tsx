@@ -1,6 +1,6 @@
 'use client';
 
-// Act 3 — Reveal. "The drop."
+// Act 3 -- Reveal. "The drop."
 //
 // This index is a thin selector mirroring inciting-incident:
 //   - Reduced motion ON  → static final-state variant, no scroll-driven anim

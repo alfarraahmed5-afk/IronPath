@@ -1,6 +1,7 @@
-// Blog index — RSC. Lists every post in /content/blog sorted by date desc.
+// Blog index, RSC. Lists every post in /content/blog sorted by date desc.
 //
-// New posts ship as MDX files in content/blog/<slug>.mdx. The list page
+// New posts ship as MDX files in content/blog/<slug>.mdx (English) and an
+// optional parallel content/blog/<slug>.ar.mdx (Arabic). The list page
 // re-renders on demand (ISR every 60s) so a fresh post shows up within
 // a minute even on a long-lived deployment.
 
@@ -8,54 +9,65 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getAllPosts } from '@/lib/blog';
 import { buildMetadata } from '@/lib/seo';
+import { fmt, getLocale, getMessages } from '@/lib/i18n';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = buildMetadata({
-  title: 'Blog',
-  description:
-    'Field notes from IronPath — working hypotheses about gym software, sharpened by the gym owners who use it.',
-  path: '/blog',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const m = getMessages(locale);
+  return buildMetadata({
+    title: m.blog.page_title,
+    description: m.blog.page_description,
+    path: '/blog',
+  });
+}
 
 const ADMIN_SIGNUP = '/start';
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: 'en' | 'ar'): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', {
+  // Force Latin digits in Arabic output (Egyptian SaaS convention,
+  // per the i18n architect's spec).
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    numberingSystem: 'latn',
   });
 }
 
 export default async function BlogIndexPage() {
-  const posts = await getAllPosts();
+  const locale = await getLocale();
+  const m = getMessages(locale);
+  const isAr = locale === 'ar';
+  const posts = await getAllPosts(locale);
 
   return (
-    <main className="bg-ink-950 text-ink-50 min-h-screen">
+    <main className="bg-ink-950 text-ink-50 min-h-screen" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Top utility bar */}
       <nav className="border-b border-ink-900">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link
             href="/"
             className="font-display text-base tracking-tight text-ink-100 hover:text-ink-50 transition-colors"
+            dir="ltr"
           >
-            IronPath
+            {m.common.brand}
           </Link>
           <div className="flex items-center gap-5 text-sm">
             <Link href="/pricing" className="text-ink-300 hover:text-ink-50 transition-colors">
-              Pricing
+              {m.common.nav.pricing}
             </Link>
             <Link href="/for-gyms" className="text-ink-300 hover:text-ink-50 transition-colors">
-              For gyms
+              {m.common.nav.for_gyms}
             </Link>
             <a
-              href={`${ADMIN_SIGNUP}?tier=growth`}
+              href={'/start'}
               className="rounded-md bg-brand-500 text-white px-3 py-1.5 hover:bg-brand-450 transition-colors"
             >
-              Start trial
+              {m.common.nav.start_trial_cta}
             </a>
           </div>
         </div>
@@ -64,28 +76,26 @@ export default async function BlogIndexPage() {
       {/* Hero */}
       <header className="mx-auto max-w-3xl px-4 sm:px-6 pt-16 sm:pt-24 pb-12">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 mb-3">
-          The IronPath blog
+          {m.blog.eyebrow}
         </p>
         <h1 className="font-display text-4xl sm:text-6xl tracking-tight text-ink-50">
-          Field notes.
+          {m.blog.h1}
         </h1>
         <p className="mt-5 text-lg text-ink-300 max-w-2xl">
-          Working hypotheses, sharpened by gym owners. We publish what
-          we&rsquo;ve learned from sitting in 43 gyms over the last year &mdash;
-          why <span className="text-brand-400">Mindbody fails small operators</span>,
-          how QR-poster signups actually convert, and what a 30-day trial has
-          to look like to be honest.
+          {m.blog.lede_a}
+          <span className="text-brand-400">{m.blog.lede_b}</span>
+          {m.blog.lede_c}
         </p>
       </header>
 
       {/* Post list */}
       <section
-        aria-label="Recent posts"
+        aria-label={m.blog.section_aria}
         className="mx-auto max-w-3xl px-4 sm:px-6 pb-24"
       >
         {posts.length === 0 ? (
           <p className="text-ink-300">
-            No posts yet &mdash; check back soon.
+            {m.blog.empty}
           </p>
         ) : (
           <ul className="space-y-10">
@@ -93,9 +103,9 @@ export default async function BlogIndexPage() {
               <li key={post.slug}>
                 <article className="group border-b border-ink-900 pb-10 last:border-b-0">
                   <p className="font-mono text-xs text-ink-400 mb-3 flex items-center gap-3">
-                    <time dateTime={post.date}>{formatDate(post.date)}</time>
+                    <time dateTime={post.date}>{formatDate(post.date, locale)}</time>
                     <span aria-hidden>&middot;</span>
-                    <span>{post.readingTimeMinutes} min read</span>
+                    <span>{fmt(m.blog.min_read, { minutes: post.readingTimeMinutes })}</span>
                   </p>
                   <h2 className="font-display text-2xl sm:text-3xl tracking-tight text-ink-50 mb-3">
                     <Link
@@ -112,7 +122,7 @@ export default async function BlogIndexPage() {
                     href={`/blog/${post.slug}`}
                     className="inline-flex items-center gap-1 text-sm text-brand-400 hover:text-brand-350 transition-colors"
                   >
-                    Read <span aria-hidden>&rarr;</span>
+                    {m.blog.read_link} <span aria-hidden>{m.blog.read_arrow}</span>
                   </Link>
                 </article>
               </li>
@@ -127,13 +137,13 @@ export default async function BlogIndexPage() {
           <p>&copy; {new Date().getFullYear()} IronPath, Inc.</p>
           <div className="flex gap-5">
             <Link href="/privacy" className="hover:text-ink-200 transition-colors">
-              Privacy
+              {m.common.nav.privacy}
             </Link>
             <Link href="/terms" className="hover:text-ink-200 transition-colors">
-              Terms
+              {m.common.nav.terms}
             </Link>
             <Link href="/pricing" className="hover:text-ink-200 transition-colors">
-              Pricing
+              {m.common.nav.pricing}
             </Link>
           </div>
         </div>

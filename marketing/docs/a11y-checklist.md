@@ -1,4 +1,4 @@
-# Marketing accessibility — manual release checklist
+# Marketing accessibility -- manual release checklist
 
 Owner: Team Gamma γ3.
 Run this checklist before promoting a marketing build to `ironpath.health`.
@@ -25,7 +25,7 @@ running. Firefox is the recommended pairing.
       with no skips. Each heading must be readable as plain English (no
       "comma comma comma" from emoji).
 - [ ] Press `K` to walk all links. Every link must read with discernible text
-      ("Pricing, link" — not "page, link" or "link").
+      ("Pricing, link" -- not "page, link" or "link").
 - [ ] Press `B` to walk all buttons. Every button must read with a label.
       `Sound off, button, not pressed` and `Motion: System, switch, mixed` are
       both acceptable.
@@ -52,7 +52,7 @@ running. Firefox is the recommended pairing.
 - [ ] Enable Windows Settings → Accessibility → Contrast themes → "Aquatic".
 - [ ] Open `https://staging.ironpath.health/` in Edge.
 - [ ] Verify every interactive control still shows a visible border or
-      button-face — no controls become invisible against the background.
+      button-face -- no controls become invisible against the background.
 - [ ] Verify the focus ring is still visible on every focusable.
 - [ ] Verify text contrast ≥ 4.5:1 for body and ≥ 3:1 for large text. Use
       Edge DevTools → Accessibility Inspector to spot-check.
@@ -81,7 +81,7 @@ Test BOTH the OS-level preference and the in-app Motion toggle.
 - [ ] Open the lead form. Fill it out using only Tab + typing. Submit with
       Enter on the submit button.
 - [ ] Open `/pricing`. Tab through every CTA. All links navigate on `Enter`.
-- [ ] Verify the sticky header never occludes a freshly-focused control —
+- [ ] Verify the sticky header never occludes a freshly-focused control --
       `scroll-margin-top: 80px` should kick in on every Tab.
 
 ## 6. Touch targets

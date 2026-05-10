@@ -2,19 +2,19 @@
 
 // Mobile-only sticky CTA pill that fades in once the visitor has scrolled
 // past 50vh and disappears when they scroll BACK down (the down-scroll
-// signal usually means they're re-reading something — don't cover it).
+// signal usually means they're re-reading something -- don't cover it).
 //
 // Why scroll-direction matters (per conversion-gtm council):
 //   - Always-visible mobile CTAs hurt content engagement; the pill
 //     covers prose, gets ignored as banner-blindness, and trains users
 //     to distrust the page chrome.
 //   - Reveal on UP-scroll signals "the user is heading back to the top
-//     to look for the CTA" — meet them where they are.
-//   - Hide on DOWN-scroll signals "they're still reading" — get out of
+//     to look for the CTA" -- meet them where they are.
+//   - Hide on DOWN-scroll signals "they're still reading" -- get out of
 //     their way.
 //
 // Performance:
-//   - Single passive scroll listener on window. Throttled via rAF — no
+//   - Single passive scroll listener on window. Throttled via rAF -- no
 //     mid-frame layout thrash even on a low-end Android.
 //   - rAF-based; never blocks the main thread on long pages.
 //   - Position: fixed; safe-area-inset-bottom for iPhone notch.
@@ -31,7 +31,7 @@ import { useReducedMotion } from '@/lib/preferences';
 export interface StickyCtaProps {
   /** Where the pill links to. Defaults to the page-local lead-form anchor. */
   href?: string;
-  /** Override the default label (kept short — "Start free trial" by default). */
+  /** Override the default label (kept short -- "Start free trial" by default). */
   label?: string;
   className?: string;
 }
@@ -76,11 +76,11 @@ export function StickyCta({
       } else if (y > lastYRef.current) {
         next = false;
       } else {
-        // Down or stationary — only hide once we're definitively past the
+        // Down or stationary -- only hide once we're definitively past the
         // threshold AND the user is moving down. Otherwise hold.
         next = visibleRef.current;
         if (!goingUp && y - lastYRef.current === 0) {
-          // stationary — preserve
+          // stationary -- preserve
         } else {
           next = false;
         }
@@ -126,7 +126,7 @@ export function StickyCta({
 
   return (
     <div
-      // md:hidden — desktop has the inline CTA + sticky header link, so
+      // md:hidden -- desktop has the inline CTA + sticky header link, so
       // the pill is mobile-only. (Tablet portrait is still mobile here.)
       className={`fixed inset-x-4 bottom-0 z-50 flex justify-center pb-[max(env(safe-area-inset-bottom),12px)] md:hidden transition-all duration-300 ease-out ${transform} ${reducedTransform} ${className}`}
       aria-hidden={visible ? 'false' : 'true'}

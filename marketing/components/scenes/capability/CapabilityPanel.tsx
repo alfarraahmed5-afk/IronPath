@@ -1,13 +1,14 @@
 'use client';
 
 import { m } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { VERCEL_EASE } from '@/lib/motion';
 
-// CapabilityPanel — single horizontal-scroll panel inside the Capability act.
+// CapabilityPanel -- single horizontal-scroll panel inside the Capability act.
 // Visuals are CSS-rendered mocks that mirror admin's surface treatment so the
 // panel reads as "this is the actual product" without needing a screenshot
 // pipeline. Replace the inline mock with an AVIF (`/scene-4/<slug>.avif`)
-// when art is finalized — the prop API is intentionally flexible.
+// when art is finalized -- the prop API is intentionally flexible.
 
 export type CapabilitySlug = 'roster' | 'grow' | 'receipt' | 'pulse';
 
@@ -23,7 +24,7 @@ export interface CapabilityPanelProps {
 
 /**
  * Each panel is a fixed-width column in the horizontal track. Width is set
- * to `100vw` on mobile (irrelevant — mobile forks to vertical stack) and
+ * to `100vw` on mobile (irrelevant -- mobile forks to vertical stack) and
  * `min(90vw, 1100px)` on desktop so 4 panels span ~360–400% of viewport,
  * matching the GSAP `xPercent: -75` translation.
  */
@@ -49,9 +50,14 @@ export function CapabilityPanel({
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-10 lg:gap-16 items-center w-full max-w-[1100px]">
         <header className="space-y-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-brand-400">
-            {String(index + 1).padStart(2, '0')} · {eyebrow}
+            {/* Index numerals stay Latin in any locale; wrap in <bdi> so the
+                bidirectional algorithm doesn't reorder "01 · الأعضاء" weirdly. */}
+            <bdi>{String(index + 1).padStart(2, '0')}</bdi> · {eyebrow}
           </p>
-          <h3 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-[1.05] tracking-tight">
+          <h3
+            data-font-display
+            className="font-display text-3xl sm:text-4xl lg:text-5xl leading-[1.05] tracking-tight"
+          >
             {title}
           </h3>
           <p className="text-ink-300 text-base sm:text-lg max-w-md">{copy}</p>
@@ -72,7 +78,7 @@ export function CapabilityPanel({
 }
 
 // ---------------------------------------------------------------------------
-// CSS mocks — purposefully geometric, never photographic. They evoke admin's
+// CSS mocks -- purposefully geometric, never photographic. They evoke admin's
 // dark-surface UI without forcing a network round-trip for an image.
 // ---------------------------------------------------------------------------
 
@@ -136,7 +142,11 @@ function Sparkline({ values, accent = false }: { values: number[]; accent?: bool
 }
 
 function RosterMock() {
-  // 8 mock members — initial avatars, sparkline of last-8-week attendance.
+  const t = useTranslations('scenes.capability.mocks');
+  // 8 mock members -- initial avatars, sparkline of last-8-week attendance.
+  // Member names stay Latin script in both locales (they're proper nouns from
+  // the example brand "Iron & Oak"). The streak suffix ("w" / "أ") is the
+  // only translatable text on the row.
   const rows = [
     { initials: 'AM', name: 'Alex Morgan',    weeks: [3, 4, 4, 3, 5, 4, 5, 5], streak: 12 },
     { initials: 'JR', name: 'Jamie Reyes',    weeks: [2, 3, 3, 4, 3, 4, 4, 4], streak: 8 },
@@ -145,8 +155,9 @@ function RosterMock() {
     { initials: 'TC', name: 'Taylor Chen',    weeks: [4, 4, 3, 3, 4, 4, 4, 5], streak: 9 },
     { initials: 'RW', name: 'Riley Walker',   weeks: [3, 3, 4, 5, 4, 5, 5, 4], streak: 11 },
   ];
+  const streakSuffix = t('rosterStreakSuffix');
   return (
-    <MockShell label="roster · 142 active">
+    <MockShell label={t('rosterLabel')}>
       <ul className="divide-y divide-ink-800/70">
         {rows.map((r) => (
           <li
@@ -154,6 +165,8 @@ function RosterMock() {
             className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0"
           >
             <span
+              lang="en"
+              dir="ltr"
               className={[
                 'size-8 rounded-full grid place-items-center text-[11px] font-mono',
                 r.accent
@@ -163,7 +176,9 @@ function RosterMock() {
             >
               {r.initials}
             </span>
-            <span className="flex-1 text-sm text-ink-100 truncate">{r.name}</span>
+            <span lang="en" dir="ltr" className="flex-1 text-sm text-ink-100 truncate">
+              {r.name}
+            </span>
             <Sparkline values={r.weeks} accent={r.accent} />
             <span
               data-numeric
@@ -172,7 +187,7 @@ function RosterMock() {
                 r.accent ? 'text-brand-400' : 'text-ink-400',
               ].join(' ')}
             >
-              {r.streak}w
+              <bdi>{r.streak}</bdi>{streakSuffix}
             </span>
           </li>
         ))}
@@ -182,27 +197,28 @@ function RosterMock() {
 }
 
 function GrowMock() {
-  // QR poster forge — the "print this, members scan" moment.
+  const t = useTranslations('scenes.capability.mocks');
+  // QR poster forge -- the "print this, members scan" moment.
   return (
-    <MockShell label="grow · poster preview">
+    <MockShell label={t('growLabel')}>
       <div className="grid grid-cols-[1fr_auto] gap-6 items-center">
         <div className="space-y-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-500">
-            Poster · 11 × 17 in
+            {t('posterDimensions')}
           </p>
           <div className="rounded-xl bg-ink-50 text-ink-950 p-5 space-y-3">
-            <p className="font-display text-2xl leading-tight tracking-tight">
-              Join the gym.
+            <p data-font-display className="font-display text-2xl leading-tight tracking-tight">
+              {t('posterHeadline')}
             </p>
             <p className="text-xs text-ink-700">
-              Scan. Pick a plan. Walk in tomorrow.
+              {t('posterBody')}
             </p>
             <div className="flex items-center gap-3">
               <FakeQR />
-              <div className="text-[10px] font-mono text-ink-700 leading-tight">
+              <div className="text-[10px] font-mono text-ink-700 leading-tight" lang="en" dir="ltr">
                 IRONPATH
                 <br />
-                /join/oak-st
+                {t('posterUrl')}
               </div>
             </div>
           </div>
@@ -213,12 +229,12 @@ function GrowMock() {
             disabled
             className="px-3 py-1.5 rounded-md text-xs bg-brand-500/90 text-white font-medium cursor-default"
           >
-            Print
+            {t('printButton')}
           </button>
           <p className="font-mono text-[10px] text-ink-500">
-            42 scans
+            {t('posterScans', { count: 42 })}
             <br />
-            this week
+            {t('posterScansSuffix')}
           </p>
         </div>
       </div>
@@ -264,19 +280,26 @@ function FakeQR() {
 }
 
 function ReceiptMock() {
+  const t = useTranslations('scenes.capability.mocks');
   // Paper-styled subscription view. Mono type, dotted leaders.
+  // Labels translate; amounts stay USD (founder kept English-locale pricing
+  // in USD; the AR Cairo wedge has separate EGP pricing on /eg).
   const lines = [
-    { label: '142 × Standard / mo',    amount: '$8,520' },
-    { label: '18 × Coached / mo',      amount: '$1,710' },
-    { label: '4 × Drop-in (week)',     amount: '$60' },
-    { label: 'Refunds',                amount: '−$45' },
+    { label: t('receiptLines.standard', { count: 142 }), amount: '$8,520' },
+    { label: t('receiptLines.coached', { count: 18 }), amount: '$1,710' },
+    { label: t('receiptLines.dropIn', { count: 4 }), amount: '$60' },
+    { label: t('receiptLines.refunds'), amount: '−$45' },
   ];
   return (
-    <MockShell label="receipt · this month">
+    <MockShell label={t('receiptLabel')}>
       <div className="font-mono text-[12px] text-ink-200 leading-relaxed">
         <div className="text-center pb-2 border-b border-dashed border-ink-700/70">
-          <div className="text-[10px] text-ink-500">IRONPATH GYM · OAK ST</div>
-          <div className="text-[10px] text-ink-500">MAY 1 — MAY 31</div>
+          {/* Receipt header is the example brand name -- Latin script in any
+              locale because it's a proper noun in the mock. */}
+          <div className="text-[10px] text-ink-500" lang="en" dir="ltr">
+            {t('receiptHeader')}
+          </div>
+          <div className="text-[10px] text-ink-500">{t('receiptPeriod')}</div>
         </div>
         <ul className="py-3 space-y-1.5">
           {lines.map((l) => (
@@ -286,19 +309,19 @@ function ReceiptMock() {
             >
               <span className="truncate text-ink-300">{l.label}</span>
               <span data-numeric className="tabular-nums text-ink-100">
-                {l.amount}
+                <bdi>{l.amount}</bdi>
               </span>
             </li>
           ))}
         </ul>
         <div className="border-t border-dashed border-ink-700/70 pt-2 grid grid-cols-[1fr_auto] gap-3">
-          <span className="text-ink-400">NET</span>
+          <span className="text-ink-400">{t('receiptNet')}</span>
           <span data-numeric className="tabular-nums text-brand-400 font-semibold">
-            $10,245
+            <bdi>$10,245</bdi>
           </span>
         </div>
         <div className="text-center pt-3 text-[10px] text-ink-500">
-          ──── auto-deposit · fri ────
+          ──── {t('receiptDeposit')} ────
         </div>
       </div>
     </MockShell>
@@ -306,8 +329,10 @@ function ReceiptMock() {
 }
 
 function PulseMock() {
+  const t = useTranslations('scenes.capability.mocks');
   // Live ember sweep + active-now counter. The hairline animates via the
   // existing `animate-pulse-travel` keyframe in tailwind config.
+  // Lifter names + movements stay Latin (mock data from the example brand).
   const lifts = [
     { who: 'Kai',   move: 'Back squat',   weight: '275 lb', mins: 1 },
     { who: 'Jamie', move: 'Bench press',  weight: '185 lb', mins: 2 },
@@ -315,11 +340,11 @@ function PulseMock() {
     { who: 'Riley', move: 'Front squat',  weight: '205 lb', mins: 5 },
   ];
   return (
-    <MockShell label="pulse · live">
+    <MockShell label={t('pulseLabel')}>
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
           <span className="text-[11px] font-mono uppercase tracking-[0.16em] text-ink-500">
-            Active now
+            {t('pulseActiveNow')}
           </span>
           <span data-numeric className="tabular-nums text-3xl text-ink-50">
             17
@@ -336,14 +361,16 @@ function PulseMock() {
             >
               <span className="flex items-center gap-2.5">
                 <span className="size-1.5 rounded-full bg-brand-450" />
-                <span className="text-ink-100">{l.who}</span>
-                <span className="text-ink-400">— {l.move}</span>
+                <span lang="en" dir="ltr" className="text-ink-100">{l.who}</span>
+                <span lang="en" dir="ltr" className="text-ink-400">, {l.move}</span>
               </span>
               <span className="flex items-center gap-3 text-xs">
-                <span data-numeric className="tabular-nums text-ink-200">
+                <span data-numeric lang="en" dir="ltr" className="tabular-nums text-ink-200">
                   {l.weight}
                 </span>
-                <span className="text-ink-500 w-10 text-right">{l.mins}m ago</span>
+                <span className="text-ink-500 w-16 text-right">
+                  {t('pulseMinutesAgo', { mins: l.mins })}
+                </span>
               </span>
             </li>
           ))}

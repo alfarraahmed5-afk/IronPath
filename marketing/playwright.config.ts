@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Team Gamma γ3 — Playwright config.
+// Team Gamma γ3 -- Playwright config.
 // Two projects: default-motion + reduced-motion. The accessibility CI gate
 // runs every test in BOTH projects so we never ship a regression that only
 // affects one motion mode.

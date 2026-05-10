@@ -9,12 +9,12 @@
 // IronPath's marketing site (`ironpath.health`, this Next app) and the
 // admin app (`admin.ironpath.health`, separate Vercel project) are
 // SEPARATE deployments on SEPARATE origins. There is no shared React
-// tree — the navigation crosses a hard document boundary.
+// tree -- the navigation crosses a hard document boundary.
 //
 // === The pragmatic solution ===
 // Two halves of one perceived animation:
 //
-//   1. MARKETING SIDE (this file's owner — α4 + α1):
+//   1. MARKETING SIDE (this file's owner -- α4 + α1):
 //      The Crescendo CTA in the Denouement scene scales/morphs to fill
 //      the viewport (cubic-bezier ease, ~480ms), then triggers the
 //      navigation. The trick is that the user sees the button "become"
@@ -28,7 +28,7 @@
 //      contracts/fades into the signup form. Same easing, same crimson
 //      accent color. The user perceives one continuous motion.
 //
-// The illusion only works if both halves run with matching tokens — see
+// The illusion only works if both halves run with matching tokens -- see
 // `@/lib/motion`'s `springModal` (380/32) and `VERCEL_EASE` curve.
 //
 // === Token contract ===
@@ -44,7 +44,7 @@ export const ADMIN_SIGNUP_URL = '/start';
 /** Duration (ms) of the marketing-side scale-out before navigation fires. */
 export const HANDOFF_SCALE_OUT_MS = 480;
 
-/** Easing curve for the scale-out — must match admin's intro curve. */
+/** Easing curve for the scale-out -- must match admin's intro curve. */
 export const HANDOFF_EASE: [number, number, number, number] = [0.32, 0.72, 0, 1];
 
 /**
@@ -69,7 +69,7 @@ export function buildSignupUrl(via: HandoffSource): string {
  * viewport, THEN navigate. Caller passes the element and the via.
  *
  * Reduced-motion callers should skip the animation and call `navigate`
- * directly — see `useReducedMotion()` in `@/lib/preferences`.
+ * directly -- see `useReducedMotion()` in `@/lib/preferences`.
  */
 export function navigateToSignup(via: HandoffSource): void {
   if (typeof window === 'undefined') return;

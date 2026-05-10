@@ -23,40 +23,75 @@
 //   - react-hook-form for state + uncontrolled inputs (zero re-renders
 //     on keystroke, fastest possible perceived input latency).
 //   - zod for schema. Schema is the single source of truth for both
-//     client and server validation — same shape posts to /api/lead
+//     client and server validation -- same shape posts to /api/lead
 //     where it is re-validated.
 
 import { useId, useMemo, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { z } from 'zod';
 
 export type LeadFormVariant = 'hero' | 'inline' | 'closing';
 
 // ─── Schema ────────────────────────────────────────────────────────────
-// Sentence-form error messages. Re-used by the API route.
+// Schema factory takes a translator so error messages are locale-aware.
+// The default messages (used by the server-side API route, which doesn't
+// have a request-locale context) stay in English -- server-side validation
+// only fires when client validation has been bypassed (curl, browser
+// extensions), so the user-facing copy lives client-side.
 
-export const leadSchema = z.object({
-  gym_name: z
-    .string()
-    .trim()
-    .min(2, "Your gym's name needs at least 2 characters.")
-    .max(80, "That's a very long gym name — keep it under 80 characters."),
-  owner_email: z
-    .string()
-    .trim()
-    .min(1, 'We need your email to set up your account.')
-    .email('That email looks incomplete — try again.'),
-  member_count: z.coerce
-    .number({ invalid_type_error: 'Member count needs to be a number.' })
-    .int('Round to a whole number.')
-    .min(1, 'You need at least 1 member to get started.')
-    .max(100_000, 'For 100k+ members, get in touch with sales directly.'),
-});
+export interface LeadFormErrorMessages {
+  gymNameTooShort: string;
+  gymNameTooLong: string;
+  ownerEmailRequired: string;
+  ownerEmailInvalid: string;
+  memberCountType: string;
+  memberCountInteger: string;
+  memberCountMin: string;
+  memberCountMax: string;
+}
+
+const DEFAULT_ERROR_MESSAGES: LeadFormErrorMessages = {
+  gymNameTooShort: "Your gym's name needs at least 2 characters.",
+  gymNameTooLong: "That's a very long gym name. Keep it under 80 characters.",
+  ownerEmailRequired: 'We need your email to set up your account.',
+  ownerEmailInvalid: 'That email looks incomplete. Try again.',
+  memberCountType: 'Member count needs to be a number.',
+  memberCountInteger: 'Round to a whole number.',
+  memberCountMin: 'You need at least 1 member to get started.',
+  memberCountMax: 'For 100k+ members, get in touch with sales directly.',
+};
+
+export function createLeadSchema(messages: LeadFormErrorMessages = DEFAULT_ERROR_MESSAGES) {
+  return z.object({
+    gym_name: z
+      .string()
+      .trim()
+      .min(2, messages.gymNameTooShort)
+      .max(80, messages.gymNameTooLong),
+    owner_email: z
+      .string()
+      .trim()
+      .min(1, messages.ownerEmailRequired)
+      .email(messages.ownerEmailInvalid),
+    member_count: z.coerce
+      .number({ invalid_type_error: messages.memberCountType })
+      .int(messages.memberCountInteger)
+      .min(1, messages.memberCountMin)
+      .max(100_000, messages.memberCountMax),
+  });
+}
+
+// Backwards-compatible export: server-side code (api/lead/route.ts) imports
+// `leadSchema` directly to validate the POST body. It doesn't need locale-
+// specific error strings -- the API returns a generic top-level "validation
+// failed" rather than per-field copy.
+export const leadSchema = createLeadSchema();
 
 export type LeadFormValues = z.infer<typeof leadSchema>;
 
-// Personal-email domains we soft-warn on. We don't block — many small
+// Personal-email domains we soft-warn on. We don't block -- many small
 // gyms legitimately run on a personal Gmail. We just nudge them toward
 // the gym's real address so onboarding emails route to the right place.
 const PERSONAL_EMAIL_DOMAINS = new Set([
@@ -95,8 +130,23 @@ export function LeadForm({
   className = '',
 }: LeadFormProps) {
   const formId = useId();
+  const t = useTranslations('leadForm');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Build the locale-aware Zod schema once per render. useMemo would be
+  // overkill -- useForm only reads the resolver on mount, and the translator
+  // function returned by useTranslations is referentially stable per locale.
+  const schema = createLeadSchema({
+    gymNameTooShort: t('fields.gymName.errors.tooShort'),
+    gymNameTooLong: t('fields.gymName.errors.tooLong'),
+    ownerEmailRequired: t('fields.ownerEmail.errors.required'),
+    ownerEmailInvalid: t('fields.ownerEmail.errors.invalid'),
+    memberCountType: t('fields.memberCount.errors.type'),
+    memberCountInteger: t('fields.memberCount.errors.integer'),
+    memberCountMin: t('fields.memberCount.errors.min'),
+    memberCountMax: t('fields.memberCount.errors.max'),
+  });
 
   const {
     register,
@@ -104,7 +154,7 @@ export function LeadForm({
     watch,
     formState: { errors, isSubmitting, touchedFields },
   } = useForm<LeadFormValues>({
-    resolver: zodResolver(leadSchema),
+    resolver: zodResolver(schema),
     // Validate on blur, not on change. See file header rationale.
     mode: 'onBlur',
     reValidateMode: 'onBlur',
@@ -137,10 +187,7 @@ export function LeadForm({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(
-          body?.error ??
-            "Something went wrong on our end. Try again — if it keeps failing, email hello@ironpath.health.",
-        );
+        throw new Error(body?.error ?? t('submit.genericError'));
       }
       const json = (await res.json()) as LeadResponse;
       if (onSuccess) {
@@ -152,7 +199,7 @@ export function LeadForm({
         });
       }
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Unknown error.');
+      setSubmitError(err instanceof Error ? err.message : t('submit.genericError'));
     }
   }
 
@@ -167,12 +214,12 @@ export function LeadForm({
       data-variant={variant}
       noValidate
       className={`flex flex-col gap-4 ${className}`}
-      aria-label="Start your IronPath trial"
+      aria-label={t('ariaLabel')}
     >
       {/* gym_name */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${formId}-gym_name`} className="text-sm font-medium text-ink-100">
-          Gym name
+          {t('fields.gymName.label')}
         </label>
         <input
           id={`${formId}-gym_name`}
@@ -182,7 +229,7 @@ export function LeadForm({
           aria-invalid={errors.gym_name ? 'true' : 'false'}
           aria-describedby={errors.gym_name ? `${formId}-gym_name-error` : undefined}
           className={`${inputBase} ${errors.gym_name ? inputErr : inputOk}`}
-          placeholder="Iron Strength Co."
+          placeholder={t('fields.gymName.placeholder')}
           {...register('gym_name')}
         />
         {errors.gym_name && (
@@ -199,7 +246,7 @@ export function LeadForm({
       {/* owner_email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${formId}-owner_email`} className="text-sm font-medium text-ink-100">
-          Your email
+          {t('fields.ownerEmail.label')}
         </label>
         <input
           id={`${formId}-owner_email`}
@@ -215,7 +262,7 @@ export function LeadForm({
                 : undefined
           }
           className={`${inputBase} ${errors.owner_email ? inputErr : inputOk}`}
-          placeholder="you@ironstrength.com"
+          placeholder={t('fields.ownerEmail.placeholder')}
           {...register('owner_email')}
         />
         {errors.owner_email && (
@@ -232,7 +279,7 @@ export function LeadForm({
             id={`${formId}-owner_email-nudge`}
             className="text-xs text-warn"
           >
-            Tip: use your gym's email so onboarding goes to the right inbox.
+            {t('fields.ownerEmail.personalEmailNudge')}
           </p>
         )}
       </div>
@@ -240,7 +287,7 @@ export function LeadForm({
       {/* member_count */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${formId}-member_count`} className="text-sm font-medium text-ink-100">
-          Active members (roughly)
+          {t('fields.memberCount.label')}
         </label>
         <input
           id={`${formId}-member_count`}
@@ -253,7 +300,7 @@ export function LeadForm({
             errors.member_count ? `${formId}-member_count-error` : undefined
           }
           className={`${inputBase} ${errors.member_count ? inputErr : inputOk}`}
-          placeholder="80"
+          placeholder={t('fields.memberCount.placeholder')}
           {...register('member_count')}
         />
         {errors.member_count && (
@@ -275,10 +322,15 @@ export function LeadForm({
           className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-base font-semibold text-white shadow-[0_8px_24px_-8px_rgba(200,16,46,0.65)] transition-all hover:bg-brand-450 focus:outline-none focus:ring-2 focus:ring-brand-350 focus:ring-offset-2 focus:ring-offset-ink-950 disabled:cursor-wait disabled:opacity-60"
           aria-busy={submitting ? 'true' : 'false'}
         >
-          {submitting ? 'Starting your trial…' : 'Start my 30-day trial →'}
+          {submitting ? t('submit.submitting') : (
+            <>
+              {t('submit.idle')}{' '}
+              <span aria-hidden className="rtl:inline-block rtl:-scale-x-100">→</span>
+            </>
+          )}
         </button>
         <p className="text-xs text-ink-400">
-          No credit card. Set up in 5 minutes. Cancel anytime.
+          {t('submit.trust')}
         </p>
         {submitError && (
           <p role="alert" className="text-sm text-error">

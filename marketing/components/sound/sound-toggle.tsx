@@ -1,16 +1,16 @@
 'use client';
 
 /**
- * Sound on/off toggle — the ONLY surface that may un-mute the
+ * Sound on/off toggle -- the ONLY surface that may un-mute the
  * marketing site. Per spec (sound-design + a11y council):
  *   - Real <button> with aria-pressed reflecting state.
  *   - Visible text label ("Sound on" / "Sound off") AND speaker icon
- *     — never icon-only (a11y: WCAG 1.4.1 / 2.5.3).
+ *     -- never icon-only (a11y: WCAG 1.4.1 / 2.5.3).
  *   - Touch target ≥44×44 (WCAG 2.5.5 AAA via min-h/min-w).
  *   - First "on" click awaits initAudio() INSIDE the gesture handler
  *     so iOS Safari unlocks the AudioContext on the same user
  *     interaction. We intentionally do NOT setSoundPreference until
- *     the prime resolves — if init throws, we stay muted and surface
+ *     the prime resolves -- if init throws, we stay muted and surface
  *     nothing to the user (silent failure is the right product call
  *     here; sound is a nice-to-have).
  *   - When the user toggles OFF we call `setMuted(true)` immediately
@@ -50,7 +50,7 @@ export function SoundToggle() {
         setSoundPreference('off');
       }
     } catch {
-      // initAudio failed — stay muted, do not change preference.
+      // initAudio failed -- stay muted, do not change preference.
     } finally {
       setBusy(false);
     }
@@ -82,7 +82,7 @@ export function SoundToggle() {
 /**
  * Inline SVG speaker icon. Two states (on = waves, off = X overlay).
  * `aria-hidden` because the visible text label already conveys state
- * to assistive tech — we don't want screen readers double-announcing.
+ * to assistive tech -- we don't want screen readers double-announcing.
  */
 function SpeakerIcon({ on }: { on: boolean }) {
   return (
@@ -98,7 +98,7 @@ function SpeakerIcon({ on }: { on: boolean }) {
       aria-hidden="true"
       focusable="false"
     >
-      {/* Speaker body — present in both states */}
+      {/* Speaker body -- present in both states */}
       <path d="M3 6h2l3.5-2.5v9L5 10H3V6Z" />
       {on ? (
         <>

@@ -1,4 +1,4 @@
-// The cinematic landing page — composes all 7 acts (6 scene components,
+// The cinematic landing page -- composes all 7 acts (6 scene components,
 // since the Quiet Beat is folded into Denouement). Each scene is its own
 // client/server boundary; this page itself is RSC.
 

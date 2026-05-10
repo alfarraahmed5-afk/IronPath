@@ -1,0 +1,746 @@
+{
+  "chrome": {
+    "skipToContent": "Skip to content",
+    "nav": {
+      "pricing": "Pricing",
+      "blog": "Blog",
+      "forGyms": "For gyms",
+      "signIn": "Sign in"
+    },
+    "footer": {
+      "copyright": "© {year} IronPath",
+      "rightsReserved": "© {year} IronPath. All rights reserved.",
+      "ariaLabel": "Site footer",
+      "ariaNav": "Footer navigation",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "contact": "Contact",
+      "blog": "Blog",
+      "bookChat": "Book a 15-min chat"
+    },
+    "localeSwitcher": {
+      "ariaLabel": "Language",
+      "switchTo": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    },
+    "cairoBanner": {
+      "message": "We are in Cairo. See gym pricing in EGP and book a free in-person demo.",
+      "cta": "For Cairo gyms",
+      "dismiss": "Dismiss Cairo banner",
+      "ariaLabel": "Cairo visitor banner"
+    }
+  },
+  "scenes": {
+    "coldOpen": {
+      "ariaLabel": "IronPath, run your gym, not software",
+      "headlineLine1": "Run your gym,",
+      "headlineLine2": "not software.",
+      "subhead": "For independent gym owners burned by their old gym software. Workouts in your members' pockets. Members tracked, churn predicted.",
+      "cta": "Start free trial",
+      "trust": "30-day free trial. No card. Cancel anytime."
+    },
+    "incitingIncident": {
+      "ariaLabel": "Inciting incident, what gym ownership looks like before IronPath",
+      "eyebrow": "BEFORE",
+      "headline": "What gym ownership looks like at 11:47am.",
+      "lede": "Forty members. One spreadsheet. No signal. The work is real but the system is held together by you remembering everything.",
+      "cards": {
+        "memberships": {
+          "eyebrow": "Memberships",
+          "caption": "Two hundred rows in Excel. One coach who knows where the truth is."
+        },
+        "clock": {
+          "eyebrow": "11:47am",
+          "caption": "You opened at 6. Three people came. The rest, you assume, are coming."
+        },
+        "phone": {
+          "eyebrow": "No signal",
+          "caption": "No notifications. No new sign-ups. Members forget you exist between sessions."
+        }
+      }
+    },
+    "reveal": {
+      "ariaLabel": "Reveal, this is IronPath",
+      "headline": "This is IronPath.",
+      "dashboard": {
+        "title": "Dashboard",
+        "todayAt": "Today, 11:47",
+        "gymName": "Iron & Oak",
+        "stats": {
+          "activeMembers": "Active members",
+          "monthlyRecurring": "Monthly recurring",
+          "retention": "Retention"
+        },
+        "activity": "Activity",
+        "lastSevenDays": "last 7d"
+      },
+      "bento": {
+        "churn": {
+          "eyebrow": "Churn risk",
+          "flagged": "{count} flagged",
+          "quietDays": "{days}d quiet"
+        },
+        "week": {
+          "eyebrow": "This week",
+          "delta": "+{count} sessions",
+          "caption": "Monday surge held through Thursday."
+        },
+        "billing": {
+          "eyebrow": "Billing",
+          "status": "All paid",
+          "perMonth": "/mo",
+          "caption": "No failed charges this cycle."
+        }
+      },
+      "quote": {
+        "body": "We stopped chasing payments after week three.",
+        "attribution": "Mike, Iron & Oak"
+      }
+    },
+    "capability": {
+      "eyebrow": "Act 4 · Capability",
+      "headline": "Four screens. One operating room for your gym.",
+      "panels": {
+        "roster": {
+          "eyebrow": "Roster",
+          "title": "Every member, every workout, every week.",
+          "copy": "A living grid of who walked in, who skipped, who is on a streak. Catch churn before it leaves."
+        },
+        "grow": {
+          "eyebrow": "Grow",
+          "title": "Print one poster. Members scan. They are in.",
+          "copy": "Generate a QR poster for the front door. Walk-ins self-onboard from their phone, no front-desk laptop required."
+        },
+        "receipt": {
+          "eyebrow": "Receipt",
+          "title": "Your gym's books. No spreadsheets.",
+          "copy": "Subscriptions, drop-ins, refunds. Totalled and reconciled by Friday. Paper receipt, pixel-perfect."
+        },
+        "pulse": {
+          "eyebrow": "Live pulse",
+          "title": "See lifts as they happen.",
+          "copy": "Members log sets from the floor. You see the room breathe: active counts, fresh PRs, the live current."
+        }
+      },
+      "mocks": {
+        "rosterLabel": "roster · 142 active",
+        "growLabel": "grow · poster preview",
+        "receiptLabel": "receipt · this month",
+        "pulseLabel": "pulse · live",
+        "posterDimensions": "Poster · 11 × 17 in",
+        "posterHeadline": "Join the gym.",
+        "posterBody": "Scan. Pick a plan. Walk in tomorrow.",
+        "posterUrl": "/join/oak-st",
+        "posterScans": "{count} scans",
+        "posterScansSuffix": "this week",
+        "printButton": "Print",
+        "rosterStreakSuffix": "w",
+        "receiptHeader": "IRONPATH GYM · OAK ST",
+        "receiptPeriod": "MAY 1, MAY 31",
+        "receiptLines": {
+          "standard": "{count} × Standard / mo",
+          "coached": "{count} × Coached / mo",
+          "dropIn": "{count} × Drop-in (week)",
+          "refunds": "Refunds"
+        },
+        "receiptNet": "NET",
+        "receiptDeposit": "auto-deposit · fri",
+        "pulseActiveNow": "Active now",
+        "pulseMinutesAgo": "{mins}m ago"
+      }
+    },
+    "pricing": {
+      "eyebrow": "Act 5 · Pricing",
+      "headline": "One price. Pick your size.",
+      "lede": "Every plan unlocks the full IronPath product. The only thing that changes is how many members you bring.",
+      "perMonth": "/mo",
+      "currencySymbol": "$",
+      "footnote": "All tiers include the 30-day trial. Switch tiers anytime.",
+      "footnoteLink": "See what is shipping next",
+      "tiers": {
+        "starter": {
+          "name": "Starter",
+          "cap": "Up to 50 members",
+          "tagline": "For the studio finding its rhythm.",
+          "features": {
+            "f1": "Member roster & attendance",
+            "f2": "Workout programming, 600+ movements",
+            "f3": "QR poster forge",
+            "f4": "Email support"
+          },
+          "cta": "Start free trial"
+        },
+        "growth": {
+          "name": "Growth",
+          "cap": "Up to 200 members",
+          "tagline": "For the gym hitting its stride.",
+          "features": {
+            "f1": "Everything in Starter",
+            "f2": "Subscription receipts in admin",
+            "f3": "Trial-end retention emails (automated)",
+            "f4": "Activation milestone celebrations"
+          },
+          "cta": "Start free trial"
+        },
+        "unlimited": {
+          "name": "Unlimited",
+          "cap": "No member cap",
+          "tagline": "For the gym that keeps growing.",
+          "features": {
+            "f1": "Everything in Growth",
+            "f2": "Custom branding (logo + accent color)",
+            "f3": "Founder onboarding call",
+            "f4": "Priority email support"
+          },
+          "cta": "Start free trial"
+        }
+      }
+    },
+    "denouement": {
+      "ariaLabel": "Closing",
+      "quietBeat": {
+        "line": "30 days free. Members never pay.",
+        "ariaLabel": "Free trial reassurance"
+      },
+      "crescendo": {
+        "ariaLabel": "Start free trial",
+        "cta": "Start free trial",
+        "trust": "30-day trial. No card. Set up in 5 minutes."
+      }
+    }
+  },
+  "leadForm": {
+    "ariaLabel": "Start your IronPath trial",
+    "fields": {
+      "gymName": {
+        "label": "Gym name",
+        "placeholder": "Iron Strength Co.",
+        "errors": {
+          "tooShort": "Your gym's name needs at least 2 characters.",
+          "tooLong": "That is a very long gym name. Keep it under 80 characters."
+        }
+      },
+      "ownerEmail": {
+        "label": "Your email",
+        "placeholder": "you@ironstrength.com",
+        "errors": {
+          "required": "We need your email to set up your account.",
+          "invalid": "That email looks incomplete. Try again."
+        },
+        "personalEmailNudge": "Tip: use your gym's email so onboarding goes to the right inbox."
+      },
+      "memberCount": {
+        "label": "Active members (roughly)",
+        "placeholder": "80",
+        "errors": {
+          "type": "Member count needs to be a number.",
+          "integer": "Round to a whole number.",
+          "min": "You need at least 1 member to get started.",
+          "max": "For 100k+ members, get in touch with sales directly."
+        }
+      }
+    },
+    "submit": {
+      "idle": "Start my 30-day trial",
+      "submitting": "Starting your trial...",
+      "trust": "No credit card. Set up in 5 minutes. Cancel anytime.",
+      "genericError": "Something went wrong on our end. Try again. If it keeps failing, email hello@ironpath.health."
+    }
+  },
+  "common": {
+    "brand": "IronPath",
+    "nav": {
+      "pricing": "Pricing",
+      "blog": "Blog",
+      "for_gyms": "For gyms",
+      "roadmap": "Roadmap",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "start_trial_cta": "Start trial",
+      "start_free_trial": "Start free trial",
+      "see_pricing": "See pricing",
+      "all_posts": "All posts",
+      "back_arrow_aria": "Back"
+    },
+    "footer": {
+      "copyright": "© {year} IronPath, Inc.",
+      "copyright_short": "© {year} IronPath"
+    }
+  },
+  "pricing": {
+    "page_title": "Pricing",
+    "h1": "Pricing that scales with you.",
+    "lede_a": "All tiers include the ",
+    "lede_b": "30-day free trial",
+    "lede_c": ". No card up front. Cancel from the billing page in two clicks.",
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "tagline": "Everything you need to run a small gym without spreadsheets.",
+        "cap": "50 members",
+        "features": [
+          "Up to 50 active members",
+          "Member app (iOS + Android)",
+          "Workout builder, 600+ movements",
+          "QR poster for the gym wall",
+          "Email + push notifications",
+          "Email support, 1 business day"
+        ]
+      },
+      "growth": {
+        "name": "Growth",
+        "tagline": "For gyms past the first plateau.",
+        "cap": "200 members",
+        "features": [
+          "Up to 200 active members",
+          "Everything in Starter",
+          "Trial-end retention emails (automated)",
+          "Activation milestone celebrations",
+          "Subscription receipts in admin",
+          "Email support, same-day"
+        ]
+      },
+      "unlimited": {
+        "name": "Unlimited",
+        "tagline": "For the gym that keeps growing.",
+        "cap": "No member cap",
+        "features": [
+          "Unlimited active members",
+          "Everything in Growth",
+          "Custom branding (logo + accent color)",
+          "Founder onboarding call",
+          "Direct line to founder for product feedback",
+          "Priority email support"
+        ]
+      }
+    },
+    "per_month": "/mo",
+    "compare": {
+      "heading": "Feature comparison",
+      "col_feature": "Feature",
+      "col_starter": "Starter",
+      "col_growth": "Growth",
+      "col_unlimited": "Unlimited",
+      "row_yes": "Yes",
+      "row_dash": "-",
+      "rows": [
+        {
+          "label": "Member cap",
+          "starter": "50",
+          "growth": "200",
+          "unlimited": "Unlimited"
+        },
+        {
+          "label": "Member app (iOS + Android)",
+          "starter": "Yes",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Workout builder",
+          "starter": "Yes",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "QR poster forge",
+          "starter": "Yes",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Push + email notifications",
+          "starter": "Yes",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Trial-end retention emails",
+          "starter": "-",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Activation milestones",
+          "starter": "-",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Subscription receipts",
+          "starter": "-",
+          "growth": "Yes",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Custom branding (logo + color)",
+          "starter": "-",
+          "growth": "-",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Founder onboarding call",
+          "starter": "-",
+          "growth": "-",
+          "unlimited": "Yes"
+        },
+        {
+          "label": "Support",
+          "starter": "Email · 1 day",
+          "growth": "Email · same day",
+          "unlimited": "Priority email"
+        }
+      ]
+    },
+    "faq": {
+      "heading": "Frequently asked",
+      "items": [
+        {
+          "q": "What happens after the 30-day trial?",
+          "a_html": "On day 30 we email you with a one-click upgrade link. If you do nothing, the gym is paused (members can still log in to read their history but new check-ins and workouts are disabled). We never auto-bill a card you haven't explicitly entered."
+        },
+        {
+          "q": "Can I switch tiers anytime?",
+          "a_html": "Yes. Upgrades take effect immediately and we prorate the difference. Downgrades take effect at the next billing cycle. There is never a cancellation fee."
+        },
+        {
+          "q": "Do you charge per gym member?",
+          "a_html": "No. We deliberately do not charge per member. A gym at 180 members does not cost meaningfully more to serve than a gym at 80. The cost to serve you is the cost to serve you. Pricing scales with <accent>tier</accent>, not headcount."
+        },
+        {
+          "q": "How does billing work today?",
+          "a_html": "Right now we invoice you directly via Stripe each month. Self-serve card billing on the website is on the <link>roadmap</link> for late 2026. Until then, our finance flow is one email per month with a paid-in-full receipt."
+        },
+        {
+          "q": "Can I import members from old gym software / our spreadsheet?",
+          "a_html": "Not self-serve yet, that's a Q3 2026 build. In the meantime, send us your CSV (or old gym software export) and we'll do the import for you on a screen-share call. Usually under an hour."
+        },
+        {
+          "q": "What's on the roadmap that I'd care about?",
+          "a_html": "Class scheduling + waitlists, churn dashboard, multi-location, and a member-import wizard are all in the next two quarters. The full list with target dates is on the <link>roadmap</link>."
+        }
+      ]
+    },
+    "founder": {
+      "eyebrow": "Talk to the founder before signing up",
+      "name": "Ahmed, founder, IronPath",
+      "body": "After a year of in-person walkthroughs at independent gyms across Cairo, If you're weighing IronPath against your spreadsheets and WhatsApp groups, grab 15 minutes, I'll tell you honestly whether we're the right call.",
+      "cta_cal": "Book 15 min on Cal.com",
+      "cta_linkedin": "LinkedIn",
+      "section_aria": "Talk to the founder",
+      "avatar_letter": "A"
+    }
+  },
+  "blog": {
+    "page_title": "Blog",
+    "page_description": "Field notes from IronPath, working hypotheses about gym software, sharpened by the gym owners who use it.",
+    "eyebrow": "The IronPath blog",
+    "h1": "Field notes.",
+    "lede_a": "Working hypotheses, sharpened by gym owners. We publish what we've learned from sitting in dozens of gyms over the last year, why ",
+    "lede_b": "old gym software fails small studios",
+    "lede_c": ", how QR-poster signups actually convert, and what a 30-day trial has to look like to be honest.",
+    "empty": "No posts yet, check back soon.",
+    "min_read": "{minutes} min read",
+    "read_link": "Read",
+    "read_arrow": "→",
+    "section_aria": "Recent posts"
+  },
+  "post": {
+    "all_posts": "All posts",
+    "back_arrow": "←",
+    "footer_h2_a": "Liked this? Start your ",
+    "footer_h2_b": "30-day trial",
+    "footer_h2_c": ".",
+    "footer_body": "No card up front. Import your members from any CSV in the first 10 minutes. Cancel from the billing page in two clicks.",
+    "not_found_title": "Post not found"
+  },
+  "for_gyms": {
+    "page_title": "For independent gym owners",
+    "page_description": "Why IronPath is built for the operator running 80-300 members on coffee and willpower. Flat pricing, a member app that actually opens, and a tablet UX that respects your front-desk staff.",
+    "eyebrow": "For independent gym owners",
+    "h1": "Built for the gym you actually run.",
+    "lede_a": "Not the chain you compete with. Not the franchise you used to work for. The 80",
+    "lede_dash": "-",
+    "lede_b": "300-member gym you got into business to run, currently operating on ",
+    "lede_accent": "coffee and willpower",
+    "lede_c": ".",
+    "s1_h2": "Software that gets out of the way.",
+    "s1_p1": "The dominant gym software on the market today was built for chain operators with 14 staff and a regional manager. It assumes you have someone whose job is to keep the software working. You don't. You have you, your two coaches, and a front-desk person who quit last month and hasn't been replaced.",
+    "s1_p2_a": "IronPath is the opposite of that. The tablet UI at the front desk is three taps to check someone in. The owner app on your phone shows you who's drifting and who you should call this week, not a dashboard with 40 widgets, just ",
+    "s1_p2_accent": "five names",
+    "s1_p2_b": " and a reason. The member app opens to today's workout, not a marketing carousel.",
+    "s2_h2": "Pricing that doesn't punish you for growing.",
+    "s2_p1_a": "Per-member pricing is a tax on success. The plan that works at 80 members is the wrong plan at 180, and crossing the threshold doubles your bill in a month you weren't expecting it. We refuse to play that game. IronPath is ",
+    "s2_p1_accent": "flat",
+    "s2_p1_b": ": $49 / $99 / $199 a month for tiers that scale with feature need, not headcount. Go from 80 to 800 members on the entry tier; the bill is still $49.",
+    "s2_p2": "We also don't take a cut of your member billing. Stripe charges its standard processing fee directly to you. We are a software vendor, not a payment middleman dressed up as one.",
+    "s3_h2": "A member app you're proud of.",
+    "s3_p1_a": "Your members' phones are the most valuable real estate in your business. Most gym apps treat that real estate like a billboard, push notifications about challenges, referral programs, dopamine drips. IronPath's member app opens to today's workout. That's it. They tap, they log, they leave. Retention isn't built on engagement metrics. It's built on ",
+    "s3_p1_accent": "actually getting workouts in",
+    "s3_p1_b": ".",
+    "s3_p2": "And the app is yours. Custom branding on Growth and Unlimited puts your logo, color, and gym name in front of your members every time they open it, not ours.",
+    "s4_h2": "Predict churn before it happens.",
+    "s4_p1_a": "The single highest-leverage thing the owner app does is tell you who's about to cancel before they know they're about to cancel. Members drift in a predictable pattern: weekly attendance drops 30%, then 60%, then they ghost. The IronPath churn dashboard surfaces those drifters at week one, not week four. A two-minute check-in call from you keeps roughly half of them on the books. We've watched gyms recover ",
+    "s4_p1_accent": "$1,400-$3,000",
+    "s4_p1_b": " a month doing exactly that.",
+    "s5_h2": "Try it for 30 days. No card.",
+    "s5_p1": "Import your members from any CSV in the first 10 minutes. Run your gym on it for a month. If by day 30 it hasn't made your week measurably easier, the trial just ends, we never auto-bill a card you didn't enter."
+  },
+  "roadmap": {
+    "page_title": "Roadmap",
+    "page_description": "What's shipped, what's next, and rough quarterly targets for everything in between. Honest by default, no vapor.",
+    "hero_eyebrow": "ROADMAP",
+    "hero_h1": "What's shipped, what's next.",
+    "hero_lede": "Our pricing page only lists what's actually shipped today. Everything else lives here, with rough quarterly targets. Targets slip; we update this page when they do.",
+    "shipped_label": "SHIPPED · LIVE TODAY",
+    "shipped_count": "{count} features",
+    "shipped_h2": "Live in production right now.",
+    "coming_label": "COMING UP",
+    "coming_h2": "Targets, not promises.",
+    "coming_lede": "Quarterly buckets reflect priority order. If you're a customer and a specific item moves you, tell us, we re-order based on demand from paying gyms.",
+    "items_count": "{count} items",
+    "maybe_label": "MAYBE LATER · NO COMMITMENT",
+    "maybe_h2": "Things we've thought about.",
+    "maybe_lede": "On the wall, but not in any quarter. We build them when paying customers ask, or we don't build them at all.",
+    "cta_h2": "Want to influence priority?",
+    "cta_body": "Become a paying customer. We re-order this list based on what real gyms need. Start with what we have today, what we ship next is shaped by you.",
+    "cta_link": "See pricing",
+    "last_updated": "Last updated {date}",
+    "shipped": [
+      {
+        "title": "Member roster + attendance",
+        "detail": "Active members, last-active timestamps, manual check-in."
+      },
+      {
+        "title": "Workout builder, 600+ movements",
+        "detail": "Per-exercise programming, set/rep schemes, gym-template routines."
+      },
+      {
+        "title": "Member app (iOS + Android)",
+        "detail": "Workouts, attendance, profile, notifications, Expo + RN."
+      },
+      {
+        "title": "QR poster forge",
+        "detail": "Print one A3/A4 poster, members scan, they activate. The single highest-leverage onboarding event."
+      },
+      {
+        "title": "Trial-end retention emails (automated)",
+        "detail": "Day 21/25/28/30/31/37 sequence, brand-templated, gated by sent-log idempotency."
+      },
+      {
+        "title": "Activation milestone celebrations",
+        "detail": "In-app toasts when a gym hits 'first announcement' or '5 workouts logged'."
+      },
+      {
+        "title": "Cancellation save flow",
+        "detail": "Reason picker → contextual save offer (pause / month-free / downgrade) → confirmation. With audit trail."
+      },
+      {
+        "title": "Subscription receipts in admin",
+        "detail": "Per-month receipts with mark-paid + extend-trial controls (super-admin operated for now)."
+      },
+      {
+        "title": "Custom branding (logo + accent color)",
+        "detail": "Per-gym brand color and logo applied across admin and member-facing surfaces."
+      },
+      {
+        "title": "Founder onboarding call",
+        "detail": "For Unlimited tier, 30-min walkthrough with Ahmed."
+      }
+    ],
+    "quarters": [
+      {
+        "label": "Q3 2026 · Jul-Sep",
+        "blurb": "Closing the most-asked gaps from the pricing page.",
+        "items": [
+          {
+            "title": "Bulk member import wizard",
+            "detail": "CSV + guided old gym software export mapping. Self-serve."
+          },
+          {
+            "title": "Audit log export (CSV / JSON)",
+            "detail": "The audit log already exists; this is the export endpoint + filters."
+          },
+          {
+            "title": "Member retention emails (drip + win-back)",
+            "detail": "Extend the trial-end sequence into post-conversion lifecycle."
+          }
+        ]
+      },
+      {
+        "label": "Q4 2026 · Oct-Dec",
+        "blurb": "Operational depth, pricing self-serve, scheduling, finer roles.",
+        "items": [
+          {
+            "title": "Stripe billing self-serve",
+            "detail": "Today billing is manual via Stripe Invoices. This is the website checkout flow."
+          },
+          {
+            "title": "Front-desk check-in flow",
+            "detail": "Manual + QR check-in screen for staff at the door. Today only QR-poster activation is automated."
+          },
+          {
+            "title": "Class scheduling + waitlists",
+            "detail": "Recurring class blocks, member booking, waitlist promotion. Starts here, finishes Q1 2027."
+          },
+          {
+            "title": "Custom branding, app name + advanced options",
+            "detail": "Beyond logo + color: app name on member device, gym-specific welcome video, custom domain on member portal."
+          },
+          {
+            "title": "Role-based permissions (4 roles)",
+            "detail": "Owner / manager / coach / front-desk. Today only owner + coach + member exist."
+          },
+          {
+            "title": "Read + write API access",
+            "detail": "Formalize the existing backend API as a public surface with API keys, rate limits, and docs."
+          }
+        ]
+      },
+      {
+        "label": "Q1 2027 · Jan-Mar",
+        "blurb": "Insights + integrations.",
+        "items": [
+          {
+            "title": "Class scheduling, finish + polish",
+            "detail": "Calendar UI for owners, member-side booking, no-show tracking."
+          },
+          {
+            "title": "Churn risk dashboard",
+            "detail": "Per-member churn signal scoring + a weekly digest email to owners."
+          },
+          {
+            "title": "Webhook events",
+            "detail": "member.created, attendance.logged, payment.succeeded, etc., for Zapier-style integrations."
+          },
+          {
+            "title": "Member-app deep customization",
+            "detail": "Per-gym splash screens, push-notification voice, in-app announcement layout."
+          }
+        ]
+      },
+      {
+        "label": "Q2 2027 · Apr-Jun",
+        "blurb": "Scale tier, multi-location + the operator stack.",
+        "items": [
+          {
+            "title": "Multi-location support",
+            "detail": "One owner, multiple locations under one account. Per-location MRR, attendance, staff."
+          },
+          {
+            "title": "Owner mobile companion app",
+            "detail": "Today the admin is web-only. This is the iPhone-on-the-floor view for owners."
+          },
+          {
+            "title": "SSO via Google Workspace",
+            "detail": "For larger gyms with staff already on Google. SAML follows if asked."
+          },
+          {
+            "title": "Advanced analytics + cohort retention",
+            "detail": "Beyond MRR + active count: retention triangles, cohort heatmaps, LTV curves."
+          }
+        ]
+      }
+    ],
+    "maybe_later": [
+      {
+        "title": "AI-powered programming",
+        "detail": "Routine generation from goals, exists in the spec, deprioritized until the rest of the platform is bulletproof."
+      },
+      {
+        "title": "Marketplace integrations (Whoop, Garmin, Apple Watch)",
+        "detail": "Health data ingestion. Demand-led, we build it when 5+ paying gyms ask."
+      },
+      {
+        "title": "In-app live chat between members + coaches",
+        "detail": "Tempting, but we'd rather members message via WhatsApp than build a chat product."
+      },
+      {
+        "title": "Public marketplace / community feed across gyms",
+        "detail": "Anti-feature per the platform plan, dilutes B2B positioning."
+      }
+    ]
+  },
+  "privacy": {
+    "page_title": "Privacy Policy",
+    "page_description": "How IronPath collects, uses, and protects personal data for gym owners and their members. GDPR + CCPA aligned.",
+    "h1": "Privacy Policy",
+    "last_updated_label": "Last updated {date}",
+    "last_updated_date": "May 1, 2026",
+    "intro_p1_html": "IronPath, Inc. (\"IronPath,\" \"we,\" or \"us\") operates software that helps independent gym owners run their businesses and helps their members track workouts. This Privacy Policy describes what personal data we collect, why we collect it, who we share it with, and the rights you have to access, correct, export, and delete it.",
+    "intro_p2": "By using IronPath you agree to the practices described here. If you do not agree, please do not use the service. We will tell you before we make material changes and we will keep an archive of previous versions on request.",
+    "h2_controller": "1. Who is the controller",
+    "p_controller": "For data submitted by a gym owner about their gym (lead form, billing details, business address), IronPath is the data controller under GDPR. For data about members of a gym (name, workout history, check-in records), the gym is the controller and IronPath acts as a data processor on the gym's behalf under a Data Processing Addendum that is part of the Terms of Service.",
+    "h2_collect": "2. What we collect",
+    "li_account_label": "Account data:",
+    "li_account_body": "name, email address, gym name, hashed password, optional phone number.",
+    "li_billing_label": "Billing data:",
+    "li_billing_body": "last four digits of your card, billing address, country. Full card numbers are handled directly by Stripe and never reach our servers.",
+    "li_member_label": "Member data (processed for the gym):",
+    "li_member_body": "name, email, workout logs, attendance, optional body metrics if the gym enables them.",
+    "li_usage_label": "Usage data:",
+    "li_usage_body": "pages visited, features used, device type, IP address, approximate location derived from IP.",
+    "li_support_label": "Support data:",
+    "li_support_body": "messages you send to support, attachments, screenshots you upload.",
+    "h2_use": "3. How we use it",
+    "p_use": "We use personal data to run the service, bill for it, communicate with you about it, prevent fraud and abuse, comply with legal obligations, and improve the product. We do not sell personal data, we do not rent contact lists, and we do not run third-party advertising on the service.",
+    "h2_share": "4. Who we share it with",
+    "p_share": "We share data with subprocessors who need it to deliver the service: a database host (Supabase), a payment processor (Stripe), an email-delivery provider (Resend), a hosting platform (Vercel), and an error-monitoring service (Sentry). Each is bound by a data processing agreement and we maintain a current list at ironpath.health/subprocessors.",
+    "h2_cookies": "5. Cookies",
+    "p_cookies": "We use a small number of strictly necessary cookies to keep you logged in and to remember your preferences. We use first-party analytics that does not set cross-site tracking cookies. We do not use marketing or advertising cookies.",
+    "h2_gdpr": "6. Your rights (GDPR)",
+    "p_gdpr": "If you are in the European Economic Area, the UK, or Switzerland, you have the right to access the personal data we hold about you, correct it if wrong, ask us to delete it, restrict or object to processing, port it to another provider, and withdraw consent at any time. To exercise any of these rights email privacy@ironpath.health and we will respond within 30 days.",
+    "h2_ccpa": "7. Your rights (CCPA / CPRA)",
+    "p_ccpa": "California residents have the right to know what personal information we collect, the right to delete it, the right to correct it, the right to opt out of any sale or sharing (we do neither), and the right not to be discriminated against for exercising those rights. Submit a verifiable request to privacy@ironpath.health.",
+    "h2_retention": "8. Data retention",
+    "p_retention": "Active account data is retained for as long as the account is active. After cancellation we retain a frozen copy for 90 days so you can change your mind. After 90 days we delete it from production systems and from backups within a further 35 days, except where we are required to retain billing records under tax law (typically 7 years).",
+    "h2_security": "9. Security",
+    "p_security": "Data is encrypted in transit (TLS 1.2+) and at rest (AES-256). Production access is restricted to a small number of engineers and every action is logged. We run an annual penetration test and publish a summary on request.",
+    "h2_intl": "10. International transfers",
+    "p_intl": "Our primary data center is in the United States. Where we transfer personal data out of the EEA, UK, or Switzerland, we rely on the European Commission's Standard Contractual Clauses and equivalent UK and Swiss instruments.",
+    "h2_children": "11. Children",
+    "p_children": "IronPath is not directed to children under 13. We do not knowingly collect personal data from children under 13. If you believe a child has provided us with personal data, please contact us and we will delete it.",
+    "h2_contact": "12. Contact",
+    "p_contact_a": "Email ",
+    "p_contact_link_label": "privacy@ironpath.health",
+    "p_contact_b": " for any privacy question or to exercise any right described above. For data protection inquiries from the EEA, you may also contact our EU representative at the address listed in our Subprocessors page."
+  },
+  "terms": {
+    "page_title": "Terms of Service",
+    "page_description": "The Terms of Service that govern your use of IronPath, including the trial, billing, acceptable use, and termination.",
+    "h1": "Terms of Service",
+    "last_updated_label": "Last updated {date}",
+    "last_updated_date": "May 1, 2026",
+    "intro": "These Terms of Service (\"Terms\") are a contract between IronPath, Inc. (\"IronPath,\" \"we,\" \"us\") and the customer that creates an account (\"Customer,\" \"you\"). By creating an account or using the service, you agree to these Terms. If you are entering into these Terms on behalf of a business, you represent that you have authority to bind that business.",
+    "h2_service": "1. The service",
+    "p_service": "IronPath provides software-as-a-service tools for independent gym operators to manage members, schedule classes, publish workouts, and accept payments. The service is delivered over the public internet and accessed through a web console at console.ironpath.health and through native mobile apps published under your gym's brand.",
+    "h2_trial": "2. Trial",
+    "p_trial": "New accounts may use the service for a 30-day trial without paying and without entering a payment card. The trial automatically ends after 30 days. If you have not added a payment card by then, your workspace is paused: members cannot check in, but your data is preserved for 90 days so you can resume by adding a card. After 90 days the workspace and its data are permanently deleted.",
+    "h2_fees": "3. Fees and billing",
+    "p_fees": "Subscription fees are charged monthly in advance through Stripe. Pricing is shown on the public pricing page at the time you subscribe and is fixed for the duration of your billing cycle. Fees are non-refundable except where required by law. We may change pricing for new billing cycles with at least 30 days' notice; if you do not accept the change, you may cancel before it takes effect. Sales tax is added where required.",
+    "h2_data": "4. Your data",
+    "p_data": "You own all data you submit to the service, including member records, workout content, and business records (\"Customer Data\"). You grant IronPath a limited license to host, process, transmit, and display Customer Data solely to provide the service. We will not access Customer Data except to deliver, secure, or troubleshoot the service, or as required by law. You may export Customer Data at any time as CSV or JSON.",
+    "h2_aup": "5. Acceptable use",
+    "p_aup": "You agree not to use the service to send spam, distribute malware, infringe intellectual property rights, harass any person, attempt to access another customer's data, reverse-engineer or scrape the service, or build a competing product using IronPath as the development platform. We may suspend or terminate accounts that violate this section after notice except where the violation poses an immediate threat.",
+    "h2_sla": "6. Service level",
+    "p_sla": "We target 99.9% monthly uptime, measured by external monitoring, excluding scheduled maintenance announced at least 48 hours in advance. If we miss the target in any month we will credit the following month's invoice on request, prorated to the downtime. The status page is at status.ironpath.health.",
+    "h2_termination": "7. Termination",
+    "p_termination": "You may cancel at any time from the billing page. Cancellation takes effect at the end of the current billing cycle and you will not be charged again. We may terminate for material breach on 30 days' notice if the breach is not cured, or immediately for non-payment after 14 days, illegality, or repeated violations of the Acceptable Use section. On termination, Customer Data is preserved for 90 days for export and then deleted from production systems and backups in accordance with the Privacy Policy.",
+    "h2_warranties": "8. Warranties and disclaimers",
+    "p_warranties": "The service is provided \"as is\" and \"as available.\" We disclaim all warranties to the maximum extent permitted by law, including the implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not warrant that the service will be uninterrupted or error-free.",
+    "h2_liability": "9. Limitation of liability",
+    "p_liability": "To the maximum extent permitted by law, IronPath's total liability for any claim arising out of these Terms is limited to the fees you paid in the twelve months preceding the event giving rise to the claim. We are not liable for indirect, incidental, special, consequential, or punitive damages, or for lost profits, revenue, goodwill, or data, even if advised of the possibility.",
+    "h2_indemnify": "10. Indemnification",
+    "p_indemnify": "You will defend and indemnify IronPath against any third-party claim arising from Customer Data, your use of the service in violation of these Terms, or your violation of applicable law.",
+    "h2_law": "11. Governing law",
+    "p_law": "These Terms are governed by the laws of the State of Delaware, without regard to its conflict-of-law principles. The exclusive venue for any dispute is the state and federal courts located in Wilmington, Delaware, and each party consents to that jurisdiction.",
+    "h2_changes": "12. Changes",
+    "p_changes": "We may update these Terms from time to time. If we make material changes we will give at least 30 days' notice by email and in-product banner. Continued use of the service after the effective date constitutes acceptance.",
+    "h2_contact": "13. Contact",
+    "p_contact_a": "Questions about these Terms can be sent to ",
+    "p_contact_link_label": "legal@ironpath.health",
+    "p_contact_b": "."
+  }
+}

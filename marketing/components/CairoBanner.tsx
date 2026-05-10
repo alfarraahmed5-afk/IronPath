@@ -1,6 +1,6 @@
 'use client';
 
-// CairoBanner — high-signal nudge for Egyptian visitors.
+// CairoBanner -- high-signal nudge for Egyptian visitors.
 //
 // Reads the `geo-country` cookie set by middleware. If the visitor is in
 // Egypt AND hasn't dismissed the banner this session, render a thin top
@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { GEO_COUNTRY_COOKIE } from '@/lib/ab';
 
 const DISMISS_KEY = 'cairo-banner-dismissed';
@@ -28,11 +29,14 @@ function readCookie(name: string): string | null {
 
 export function CairoBanner() {
   const pathname = usePathname();
+  const t = useTranslations('chrome.cairoBanner');
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Never on /eg itself — they're already where the banner would send them.
-    if (pathname?.startsWith('/eg')) {
+    // Never on /eg or /ar itself -- they're already where the banner would
+    // send them. Cairo wedge page (/eg) is the explicit destination, and
+    // /ar is the Arabic locale a CAI visitor would also reach.
+    if (pathname?.startsWith('/eg') || pathname?.startsWith('/ar')) {
       setShow(false);
       return;
     }
@@ -54,23 +58,21 @@ export function CairoBanner() {
   return (
     <div
       role="region"
-      aria-label="Cairo visitor banner"
+      aria-label={t('ariaLabel')}
       className="relative z-30 bg-brand-500 text-white px-4 py-2.5 text-sm flex items-center justify-center gap-3 sm:gap-4 flex-wrap"
     >
-      <span className="font-medium">
-        We&rsquo;re in Cairo. See gym pricing in EGP and book a free in-person demo.
-      </span>
+      <span className="font-medium">{t('message')}</span>
       <Link
         href="/eg"
         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/15 hover:bg-white/25 transition-colors font-medium"
       >
-        <span>For Cairo gyms</span>
-        <span aria-hidden>→</span>
+        <span>{t('cta')}</span>
+        <span aria-hidden className="rtl:inline-block rtl:-scale-x-100">→</span>
       </Link>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss Cairo banner"
+        aria-label={t('dismiss')}
         className="ml-1 inline-flex items-center justify-center w-7 h-7 rounded hover:bg-white/15 transition-colors"
       >
         <span aria-hidden className="text-base leading-none">×</span>

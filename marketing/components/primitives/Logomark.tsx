@@ -1,10 +1,10 @@
-// Logomark — IronPath wordmark.
+// Logomark -- IronPath wordmark.
 //
 // Two variants:
-//   dark  (default) — white "IronPath" wordmark on dark surfaces, with
+//   dark  (default) -- white "IronPath" wordmark on dark surfaces, with
 //                     a crimson dot terminating the "h" baseline. Use
 //                     this on the marketing dark shell.
-//   light          — black "IronPath" wordmark on light surfaces, same
+//   light          -- black "IronPath" wordmark on light surfaces, same
 //                    crimson dot. Use on legal pages, light email
 //                    templates, or anywhere on white.
 //
@@ -14,7 +14,7 @@
 //
 // The wordmark is set in inline SVG <text> using the display font
 // stack (var(--font-mona-sans), Mona Sans, falling through to Inter
-// and system sans). This keeps a single source of truth — when the
+// and system sans). This keeps a single source of truth -- when the
 // font swap finishes loading the logomark visually upgrades alongside
 // the rest of the page.
 
@@ -38,7 +38,7 @@ export function Logomark({
 }: LogomarkProps) {
   const wordmarkColor = variant === 'dark' ? '#FFFFFF' : '#0A0A0B';
 
-  // viewBox 0 0 180 40 — 4.5:1 aspect. Text baseline ~y=29.
+  // viewBox 0 0 180 40 -- 4.5:1 aspect. Text baseline ~y=29.
   const aspect = 180 / 40;
   const width = Math.round(size * aspect);
 
@@ -62,13 +62,13 @@ export function Logomark({
       className={className}
     >
       <title>{title}</title>
-      {/* The wordmark itself — uses currentColor-style fill via explicit
+      {/* The wordmark itself -- uses currentColor-style fill via explicit
           variant token so the SVG renders correctly even when extracted
           (e.g. as an OG image / open-graph asset). */}
       <text x="0" y="29" fill={wordmarkColor} style={textStyle}>
         IronPath
       </text>
-      {/* Crimson dot — the brand seam in punctuation form. Sits just
+      {/* Crimson dot -- the brand seam in punctuation form. Sits just
           past the "h" baseline. Coords are tuned for Mona Sans 700 at
           fontSize 28 and roughly survive a fallback to Inter. */}
       <circle cx="156" cy="30" r="3.5" fill={BRAND_500} />

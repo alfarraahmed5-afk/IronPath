@@ -1,6 +1,6 @@
 'use client';
 
-// EmberCanvasReal — the actual OGL ember-particle implementation.
+// EmberCanvasReal -- the actual OGL ember-particle implementation.
 //
 // Loaded only via dynamic import from `@/lib/canvas-bootstrap`, never imported
 // statically anywhere else. This keeps the OGL dependency (~4 KB gz) and the
@@ -15,7 +15,7 @@
 //   - DPR clamped per tier (B = 0.5).
 //   - First 60-frame fps watchdog: avg <30 fps → halve count once, then
 //     unmount on a second failure.
-//   - `gl.SRC_ALPHA, gl.ONE` additive blending — no depth writes needed.
+//   - `gl.SRC_ALPHA, gl.ONE` additive blending -- no depth writes needed.
 //   - Cleanup releases GL buffers + program before discarding the canvas.
 
 import { useEffect, useRef } from 'react';
@@ -40,7 +40,7 @@ function budgetFor(tier: DeviceTier): TierBudget {
     const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
     return { count: 500, dpr };
   }
-  // Tier B — half DPR, ~30% the particle count.
+  // Tier B -- half DPR, ~30% the particle count.
   return { count: 150, dpr: 0.5 };
 }
 
@@ -96,7 +96,7 @@ export function EmberCanvasReal({ className = '', visible = false, tier }: Ember
     canvasRef.current = canvas;
     wrap.appendChild(canvas);
 
-    // Additive blending — bright ember on dark poster, no depth contention.
+    // Additive blending -- bright ember on dark poster, no depth contention.
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.disable(gl.DEPTH_TEST);
@@ -171,7 +171,7 @@ export function EmberCanvasReal({ className = '', visible = false, tier }: Ember
       const tSec = (now - t0) / 1000;
       program.uniforms.uTime.value = tSec;
 
-      // Manual draw — no scene graph, no camera matrix overhead.
+      // Manual draw -- no scene graph, no camera matrix overhead.
       mesh.draw();
 
       // fps sampling for the first FRAME_SAMPLE frames after mount.
@@ -185,10 +185,10 @@ export function EmberCanvasReal({ className = '', visible = false, tier }: Ember
             if (!watchdogTriggered) {
               watchdogTriggered = true;
               halveBudget();
-              // Reset the sampler — give the trimmed budget a chance.
+              // Reset the sampler -- give the trimmed budget a chance.
               sampledFrames = 0;
             } else {
-              // Second failure — bail entirely. Hide the canvas; the AVIF
+              // Second failure -- bail entirely. Hide the canvas; the AVIF
               // poster underneath is our LCP and looks fine on its own.
               if (canvasRef.current) canvasRef.current.style.opacity = '0';
               cancelAnimationFrame(rafId);
@@ -210,7 +210,7 @@ export function EmberCanvasReal({ className = '', visible = false, tier }: Ember
 
       // Drop GL resources before yanking the canvas. OGL doesn't expose a
       // catch-all dispose, but losing context releases everything attached
-      // to it — and removing the canvas from the DOM is the trigger.
+      // to it -- and removing the canvas from the DOM is the trigger.
       try {
         const loseExt = gl.getExtension('WEBGL_lose_context');
         loseExt?.loseContext();
@@ -226,7 +226,7 @@ export function EmberCanvasReal({ className = '', visible = false, tier }: Ember
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    // Direct DOM, no Framer — this layer is critical-path-adjacent and we
+    // Direct DOM, no Framer -- this layer is critical-path-adjacent and we
     // don't want React state churn on every frame.
     c.style.opacity = visible ? '1' : '0';
   }, [visible]);

@@ -1,6 +1,6 @@
 'use client';
 
-// Crescendo CTA — the page's only full-bleed CTA. Single near-black
+// Crescendo CTA -- the page's only full-bleed CTA. Single near-black
 // section, centered crimson button with a 3s breathing radial pulse,
 // trust line below.
 //
@@ -9,11 +9,12 @@
 // why we do it this way (cross-origin, no real Framer FLIP possible).
 //
 // This component shares `layoutId="trialCta"` with α1's Cold Open hero
-// CTA — within the marketing route, scrolling between them produces a
+// CTA -- within the marketing route, scrolling between them produces a
 // real Framer FLIP morph using `springModal` (380/32, ~480ms).
 
 import { m, useAnimationControls } from 'framer-motion';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { springModal } from '@/lib/motion';
 import { useReducedMotion } from '@/lib/preferences';
 import {
@@ -25,6 +26,7 @@ import {
 
 export function CrescendoCTA() {
   const reduced = useReducedMotion();
+  const t = useTranslations('scenes.denouement.crescendo');
   const controls = useAnimationControls();
   const [navigating, setNavigating] = useState(false);
 
@@ -55,7 +57,7 @@ export function CrescendoCTA() {
   return (
     <section
       className="relative w-full min-h-[100svh] grid place-items-center px-4 bg-ink-950 overflow-hidden"
-      aria-label="Start free trial"
+      aria-label={t('ariaLabel')}
     >
       {/* Near-black backdrop with a faint radial vignette so the crimson
           button reads as the only emitter of light in the frame. */}
@@ -69,7 +71,7 @@ export function CrescendoCTA() {
       />
 
       <div className="relative flex flex-col items-center gap-6">
-        {/* The CTA itself — `layoutId` shares with α1's Cold Open button.
+        {/* The CTA itself -- `layoutId` shares with α1's Cold Open button.
             Wrapped in a positioning shell so the scale-out doesn't shove
             the trust line around. */}
         <div className="relative w-[480px] max-w-[calc(100vw-2rem)] h-16">
@@ -102,14 +104,14 @@ export function CrescendoCTA() {
               backgroundPosition: 'center',
               animationDuration: reduced ? undefined : '3s',
             }}
-            aria-label="Start free trial"
+            aria-label={t('ariaLabel')}
           >
-            Start free trial
+            <span data-font-display>{t('cta')}</span>
           </m.button>
         </div>
 
         <p className="text-xs text-ink-400 text-center max-w-md">
-          30-day trial. No card. Set up in 5 minutes.
+          {t('trust')}
         </p>
       </div>
     </section>

@@ -7,7 +7,7 @@
 //   - Headline is the highest-leverage above-the-fold element.
 //   - Three variants is the council-recommended split for first-pass
 //     copy testing without splitting traffic too thin.
-//   - Pricing/CTA labels are NOT part of this experiment — keep one
+//   - Pricing/CTA labels are NOT part of this experiment -- keep one
 //     surface variable so the readout is unambiguous.
 
 export type ABVariant = 'A' | 'B' | 'C';
@@ -26,7 +26,7 @@ export const AB_COOKIE = 'ab-pricing';
 /** Cookie name used by middleware to surface visitor city for personalization. */
 export const GEO_COOKIE = 'geo-city';
 
-/** ISO country code (EG, US, GB, etc.) — used to surface the Cairo banner
+/** ISO country code (EG, US, GB, etc.) -- used to surface the Cairo banner
  *  to Egyptian visitors and to fork the lead-form routing. */
 export const GEO_COUNTRY_COOKIE = 'geo-country';
 
@@ -46,7 +46,7 @@ export function isABVariant(value: unknown): value is ABVariant {
 }
 
 /**
- * Random uniform pick. Used by middleware (edge runtime — Math.random is
+ * Random uniform pick. Used by middleware (edge runtime -- Math.random is
  * available; we don't need crypto-grade entropy for variant assignment).
  */
 export function pickVariant(): ABVariant {

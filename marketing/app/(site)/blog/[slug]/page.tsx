@@ -1,10 +1,15 @@
-// Individual blog post — RSC.
+// Individual blog post, RSC.
 //
 // Statically pre-renders every post via generateStaticParams. ISR keeps the
 // rendered HTML fresh if a post is edited (revalidate every hour).
 // MDX is parsed at request time by next-mdx-remote/rsc; we override the
 // stock element renderers so headings/paragraphs/code/links pick up our
 // brand typography and colors.
+//
+// Localization: the active locale comes from the cookie helper today and
+// will move to the [locale] route segment when the i18n agent's PR lands.
+// The Arabic post body is loaded from a parallel <slug>.ar.mdx file when
+// the locale is ar; if the .ar.mdx is missing the EN body is shown.
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -14,12 +19,13 @@ import { evaluate } from '@mdx-js/mdx';
 // against Next's `react-server` exports condition (the bundled RSC
 // renderer's React). Passing these into `evaluate` keeps every element
 // next-mdx-remote would have produced on the same React identity as the
-// renderer — fixes the "older copy of React" prerender error that
+// renderer, fixes the "older copy of React" prerender error that
 // `next-mdx-remote/rsc` otherwise hits in this Next 15.1 / React 18.3
 // combination.
 import * as runtime from 'react/jsx-runtime';
 import { getAllSlugs, getPostBySlug } from '@/lib/blog';
 import { buildMetadata } from '@/lib/seo';
+import { getLocale, getMessages } from '@/lib/i18n';
 
 export const revalidate = 3600;
 
@@ -36,10 +42,12 @@ export async function generateMetadata(
   { params }: { params: Promise<Params> },
 ): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const locale = await getLocale();
+  const m = getMessages(locale);
+  const post = await getPostBySlug(slug, locale);
   if (!post) {
     return buildMetadata({
-      title: 'Post not found',
+      title: m.post.not_found_title,
       path: `/blog/${slug}`,
     });
   }
@@ -50,17 +58,18 @@ export async function generateMetadata(
   });
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: 'en' | 'ar'): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    numberingSystem: 'latn',
   });
 }
 
-// MDX element overrides — our brand typography stack. Headings use
+// MDX element overrides, our brand typography stack. Headings use
 // Mona Sans (font-display), body uses Inter (default), code uses
 // JetBrains Mono. Links pick up brand-400 (AA-passing on dark).
 //
@@ -151,32 +160,36 @@ export default async function PostPage(
   { params }: { params: Promise<Params> },
 ) {
   const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const locale = await getLocale();
+  const m = getMessages(locale);
+  const isAr = locale === 'ar';
+  const post = await getPostBySlug(slug, locale);
   if (!post) notFound();
 
   return (
-    <main className="bg-ink-950 text-ink-50 min-h-screen">
+    <main className="bg-ink-950 text-ink-50 min-h-screen" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Top utility bar */}
       <nav className="border-b border-ink-900">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link
             href="/"
             className="font-display text-base tracking-tight text-ink-100 hover:text-ink-50 transition-colors"
+            dir="ltr"
           >
-            IronPath
+            {m.common.brand}
           </Link>
           <div className="flex items-center gap-5 text-sm">
             <Link href="/blog" className="text-ink-300 hover:text-ink-50 transition-colors">
-              Blog
+              {m.common.nav.blog}
             </Link>
             <Link href="/pricing" className="text-ink-300 hover:text-ink-50 transition-colors">
-              Pricing
+              {m.common.nav.pricing}
             </Link>
             <a
-              href={`${ADMIN_SIGNUP}?tier=growth`}
+              href={'/start'}
               className="rounded-md bg-brand-500 text-white px-3 py-1.5 hover:bg-brand-450 transition-colors"
             >
-              Start trial
+              {m.common.nav.start_trial_cta}
             </a>
           </div>
         </div>
@@ -189,16 +202,16 @@ export default async function PostPage(
               href="/blog"
               className="hover:text-ink-200 transition-colors inline-flex items-center gap-1"
             >
-              <span aria-hidden>&larr;</span> All posts
+              <span aria-hidden>{m.post.back_arrow}</span> {m.post.all_posts}
             </Link>
           </p>
           <h1 className="font-display text-4xl sm:text-5xl tracking-tight text-ink-50 mb-5">
             {post.title}
           </h1>
           <p className="font-mono text-xs text-ink-400 flex items-center gap-3">
-            <time dateTime={post.date}>{formatDate(post.date)}</time>
+            <time dateTime={post.date}>{formatDate(post.date, locale)}</time>
             <span aria-hidden>&middot;</span>
-            <span>{post.readingTimeMinutes} min read</span>
+            <span>{post.readingTimeMinutes} {isAr ? 'دقيقة قراية' : 'min read'}</span>
             <span aria-hidden>&middot;</span>
             <span>{post.author}</span>
           </p>
@@ -210,25 +223,25 @@ export default async function PostPage(
 
         <footer className="mt-16 pt-10 border-t border-ink-900">
           <p className="font-display text-2xl text-ink-50 mb-4">
-            Liked this? Start your{' '}
-            <span className="text-brand-400">30-day trial</span>.
+            {m.post.footer_h2_a}
+            <span className="text-brand-400">{m.post.footer_h2_b}</span>
+            {m.post.footer_h2_c}
           </p>
           <p className="text-ink-300 mb-6 leading-relaxed">
-            No card up front. Import your members from a Mindbody CSV in the
-            first 10 minutes. Cancel from the billing page in two clicks.
+            {m.post.footer_body}
           </p>
           <div className="flex flex-wrap gap-3">
             <a
-              href={`${ADMIN_SIGNUP}?tier=growth`}
+              href={'/start'}
               className="inline-flex items-center gap-2 rounded-md bg-brand-500 text-white px-5 py-2.5 text-sm font-medium hover:bg-brand-450 transition-colors"
             >
-              Start free trial
+              {m.common.nav.start_free_trial}
             </a>
             <Link
               href="/pricing"
               className="inline-flex items-center gap-2 rounded-md border border-ink-700 text-ink-100 px-5 py-2.5 text-sm font-medium hover:border-ink-600 transition-colors"
             >
-              See pricing
+              {m.common.nav.see_pricing}
             </Link>
           </div>
         </footer>
@@ -239,13 +252,13 @@ export default async function PostPage(
           <p>&copy; {new Date().getFullYear()} IronPath, Inc.</p>
           <div className="flex gap-5">
             <Link href="/privacy" className="hover:text-ink-200 transition-colors">
-              Privacy
+              {m.common.nav.privacy}
             </Link>
             <Link href="/terms" className="hover:text-ink-200 transition-colors">
-              Terms
+              {m.common.nav.terms}
             </Link>
             <Link href="/blog" className="hover:text-ink-200 transition-colors">
-              Blog
+              {m.common.nav.blog}
             </Link>
           </div>
         </div>

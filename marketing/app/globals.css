@@ -15,6 +15,25 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Arabic typography. When the document (or any subtree) is in Arabic,
+     IBM Plex Sans Arabic leads the stack -- Inter has no Arabic glyphs and
+     would fall back to a generic face that breaks the visual register
+     mid-paragraph. The display family also pulls Plex Arabic so headline
+     weights are real, not synthesised by the browser. */
+  html[lang^="ar"] body,
+  [lang^="ar"] {
+    font-family: var(--font-plex-arabic), var(--font-inter), 'Geeza Pro',
+      'Tahoma', 'Arial', sans-serif;
+  }
+
+  /* Numerics stay monospaced regardless of locale -- Egyptian SaaS convention
+     keeps Latin digits in Arabic copy because Arabic-Indic numerals (٠١٢٣٤٥)
+     read as old-fashioned for SMB founders scanning prices fast. The
+     numbering system is enforced via Intl.NumberFormat in i18n.ts. */
+  [lang^="ar"] [data-numeric] {
+    font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  }
+
   :focus-visible {
     outline: 2px solid theme(colors.brand.350);
     outline-offset: 3px;

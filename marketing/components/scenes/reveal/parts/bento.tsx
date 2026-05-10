@@ -5,9 +5,11 @@
 // rest of the marketing site (and the admin app).
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { listStagger, listItem } from '@/lib/motion';
 
 export function Bento() {
+  const t = useTranslations('scenes.reveal.bento');
   return (
     <LazyMotion features={domAnimation}>
       <m.div
@@ -17,47 +19,56 @@ export function Bento() {
       >
         <m.div {...listItem} className="rounded-xl border border-ink-800 bg-ink-900/60 p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] uppercase tracking-wider text-ink-400">Churn risk</span>
-            <span className="text-[10px] font-mono text-brand-400">3 flagged</span>
+            <span className="text-[10px] uppercase tracking-wider text-ink-400">{t('churn.eyebrow')}</span>
+            <span className="text-[10px] font-mono text-brand-400">{t('churn.flagged', { count: 3 })}</span>
           </div>
           <ul className="space-y-2 text-xs">
-            <ChurnRow name="Marcus T." days={11} />
-            <ChurnRow name="Sara K." days={9} />
-            <ChurnRow name="Dev P." days={7} />
+            <ChurnRow name="Marcus T." days={11} dayLabel={t('churn.quietDays', { days: 11 })} />
+            <ChurnRow name="Sara K." days={9} dayLabel={t('churn.quietDays', { days: 9 })} />
+            <ChurnRow name="Dev P." days={7} dayLabel={t('churn.quietDays', { days: 7 })} />
           </ul>
         </m.div>
 
         <m.div {...listItem} className="rounded-xl border border-ink-800 bg-ink-900/60 p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] uppercase tracking-wider text-ink-400">This week</span>
-            <span className="text-[10px] font-mono text-ink-300">+12 sessions</span>
+            <span className="text-[10px] uppercase tracking-wider text-ink-400">{t('week.eyebrow')}</span>
+            <span className="text-[10px] font-mono text-ink-300">{t('week.delta', { count: 12 })}</span>
           </div>
           {/* Tiny sparkline */}
           <Sparkline values={[3, 5, 4, 6, 7, 9, 12]} />
-          <p className="mt-3 text-xs text-ink-300">Monday surge held through Thursday.</p>
+          <p className="mt-3 text-xs text-ink-300">{t('week.caption')}</p>
         </m.div>
 
         <m.div {...listItem} className="rounded-xl border border-ink-800 bg-ink-900/60 p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] uppercase tracking-wider text-ink-400">Billing</span>
-            <span className="text-[10px] font-mono text-success">All paid</span>
+            <span className="text-[10px] uppercase tracking-wider text-ink-400">{t('billing.eyebrow')}</span>
+            <span className="text-[10px] font-mono text-success">{t('billing.status')}</span>
           </div>
           <div className="flex items-baseline gap-2">
             <div data-numeric className="font-display text-2xl text-ink-50">$4,851</div>
-            <div className="text-[10px] text-ink-400">/mo</div>
+            <div className="text-[10px] text-ink-400">{t('billing.perMonth')}</div>
           </div>
-          <p className="mt-2 text-xs text-ink-300">No failed charges this cycle.</p>
+          <p className="mt-2 text-xs text-ink-300">{t('billing.caption')}</p>
         </m.div>
       </m.div>
     </LazyMotion>
   );
 }
 
-function ChurnRow({ name, days }: { name: string; days: number }) {
+function ChurnRow({
+  name,
+  dayLabel,
+}: {
+  name: string;
+  // The numeric value, kept for prop-stability even though `dayLabel` carries
+  // the rendered string. Future variants may want both.
+  days: number;
+  dayLabel: string;
+}) {
   return (
     <li className="flex items-center justify-between">
       <span className="text-ink-200">{name}</span>
-      <span className="font-mono text-ink-400">{days}d quiet</span>
+      <span className="font-mono text-ink-400">{dayLabel}</span>
     </li>
   );
 }

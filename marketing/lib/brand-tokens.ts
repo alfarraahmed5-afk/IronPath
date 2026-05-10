@@ -3,7 +3,7 @@
 // inline styles where Tailwind can't reach.
 
 export const BRAND = {
-  // Crimson scale — see tailwind.config.ts for the full ladder.
+  // Crimson scale -- see tailwind.config.ts for the full ladder.
   // brand-500 fails WCAG AA body-on-dark; brand-400 is the body companion.
   500: '#C8102E',
   450: '#FF1A3D',
@@ -25,7 +25,7 @@ export const INK = {
   50:  '#FAFAFB',
 } as const;
 
-// Hero photography credit (Unsplash — free license).
+// Hero photography credit (Unsplash -- free license).
 // Replace src URLs at agent-implementation time with locally-hosted AVIFs
 // for proper LCP performance.
 export const HERO_PHOTOS = {

@@ -1,5 +1,5 @@
 /**
- * Marketing audio system — Howler-backed sprite player.
+ * Marketing audio system -- Howler-backed sprite player.
  *
  * Design constraints (sound-design + a11y council):
  *   1. Muted by default. NO autoplay. AudioContext is never resumed
@@ -17,25 +17,25 @@
  *      SFX (a CTA confirm or weight drop) is intelligible above it.
  *   6. AudioContext is suspended whenever `document.hidden` flips true
  *      (the user tabbed away). It resumes on the next visibility event
- *      iff sound is still on — no spurious resume on a backgrounded
+ *      iff sound is still on -- no spurious resume on a backgrounded
  *      tab.
  *
  * Public API:
- *   - initAudio()                 — call inside a user-gesture handler.
- *   - play(name, options?)        — fire a sprite. No-op when muted.
+ *   - initAudio()                 -- call inside a user-gesture handler.
+ *   - play(name, options?)        -- fire a sprite. No-op when muted.
  *   - playAmbient() / stopAmbient()
  *   - duck(durationMs)
- *   - setMuted(boolean)           — kill switch wired to useSoundOn().
+ *   - setMuted(boolean)           -- kill switch wired to useSoundOn().
  *
  * This module is imported by `components/sound/sound-toggle.tsx` and
  * (eventually) by scene components that want to fire confirm/hover
- * SFX. It is safe to import at the top of any client component — the
+ * SFX. It is safe to import at the top of any client component -- the
  * Howler dependency is only loaded after `initAudio()` runs.
  */
 
 import type { Howl } from 'howler';
 
-// Sprite layout — keep in lockstep with `lib/audio-licenses.md`.
+// Sprite layout -- keep in lockstep with `lib/audio-licenses.md`.
 // [offsetMs, durationMs] tuples. `true` (third element) marks loops.
 export const SPRITE: Record<string, [number, number]> = {
   'cta-hover':   [0,    180],
@@ -93,7 +93,7 @@ function loadHowler(): Promise<HowlerModule> {
  * Safari the context is created in "suspended" state and the only way
  * to unlock it is to play a zero-byte buffer during a touch handler.
  * Howler 2.2 already plays a silent buffer in its `_unlockAudio`
- * routine, but only on the first `Howl.play()` — which is too late if
+ * routine, but only on the first `Howl.play()` -- which is too late if
  * we want subsequent plays to be reliable. So we trigger that path
  * explicitly here.
  *
@@ -175,7 +175,7 @@ function _onVisibilityChange() {
  *
  * When transitioning from on -> off, ambient is faded out and any
  * scheduled duck-restore is cancelled. When off -> on, no sound plays
- * automatically — the caller decides whether to start the ambient bed.
+ * automatically -- the caller decides whether to start the ambient bed.
  */
 export function setMuted(muted: boolean): void {
   _muted = muted;
@@ -214,7 +214,7 @@ export function play(
 }
 
 /**
- * Start the ambient gym bed (looping). Idempotent — calling twice does
+ * Start the ambient gym bed (looping). Idempotent -- calling twice does
  * not stack two loops. No-op when muted.
  */
 export function playAmbient(): void {

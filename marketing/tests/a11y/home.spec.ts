@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-// Team Gamma γ3 — Home a11y scan.
+// Team Gamma γ3 -- Home a11y scan.
 //
 // Per project (default-motion + reduced-motion), we scan `/` for serious +
 // critical axe violations and assert structural a11y invariants:

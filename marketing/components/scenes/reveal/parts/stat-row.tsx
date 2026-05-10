@@ -6,16 +6,18 @@
 // identical odometers.
 
 import NumberFlow from '@number-flow/react';
+import { useTranslations } from 'next-intl';
 
 interface StatRowProps {
   /** When true, the numbers count up from 0 to their target values. Driven
-   *  by parent — usually flips at the drop boundary (~340vh global). */
+   *  by parent -- usually flips at the drop boundary (~340vh global). */
   active: boolean;
   /** When true, render final values immediately (reduced-motion variant). */
   staticFinal?: boolean;
 }
 
 export function StatRow({ active, staticFinal = false }: StatRowProps) {
+  const t = useTranslations('scenes.reveal.dashboard.stats');
   const target = active || staticFinal;
   return (
     <div
@@ -24,19 +26,19 @@ export function StatRow({ active, staticFinal = false }: StatRowProps) {
       aria-live={staticFinal ? 'polite' : undefined}
     >
       <Stat
-        label="Active members"
+        label={t('activeMembers')}
         value={target ? 217 : 0}
         prefix=""
         suffix=""
       />
       <Stat
-        label="Monthly recurring"
+        label={t('monthlyRecurring')}
         value={target ? 4851 : 0}
         prefix="$"
         suffix=""
       />
       <Stat
-        label="Retention"
+        label={t('retention')}
         value={target ? 89 : 0}
         prefix=""
         suffix="%"

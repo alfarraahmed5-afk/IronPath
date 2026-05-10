@@ -1,15 +1,16 @@
 'use client';
 
-// Quiet Beat — the breath before the Crescendo CTA.
+// Quiet Beat -- the breath before the Crescendo CTA.
 // 50vh tall, one centered line, ONE expo.out reveal (the only place that
 // curve appears on the page). A tighter ember seam sits above the line:
-// 12px halo, opacity 0.12 — quieter than every other seam.
+// 12px halo, opacity 0.12 -- quieter than every other seam.
 
 import { m, useInView } from 'framer-motion';
 import { useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { useReducedMotion } from '@/lib/preferences';
 
-// expo.out — `1 - 2^(-10x)`. Approximated as a cubic-bezier so it
+// expo.out -- `1 - 2^(-10x)`. Approximated as a cubic-bezier so it
 // composites on the GPU and obeys MotionConfig's reducedMotion rule.
 // This is the ONLY place this curve appears on the page; please keep it
 // that way (see the creative-director's red lines).
@@ -17,6 +18,7 @@ const EXPO_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export function QuietBeat() {
   const reduced = useReducedMotion();
+  const t = useTranslations('scenes.denouement.quietBeat');
   const ref = useRef<HTMLDivElement>(null);
   // `once: true` so scrolling back up doesn't replay the reveal.
   const inView = useInView(ref, { once: true, amount: 0.6 });
@@ -25,9 +27,9 @@ export function QuietBeat() {
     <section
       ref={ref}
       className="relative h-[50vh] grid place-items-center px-4"
-      aria-label="Free trial reassurance"
+      aria-label={t('ariaLabel')}
     >
-      {/* Tighter ember seam — 12px halo, opacity 0.12. Authored inline
+      {/* Tighter ember seam -- 12px halo, opacity 0.12. Authored inline
           (not via `<EmberSeam />`) because we need the unique geometry. */}
       <div
         aria-hidden
@@ -47,9 +49,10 @@ export function QuietBeat() {
             ? { duration: 0 }
             : { duration: 1.2, ease: EXPO_OUT }
         }
+        data-font-display
         className="font-display text-2xl sm:text-3xl text-ink-100 text-center tracking-tight"
       >
-        30 days free. Members never pay.
+        {t('line')}
       </m.p>
     </section>
   );

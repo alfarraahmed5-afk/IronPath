@@ -6,8 +6,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Crimson scale — admin parity with a11y additions.
-        // brand-500 #C8102E fails WCAG AA body on ink-900 (3.36:1) — never use for body text on dark.
+        // Crimson scale -- admin parity with a11y additions.
+        // brand-500 #C8102E fails WCAG AA body on ink-900 (3.36:1) -- never use for body text on dark.
         // brand-400 #FF4566 (5.93:1) is the body-on-dark companion.
         // brand-350 #FF6680 (7.03:1 AAA) is the focus-ring color.
         brand: {
@@ -25,7 +25,7 @@ const config: Config = {
           800: '#640618',
           900: '#430411',
         },
-        // Warm ink scale — admin parity, extended with 950.
+        // Warm ink scale -- admin parity, extended with 950.
         ink: {
           50:  '#FAFAFB',
           100: '#E5E5E7',
@@ -47,9 +47,26 @@ const config: Config = {
         info:    '#3B82F6',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'sans-serif'],
+        // Arabic font variable leads each stack; it's only set on the <html>
+        // when locale === 'ar' (see app/ar/layout.tsx). For EN visitors the
+        // var resolves to its empty default and the browser skips straight
+        // to Inter / Mona Sans / system fonts. Net cost on EN: zero bytes,
+        // zero CSS recompute.
+        sans: [
+          'var(--font-plex-arabic)',
+          'var(--font-inter)',
+          'system-ui',
+          '-apple-system',
+          'sans-serif',
+        ],
         mono: ['var(--font-jetbrains-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-        display: ['var(--font-mona-sans)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        display: [
+          'var(--font-plex-arabic)',
+          'var(--font-mona-sans)',
+          'var(--font-inter)',
+          'system-ui',
+          'sans-serif',
+        ],
       },
       keyframes: {
         'ember-breathe': {

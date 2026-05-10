@@ -7,7 +7,7 @@ import { FeatureList, type Feature } from './parts/FeatureList';
 import { springMagnetic, VERCEL_EASE } from '@/lib/motion';
 import { useReducedMotion } from '@/lib/preferences';
 
-// TierCard — a single pricing plan card.
+// TierCard -- a single pricing plan card.
 //
 // Behavior:
 // - NumberFlow on the price digit, triggered the first time the card enters
@@ -30,6 +30,12 @@ export interface TierCardProps {
   features: Feature[];
   /** Subtle pulse + slightly stronger border, no badge. */
   accent?: boolean;
+  /** Translated CTA label ("Start free trial" / "ابدأ تجربتك المجانية"). */
+  ctaLabel: string;
+  /** Translated suffix after the price ("/mo" / "/شهر"). */
+  perMonthLabel: string;
+  /** Currency symbol prefix (kept as a prop in case AR ever wants ج.م.). */
+  currencySymbol: string;
 }
 
 const ADMIN_SIGNUP = '/start';
@@ -42,10 +48,13 @@ export function TierCard({
   tagline,
   features,
   accent = false,
+  ctaLabel,
+  perMonthLabel,
+  currencySymbol,
 }: TierCardProps) {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
-  // `once: true` means we trigger the NumberFlow animation a single time —
+  // `once: true` means we trigger the NumberFlow animation a single time --
   // re-entering the viewport doesn't replay it (would feel gimmicky).
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
@@ -54,7 +63,7 @@ export function TierCard({
     : { y: -4, scale: 1.02, transition: springMagnetic };
 
   // Accent pulse: animate the boxShadow opacity in a 4s loop. Disabled when
-  // reduced-motion is on — the static accent border is enough.
+  // reduced-motion is on -- the static accent border is enough.
   const accentAnimate =
     accent && !reduced
       ? {
@@ -89,8 +98,12 @@ export function TierCard({
           {name}
         </p>
         <p className="text-sm text-ink-300 mb-4">{tagline}</p>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-ink-400 text-2xl">$</span>
+        {/* Price block stays LTR even in Arabic -- the founder + i18n architect
+            agreed Latin digits are the Egyptian SaaS norm and currency-symbol-
+            then-amount is the universally readable order. <bdi> wrapping
+            keeps the bidirectional algorithm from re-ordering the run. */}
+        <div className="flex items-baseline gap-1.5" dir="ltr">
+          <span className="text-ink-400 text-2xl">{currencySymbol}</span>
           <span
             data-numeric
             className="font-display text-5xl sm:text-6xl tracking-tight tabular-nums text-ink-50"
@@ -106,7 +119,7 @@ export function TierCard({
               />
             )}
           </span>
-          <span className="text-ink-400 text-sm">/mo</span>
+          <span className="text-ink-400 text-sm">{perMonthLabel}</span>
         </div>
         <p className="mt-2 text-xs font-mono uppercase tracking-[0.14em] text-brand-400">
           {cap}
@@ -125,7 +138,7 @@ export function TierCard({
               : 'bg-ink-50 text-ink-950 hover:bg-white',
           ].join(' ')}
         >
-          Start free trial
+          {ctaLabel}
         </a>
       </div>
     </m.div>

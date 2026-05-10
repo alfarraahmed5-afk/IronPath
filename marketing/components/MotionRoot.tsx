@@ -1,6 +1,6 @@
 'use client';
 
-// Canonical motion wrapper — every other α agent and β1 imports this.
+// Canonical motion wrapper -- every other α agent and β1 imports this.
 //
 // Why this file exists:
 //   - LazyMotion + `strict` cuts the initial framer-motion bundle from
@@ -12,7 +12,7 @@
 //     tree without per-component plumbing.
 //
 // IMPORTANT: do not change the imports below without coordinating across
-// teams — `domAnimation` is the bare minimum that supports `layout`,
+// teams -- `domAnimation` is the bare minimum that supports `layout`,
 // spring transitions, variants, and gesture animations, all of which the
 // scenes rely on. `domMax` would re-add ~25kb (drag, layoutGroup, etc.).
 

@@ -1,9 +1,9 @@
 // Device-tier classification for the ember-canvas WebGL layer.
 //
 // Three tiers, mapped to canvas budgets:
-//   A — desktop / high-end mobile. Full 500 particles at native DPR.
-//   B — mid-range mobile. 150 particles at half DPR.
-//   C — low-memory / low-core / data-saver. NO canvas at all (return null).
+//   A -- desktop / high-end mobile. Full 500 particles at native DPR.
+//   B -- mid-range mobile. 150 particles at half DPR.
+//   C -- low-memory / low-core / data-saver. NO canvas at all (return null).
 //
 // SSR safe: returns 'C' on the server so nothing tries to render before the
 // browser hydration phase tells us what we actually have.
@@ -27,7 +27,7 @@ export function getDeviceTier(): DeviceTier {
 
   const nav = navigator as ExtendedNavigator;
 
-  // Honor Save-Data preemptively — never burn battery / radio for fluff.
+  // Honor Save-Data preemptively -- never burn battery / radio for fluff.
   if (nav.connection?.saveData) return 'C';
 
   const memory = nav.deviceMemory ?? 4;

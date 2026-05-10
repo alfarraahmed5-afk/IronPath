@@ -5,8 +5,10 @@
 // rotating wall of testimonials.
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 
 export function Quote() {
+  const t = useTranslations('scenes.reveal.quote');
   return (
     <LazyMotion features={domAnimation}>
       <m.figure
@@ -16,11 +18,14 @@ export function Quote() {
         transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
         className="max-w-2xl mx-auto text-center"
       >
-        <blockquote className="font-display text-xl sm:text-2xl md:text-3xl text-ink-100 tracking-tight leading-snug">
-          &ldquo;We stopped chasing payments after week three.&rdquo;
+        <blockquote
+          data-font-display
+          className="font-display text-xl sm:text-2xl md:text-3xl text-ink-100 tracking-tight leading-snug"
+        >
+          &ldquo;{t('body')}&rdquo;
         </blockquote>
         <figcaption className="mt-4 text-xs font-mono text-ink-400">
-          Mike &mdash; Iron &amp; Oak
+          {t('attribution')}
         </figcaption>
       </m.figure>
     </LazyMotion>

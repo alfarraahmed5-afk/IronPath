@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-// Team Gamma γ3 — Pricing a11y scan.
+// Team Gamma γ3 -- Pricing a11y scan.
 //
 // Pricing route is owned by α/β. The scan currently runs against /pricing
 // if it exists; if the route 404s (placeholder repo state) the test is
@@ -14,7 +14,7 @@ test.describe('pricing page a11y', () => {
   test('axe finds no serious or critical violations', async ({ page }) => {
     const response = await page.goto('/pricing', { waitUntil: 'networkidle' });
     if (!response || response.status() === 404) {
-      test.skip(true, '/pricing not yet implemented — skipping a11y scan');
+      test.skip(true, '/pricing not yet implemented -- skipping a11y scan');
     }
 
     const results = await new AxeBuilder({ page })

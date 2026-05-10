@@ -1,6 +1,6 @@
 'use client';
 
-// Hero — the foreground composition that sits over the LCP poster.
+// Hero -- the foreground composition that sits over the LCP poster.
 //
 // Animation choreography (per motion-design lens, VERCEL_EASE everywhere):
 //   t=0       : poster paints (LCP)
@@ -12,11 +12,12 @@
 // Reduced-motion fork: collapse all of the above to a single 200ms opacity
 // fade. No translate, no blur. Same composition, same final state.
 //
-// CTA is the SOURCE of the cross-route morph — `layoutId="trialCta"`. α4
+// CTA is the SOURCE of the cross-route morph -- `layoutId="trialCta"`. α4
 // will set the matching layoutId at the admin signup landing target.
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { VERCEL_EASE, springMagnetic } from '@/lib/motion';
 import { useReducedMotion } from '@/lib/preferences';
 
@@ -32,6 +33,7 @@ export interface HeroProps {
 
 export function Hero({ className = '' }: HeroProps) {
   const reduced = useReducedMotion();
+  const t = useTranslations('scenes.coldOpen');
   const [ctaArmed, setCtaArmed] = useState(false);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export function Hero({ className = '' }: HeroProps) {
     if (typeof w.requestIdleCallback === 'function') {
       w.requestIdleCallback(arm, { timeout: 2000 });
     } else {
-      // Safari path — schedule on next macrotask after paint.
+      // Safari path -- schedule on next macrotask after paint.
       timer = setTimeout(arm, 0);
     }
     return () => {
@@ -100,29 +102,29 @@ export function Hero({ className = '' }: HeroProps) {
       <div
         className={`relative z-10 flex h-full w-full flex-col ${className}`}
       >
-        {/* Headline + sub-head block — top half on mobile, vertically
+        {/* Headline + sub-head block -- top half on mobile, vertically
             centered on sm+ via the parent grid. */}
         <div className="flex flex-1 flex-col justify-center px-6 pt-24 sm:px-12 sm:pt-0 lg:px-20">
           <div className="max-w-3xl">
             <m.h1
               {...headlineAnim}
+              data-font-display
               className="font-display text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.025em] text-ink-50"
             >
-              Run your gym,
+              {t('headlineLine1')}
               <br />
-              <span className="text-ink-100">not software.</span>
+              <span className="text-ink-100">{t('headlineLine2')}</span>
             </m.h1>
             <m.p
               {...subAnim}
               className="mt-6 max-w-xl text-base leading-relaxed text-ink-300 sm:text-lg"
             >
-              For independent gym owners burned by Mindbody. Workouts in your
-              members&apos; pockets. Members tracked, churn predicted.
+              {t('subhead')}
             </m.p>
           </div>
         </div>
 
-        {/* CTA cluster — center on sm+, bottom-thumb-arc on mobile.
+        {/* CTA cluster -- center on sm+, bottom-thumb-arc on mobile.
             `pb-[max(env(safe-area-inset-bottom),1.5rem)]` honors iOS home
             indicator on mobile only; sm+ keeps the standard padding. */}
         <div
@@ -160,13 +162,16 @@ export function Hero({ className = '' }: HeroProps) {
                 'min-h-[48px] min-w-[200px]',
               ].join(' ')}
             >
-              Start free trial
+              {t('cta')}
+              {/* Forward-pointing arrow. Flips horizontally under RTL via
+                  the rtl: variant so it always reads as "go forward" in
+                  the document's reading direction. */}
               <svg
                 aria-hidden
                 viewBox="0 0 16 16"
                 width="16"
                 height="16"
-                className="ml-2"
+                className="ml-2 rtl:ml-0 rtl:mr-2 rtl:-scale-x-100"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -177,7 +182,7 @@ export function Hero({ className = '' }: HeroProps) {
               </svg>
             </m.a>
             <p className="text-xs text-ink-400">
-              30-day free trial. No card. Cancel anytime.
+              {t('trust')}
             </p>
           </m.div>
         </div>

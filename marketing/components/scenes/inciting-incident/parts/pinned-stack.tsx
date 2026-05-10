@@ -8,7 +8,7 @@
 // us write to refs via `gsap.quickSetter` which avoids the React-state-in-
 // onUpdate trap that drops 60fps to 20.
 //
-// Mobile fork: ScrollTrigger.matchMedia disables pinning under 768px — on
+// Mobile fork: ScrollTrigger.matchMedia disables pinning under 768px -- on
 // touch + small viewports the pin behavior is jarring and battery-expensive,
 // so we collapse to a normal stacked flow there too.
 //
@@ -59,7 +59,7 @@ export function PinnedStack() {
           ? gsap.quickSetter(captionRef.current, 'opacity')
           : null;
 
-        // Initial state — only frame 1 visible, hairline at 1px, caption muted.
+        // Initial state -- only frame 1 visible, hairline at 1px, caption muted.
         set1?.(1);
         set2?.(0);
         set3?.(0);
@@ -108,7 +108,7 @@ export function PinnedStack() {
       // the upstream branch in index.tsx and never load this module at all,
       // but matchMedia still guards in case the OS pref flips mid-session.
       mm.add('(max-width: 767px)', () => {
-        // Show all three at full opacity — the layout below already stacks
+        // Show all three at full opacity -- the layout below already stacks
         // them in normal flow on mobile via CSS.
         if (frame1Ref.current) frame1Ref.current.style.opacity = '1';
         if (frame2Ref.current) frame2Ref.current.style.opacity = '1';
@@ -127,7 +127,7 @@ export function PinnedStack() {
       ref={containerRef}
       // 200vh container; the stage child is pinned for the duration.
       className="relative md:h-[200vh] bg-ink-950"
-      aria-label="Inciting incident — the silence before"
+      aria-label="Inciting incident -- the silence before"
     >
       <div
         ref={stageRef}
@@ -135,7 +135,7 @@ export function PinnedStack() {
         // normal-flow column where the three frames just stack.
         className="md:h-screen md:sticky md:top-0 flex flex-col items-stretch overflow-hidden"
       >
-        {/* Saturation -30%, monochrome tilt — this entire stage stays cold. */}
+        {/* Saturation -30%, monochrome tilt -- this entire stage stays cold. */}
         <div
           className="relative flex-1 flex md:block flex-col"
           style={{ filter: 'saturate(0.7) brightness(0.92)' }}
@@ -152,7 +152,7 @@ export function PinnedStack() {
           </div>
         </div>
 
-        {/* Caption — fixed center-bottom on the pinned stage. */}
+        {/* Caption -- fixed center-bottom on the pinned stage. */}
         <div className="relative md:absolute md:inset-x-0 md:bottom-[18vh] z-10 px-6 py-10 md:py-0 grid place-items-center pointer-events-none">
           <p
             ref={captionRef}
@@ -162,7 +162,7 @@ export function PinnedStack() {
           </p>
         </div>
 
-        {/* Hairline — thickens through scrub, hands off to Reveal. */}
+        {/* Hairline -- thickens through scrub, hands off to Reveal. */}
         <div
           ref={seamRef}
           className="absolute inset-x-0 bottom-0 overflow-hidden"

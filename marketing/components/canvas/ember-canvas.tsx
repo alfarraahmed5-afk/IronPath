@@ -1,6 +1,6 @@
 'use client';
 
-// EmberCanvas — public API for the cold-open scene.
+// EmberCanvas -- public API for the cold-open scene.
 //
 // This file is a thin re-export of the bootstrap component, which itself
 // gates everything behind a device-tier check + requestIdleCallback +

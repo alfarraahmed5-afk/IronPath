@@ -1,6 +1,6 @@
 'use client';
 
-// Team Gamma γ3 — Motion preference toggle.
+// Team Gamma γ3 -- Motion preference toggle.
 //
 // Tri-state cycle: System → Reduced → Full → System.
 // - "System" follows the OS `prefers-reduced-motion` media query (no override).
@@ -10,7 +10,7 @@
 // We expose the control as `role="switch"` with `aria-checked` taking the
 // values `'true' | 'false' | 'mixed'`. WAI-ARIA permits `mixed` on switches
 // and we use it to express the "follow system" tri-state. The button always
-// renders a visible TEXT label ("Motion: System", etc.) — no icon-only.
+// renders a visible TEXT label ("Motion: System", etc.) -- no icon-only.
 
 import { useEffect, useState } from 'react';
 import { setMotionPreference, useReducedMotion } from '@/lib/preferences';

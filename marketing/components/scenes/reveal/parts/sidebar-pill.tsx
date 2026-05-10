@@ -5,7 +5,7 @@
 // 4 simulated nav items; the active item rotates every 3s. The pill is a
 // shared layoutId element (`navActivePillDemo`) so Framer animates it
 // between positions instead of remounting it. This mirrors the actual admin
-// shell pattern, which uses `navActivePill` — using a `Demo` suffix here
+// shell pattern, which uses `navActivePill` -- using a `Demo` suffix here
 // keeps marketing isolated from any cross-route morph.
 
 import { useEffect, useState } from 'react';

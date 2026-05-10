@@ -1,10 +1,10 @@
 'use client';
 
-// LivePulseStrip — the brand's heartbeat.
+// LivePulseStrip -- the brand's heartbeat.
 //
 // A 1px ember sliver fixed to the very top of the marketing shell,
 // edge-to-edge, dark background. A 12% wide crimson sweep travels
-// left-to-right every 6-12 seconds — frequent enough that you notice
+// left-to-right every 6-12 seconds -- frequent enough that you notice
 // it even when nothing else is moving on the page, slow enough that
 // it never reads as a strobe.
 //
@@ -19,12 +19,12 @@
 import { useEffect, useState } from 'react';
 import { useReducedMotion } from '@/lib/preferences';
 
-// Sweep timing — random within this window for an organic, non-metronomic feel.
+// Sweep timing -- random within this window for an organic, non-metronomic feel.
 const MIN_INTERVAL_MS = 6000;
 const MAX_INTERVAL_MS = 12000;
 // First sweep fires shortly after mount so the strip "comes alive" fast.
 const FIRST_SWEEP_MS = 800;
-// One sweep duration — must match the inline animation below.
+// One sweep duration -- must match the inline animation below.
 const SWEEP_DURATION_MS = 2200;
 
 export function LivePulseStrip() {
@@ -61,12 +61,12 @@ export function LivePulseStrip() {
       aria-hidden="true"
       className="fixed top-0 left-0 right-0 h-px z-50 pointer-events-none overflow-hidden bg-ink-950"
     >
-      {/* Static baseline hairline — visible whether or not motion is reduced. */}
+      {/* Static baseline hairline -- visible whether or not motion is reduced. */}
       <div
         className="absolute inset-0 h-px"
         style={{ background: 'rgba(200, 16, 46, 0.10)' }}
       />
-      {/* Travelling sweep — suppressed under reduced motion. */}
+      {/* Travelling sweep -- suppressed under reduced motion. */}
       {!reduced && (
         <span
           key={pulseKey}
@@ -85,7 +85,7 @@ export function LivePulseStrip() {
           }}
         />
       )}
-      {/* Inline keyframes — keeps this primitive self-contained, no global
+      {/* Inline keyframes -- keeps this primitive self-contained, no global
           CSS dependency beyond Tailwind utilities. */}
       <style>{`
         @keyframes live-pulse-sweep {

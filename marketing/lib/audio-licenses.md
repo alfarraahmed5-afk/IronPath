@@ -1,4 +1,4 @@
-# Marketing audio assets — licenses & attribution
+# Marketing audio assets -- licenses & attribution
 
 All shipped audio assets in `marketing/public/audio/` are documented here.
 Per house policy: **CC0 only**, with full source provenance recorded so
@@ -7,7 +7,7 @@ audio without a ToS-version-locked log.
 
 ---
 
-## Current status — PLACEHOLDERS
+## Current status -- PLACEHOLDERS
 
 > The files currently shipped are **silent Opus placeholders** generated
 > locally because `ffmpeg` is unavailable in the build sandbox. They are
@@ -16,7 +16,7 @@ audio without a ToS-version-locked log.
 > they emit no sound. They MUST be replaced with real CC0 sources
 > before the marketing site goes to GA.
 >
-> Generator: `marketing/public/audio/generate-silent-opus.py` — a
+> Generator: `marketing/public/audio/generate-silent-opus.py` -- a
 > stdlib-only Python script that emits silent Ogg/Opus pages
 > (TOC byte 0xF8, CELT-only, 20 ms frames, mono, 48 kHz).
 
@@ -31,7 +31,7 @@ audio without a ToS-version-locked log.
 
 The sprite file is a single Opus stream containing 6 SFX clips at fixed
 offsets. The offsets are duplicated in `marketing/lib/audio.ts` as the
-`SPRITE` constant — keep them in sync.
+`SPRITE` constant -- keep them in sync.
 
 | Sprite key | Offset (ms) | Duration (ms) | Intent |
 | --- | ---: | ---: | --- |
@@ -96,6 +96,6 @@ loop seamlessly. Placeholder duration: 8 000 ms.
 - [ ] Ambient bed loops without an audible seam (head and tail samples
       cross-faded).
 - [ ] Total marketing audio bundle ≤ 200 KB (sprite + ambient + tags).
-- [ ] Lighthouse audit — no autoplay warning, no console errors.
+- [ ] Lighthouse audit -- no autoplay warning, no console errors.
 - [ ] Manual smoke test on iOS Safari: silent-buffer trick unlocks
       AudioContext on first toggle-to-on.

@@ -1,6 +1,6 @@
 'use client';
 
-// Animated Reveal — Act 3, "the drop".
+// Animated Reveal -- Act 3, "the drop".
 //
 // Layout:
 //   - Outer section is 200vh tall.
@@ -11,12 +11,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LazyMotion, domAnimation, m, useScroll, useTransform } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { DashboardMock } from './dashboard-mock';
 import { Bento } from './bento';
 import { Quote } from './quote';
 import { EmberSeam } from '@/components/primitives/ember-seam';
 
 export function AnimatedReveal() {
+  const t = useTranslations('scenes.reveal');
   const sectionRef = useRef<HTMLElement>(null);
   const [dropped, setDropped] = useState(false);
 
@@ -39,7 +41,7 @@ export function AnimatedReveal() {
     ([s, b]: number[]) => `saturate(${s}) brightness(${b})`,
   );
 
-  // Boolean drop trigger — flips once when we cross the threshold so child
+  // Boolean drop trigger -- flips once when we cross the threshold so child
   // components (NumberFlow stats) can roll exactly once. The subscribe
   // callback runs in the rAF loop, not on every React render, which keeps
   // this cheap.
@@ -55,9 +57,9 @@ export function AnimatedReveal() {
       <section
         ref={sectionRef}
         className="relative bg-ink-950"
-        aria-label="Reveal — this is IronPath"
+        aria-label={t('ariaLabel')}
       >
-        {/* Sticky stage — 100vh of pinned content as the section's first half scrolls past. */}
+        {/* Sticky stage -- 100vh of pinned content as the section's first half scrolls past. */}
         <div className="relative h-[200vh]">
           <div className="sticky top-0 h-screen flex items-center justify-center px-4 sm:px-6">
             <m.div style={{ filter }} className="w-full">
@@ -66,7 +68,7 @@ export function AnimatedReveal() {
           </div>
         </div>
 
-        {/* Bento + quote — normal flow below the sticky stage. */}
+        {/* Bento + quote -- normal flow below the sticky stage. */}
         <div className="px-4 sm:px-6 pb-32 -mt-32 space-y-24">
           <div className="max-w-[1100px] mx-auto">
             <Bento />
@@ -74,7 +76,7 @@ export function AnimatedReveal() {
           <Quote />
         </div>
 
-        {/* Hairline — match-cut into the next scene. */}
+        {/* Hairline -- match-cut into the next scene. */}
         <EmberSeam />
       </section>
     </LazyMotion>

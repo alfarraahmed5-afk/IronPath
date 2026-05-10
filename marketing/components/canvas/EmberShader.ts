@@ -1,13 +1,13 @@
 // GLSL shaders for the ember-particle canvas.
 //
 // Vertex attributes (interleaved per-particle, set once at init):
-//   position.xy  — base spawn position in clip space (-1..1).
-//   position.z   — birth-phase offset (0..1), keeps particles desynchronized.
-//   seed         — per-particle pseudo-random for jitter / size variance.
+//   position.xy  -- base spawn position in clip space (-1..1).
+//   position.z   -- birth-phase offset (0..1), keeps particles desynchronized.
+//   seed         -- per-particle pseudo-random for jitter / size variance.
 //
 // Uniforms (updated per frame):
-//   uTime        — seconds since canvas mount.
-//   uResolution  — canvas width/height in CSS px (for any FS-based math).
+//   uTime        -- seconds since canvas mount.
+//   uResolution  -- canvas width/height in CSS px (for any FS-based math).
 //
 // Animation lives entirely in the vertex shader so we don't have to push a
 // new buffer every frame. Each particle integrates its own age from uTime,
@@ -28,7 +28,7 @@ void main() {
   age = mod(age, 1.0);
   vAge = age;
 
-  // Subtle horizontal drift — sin wave, period a few seconds, ±0.05 NDC.
+  // Subtle horizontal drift -- sin wave, period a few seconds, ±0.05 NDC.
   float driftX = sin(uTime * 0.5 + seed * 6.28) * 0.05;
 
   // Vertical travel: spawn near bottom (y - 0.7), rise 1.4 over a full life.
@@ -51,7 +51,7 @@ varying float vAge;
 
 void main() {
   // brand-500 (#C8102E) in roughly linear sRGB. Slight bias toward warmer
-  // ember red over the wire crimson — this layer is additive over a B&W
+  // ember red over the wire crimson -- this layer is additive over a B&W
   // poster, so the saturation reads stronger in screen space.
   vec3 ember = vec3(0.78, 0.06, 0.18);
 

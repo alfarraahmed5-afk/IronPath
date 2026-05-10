@@ -1,5 +1,11 @@
 import type { NextConfig } from 'next';
 import path from 'node:path';
+import createNextIntlPlugin from 'next-intl/plugin';
+
+// next-intl wired to the project's i18n.ts config. We do NOT use next-intl's
+// route-rewriting middleware (see i18n.ts header for rationale); the plugin
+// only resolves messages and exposes useTranslations / getTranslations.
+const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -20,4 +26,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

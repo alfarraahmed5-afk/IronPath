@@ -1,6 +1,6 @@
 'use client';
 
-// "Before" frame 2 — a stopped analog clock at 11:47. The hands do NOT move;
+// "Before" frame 2 -- a stopped analog clock at 11:47. The hands do NOT move;
 // that's the point. SVG so it scales sharp on retina + inherits the scene's
 // monochrome filter without any image asset.
 
@@ -44,7 +44,7 @@ export const StoppedClock = forwardRef<HTMLDivElement>(function StoppedClock(_, 
             />
           );
         })}
-        {/* Hour hand — frozen */}
+        {/* Hour hand -- frozen */}
         <line
           x1="100"
           y1="100"
@@ -54,7 +54,7 @@ export const StoppedClock = forwardRef<HTMLDivElement>(function StoppedClock(_, 
           strokeWidth="3"
           strokeLinecap="round"
         />
-        {/* Minute hand — frozen */}
+        {/* Minute hand -- frozen */}
         <line
           x1="100"
           y1="100"

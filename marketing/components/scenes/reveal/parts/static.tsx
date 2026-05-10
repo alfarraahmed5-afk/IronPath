@@ -9,6 +9,7 @@
 // heading: "This is IronPath." with a 200ms opacity fade.
 
 import { LazyMotion, domAnimation, m } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { DashboardMock } from './dashboard-mock';
 import { Bento } from './bento';
 import { Quote } from './quote';
@@ -22,21 +23,23 @@ const fade = {
 };
 
 export function StaticReveal() {
+  const t = useTranslations('scenes.reveal');
   return (
     <LazyMotion features={domAnimation}>
       <section
         className="relative bg-ink-950 px-4 sm:px-6 py-24 space-y-16"
-        aria-label="Reveal — this is IronPath"
+        aria-label={t('ariaLabel')}
       >
         <m.h2
           {...fade}
+          data-font-display
           className="font-display text-3xl sm:text-5xl text-ink-50 text-center max-w-3xl mx-auto tracking-tight"
         >
-          This is IronPath.
+          {t('headline')}
         </m.h2>
 
         <m.div {...fade} className="w-full max-w-[1100px] mx-auto">
-          {/* Dropped + staticFinal — the static final state, accessible live region. */}
+          {/* Dropped + staticFinal -- the static final state, accessible live region. */}
           <DashboardMock dropped staticFinal />
         </m.div>
 

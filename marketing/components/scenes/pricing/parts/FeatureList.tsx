@@ -3,7 +3,7 @@
 
 export interface Feature {
   text: string;
-  /** When true, render with brand accent — used to highlight the cap line. */
+  /** When true, render with brand accent -- used to highlight the cap line. */
   emphasize?: boolean;
 }
 

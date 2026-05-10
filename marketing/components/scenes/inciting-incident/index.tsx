@@ -1,6 +1,6 @@
 'use client';
 
-// Act 2 — Inciting Incident.
+// Act 2 -- Inciting Incident.
 //
 // Iteration history:
 //   v1 (initial): GSAP-pinned 200vh cross-fade between 3 frames. Cinematic

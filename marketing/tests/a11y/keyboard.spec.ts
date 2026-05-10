@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Team Gamma γ3 — Keyboard accessibility.
+// Team Gamma γ3 -- Keyboard accessibility.
 //
 // Verifies the keyboard map for `/`:
 //   1. Skip-to-content is the FIRST Tab stop.

@@ -24,7 +24,7 @@ export function StaticStack() {
     <LazyMotion features={domAnimation}>
       <section
         className="relative bg-ink-950"
-        aria-label="Inciting incident — the silence before"
+        aria-label="Inciting incident -- the silence before"
       >
         <div style={{ filter: 'saturate(0.7) brightness(0.92)' }}>
           {/* Three frames stacked vertically. Each occupies ~70vh so they

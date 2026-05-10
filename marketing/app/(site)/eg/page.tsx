@@ -1,11 +1,11 @@
-// /eg — Cairo wedge page.
+// /eg -- Cairo wedge page.
 //
 // Per the GTM strategist (council lens 4): ship a single static landing
 // page for Cairo BEFORE investing in full i18n architecture. One page,
 // one CTA (WhatsApp to Ahmed), one number (+20 10 3659 6238). Use it to
 // book 5 in-person Cairo demos in week 1. Architecture follows demand.
 //
-// English-with-Arabic-flex per copywriter's deck — Arabic key phrases
+// English-with-Arabic-flex per copywriter's deck -- Arabic key phrases
 // inline (`dir="rtl"` spans), English body copy. EGP pricing visible.
 // No founder photo, no last name (founder direction).
 
@@ -25,7 +25,7 @@ export const metadata: Metadata = buildMetadata({
 const WHATSAPP_NUMBER = '+20 10 3659 6238';
 const WHATSAPP_LINK =
   'https://wa.me/201036596238?text=' +
-  encodeURIComponent("Hi Ahmed — I run a gym in Cairo and I'd like to see IronPath.");
+  encodeURIComponent("Hi Ahmed -- I run a gym in Cairo and I'd like to see IronPath.");
 
 interface Tier {
   name: string;
@@ -73,7 +73,7 @@ function formatEgp(n: number): string {
 export default function EgyptPage() {
   return (
     <main className="bg-ink-950 text-ink-50 min-h-screen">
-      {/* Top utility bar — minimal, no cinematic chrome on this page. */}
+      {/* Top utility bar -- minimal, no cinematic chrome on this page. */}
       <nav className="border-b border-ink-900">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link
@@ -93,7 +93,7 @@ export default function EgyptPage() {
         </div>
       </nav>
 
-      {/* Hero — bilingual */}
+      {/* Hero -- bilingual */}
       <section className="px-4 sm:px-6 py-20 sm:py-28">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-brand-400 mb-4 tracking-wider">
@@ -146,7 +146,7 @@ export default function EgyptPage() {
             </p>
             <p>
               Members forget you exist between sessions. Renewals slip. New
-              sign-ups go to whoever follows up first &mdash; and you&rsquo;re
+              sign-ups go to whoever follows up first ,  and you&rsquo;re
               the one running the front desk.
             </p>
             <p
@@ -162,7 +162,7 @@ export default function EgyptPage() {
 
       <hr className="border-ink-900" />
 
-      {/* What you actually get — only ship what we have */}
+      {/* What you actually get -- only ship what we have */}
       <section className="px-4 sm:px-6 py-20 sm:py-24">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-ink-400 mb-3 tracking-wider">
@@ -191,7 +191,7 @@ export default function EgyptPage() {
               {
                 en: 'Push + email notifications',
                 detail:
-                  "You're back in your members' pockets. Renewal reminders, class invites, retention nudges &mdash; automated.",
+                  "You're back in your members' pockets. Renewal reminders, class invites, retention nudges ,  automated.",
               },
               {
                 en: 'QR poster for the gym wall',
@@ -222,7 +222,7 @@ export default function EgyptPage() {
 
       <hr className="border-ink-900" />
 
-      {/* Pricing — EGP, monthly only */}
+      {/* Pricing -- EGP, monthly only */}
       <section className="px-4 sm:px-6 py-20 sm:py-24">
         <div className="mx-auto max-w-5xl">
           <p className="font-mono text-[11px] text-ink-400 mb-3 tracking-wider">
@@ -322,7 +322,7 @@ export default function EgyptPage() {
           </p>
           <p className="text-ink-300 mb-10 leading-relaxed">
             Send Ahmed a WhatsApp. He&rsquo;ll come to your gym for a free
-            in-person demo &mdash; usually within a week.
+            in-person demo ,  usually within a week.
           </p>
           <a
             href={WHATSAPP_LINK}
@@ -339,7 +339,7 @@ export default function EgyptPage() {
         </div>
       </section>
 
-      {/* Quiet footer — no founder name, no LinkedIn, no Cal.com.
+      {/* Quiet footer -- no founder name, no LinkedIn, no Cal.com.
           Just the basics + a way back to the international site. */}
       <footer className="border-t border-ink-900 px-4 sm:px-6 py-10 text-xs text-ink-400">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row gap-4 sm:justify-between">
