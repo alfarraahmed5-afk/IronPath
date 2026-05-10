@@ -29,6 +29,7 @@ import duelsRouter from './routes/duels';
 import superAdminRouter from './routes/superAdmin';
 import { authTwoFactorRouter, superAdminTwoFactorRouter } from './routes/twoFactor';
 import leadsRouter from './routes/leads';
+import demoRouter from './routes/demo';
 import { startJobs, initJobs } from './jobs/index';
 import { assertSchemaReady } from './lib/schemaProbes';
 
@@ -103,6 +104,7 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/super-admin/2fa', superAdminTwoFactorRouter);
 app.use('/api/v1/super-admin', superAdminRouter);
 app.use('/api/v1/leads', leadsRouter);
+app.use('/api/v1/demo', demoRouter);
 app.use('/api/v1/trainer', trainerRouter);
 app.use('/api/v1/duels', duelsRouter);
 

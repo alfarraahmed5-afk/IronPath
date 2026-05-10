@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
-import { inter, jetbrainsMono } from '@/lib/fonts';
+import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { inter, jetbrainsMono, monaSans } from '@/lib/fonts';
 import { LivePulseStrip } from '@/components/primitives/live-pulse-strip';
 import { PreferencesBar } from '@/components/chrome/preferences-bar';
 import './globals.css';
@@ -28,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${monaSans.variable}`}
     >
       <body className="bg-ink-950 text-ink-50 antialiased">
         <a href="#main" className="skip-to-content">Skip to content</a>
@@ -51,6 +54,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mt-24 px-4 py-12 sm:px-6 border-t border-ink-900 text-xs text-ink-400">
           <p>© {new Date().getFullYear()} IronPath</p>
         </footer>
+        <Analytics />
+        <SpeedInsights />
+        <Script
+          src="https://plausible.io/js/script.js"
+          data-domain="ironpath.health"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

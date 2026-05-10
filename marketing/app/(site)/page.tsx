@@ -1,13 +1,23 @@
-// STUB — Team Alpha α1 owns the hero (Cold Open chapter).
-// α2/α3/α4 own the remaining chapters.
-// This placeholder lets the build succeed while parallel teams fill in scenes.
+// The cinematic landing page — composes all 7 acts (6 scene components,
+// since the Quiet Beat is folded into Denouement). Each scene is its own
+// client/server boundary; this page itself is RSC.
+
+import ColdOpenScene from '@/components/scenes/cold-open';
+import IncitingIncidentScene from '@/components/scenes/inciting-incident';
+import RevealScene from '@/components/scenes/reveal';
+import CapabilityScene from '@/components/scenes/capability';
+import PricingScene from '@/components/scenes/pricing';
+import DenouementScene from '@/components/scenes/denouement';
 
 export default function HomePage() {
   return (
-    <div className="min-h-[100svh] grid place-items-center">
-      <p className="text-ink-400 text-sm">
-        Marketing site — cinematic hero in progress.
-      </p>
-    </div>
+    <>
+      <ColdOpenScene />
+      <IncitingIncidentScene />
+      <RevealScene />
+      <CapabilityScene />
+      <PricingScene />
+      <DenouementScene />
+    </>
   );
 }

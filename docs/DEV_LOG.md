@@ -92,6 +92,43 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Marketing 12-agent sprint integration (10 of 12 landed)
+
+After the pre-stage at `a902d68`, spawned 12 worktree-isolated agents in parallel against the council-synthesized 3-PR plan. The first batch tripped the worktree fork-base race (origin/master locally was at `3c8b060` while local master was at `a902d68`; the harness picked origin/master for some agents); resolved with `git update-ref refs/remotes/origin/master refs/heads/master` and a re-spawn. The re-spawn ran into Anthropic API rate limits mid-execution — 10 of 12 agents wrote real work to their worktrees but never committed, 2 (β1 page composition + γ1 WebGL ember) wrote nothing.
+
+Salvaged the 10 worktrees' uncommitted work via `cp -r` per-worktree (file-ownership matrix was strict, no merge conflicts) plus inline-finished β1's mechanical scope so the cinematic page actually composes.
+
+**What landed (each lens's deliverables):**
+
+- **α1 (Cold Open hero)** — `marketing/components/scenes/cold-open/{index,Hero,HeroPoster}.tsx` + `public/hero/poster.{avif,webp}`. AVIF poster as LCP, headline + sub-head + CTA, ember seam, magnetic CTA with `layoutId="trialCta"` source, reduced-motion content fork, mobile thumb-arc CTA placement. ~165 kB initial JS on `/`.
+- **α2 (Inciting Incident + Reveal)** — `marketing/components/scenes/{inciting-incident,reveal}/index.tsx` + 7 sub-components (`spreadsheet-fragment`, `stopped-clock`, `silent-phone`, `pinned-stack`, `static-stack`, `bento`, `dashboard-mock`, `quote`, `sidebar-pill`, `stat-row`, `animated`, `static`). GSAP ScrollTrigger pinning, NumberFlow drop, brand-crimson saturation snap at ~340vh.
+- **α3 (Capability + Pricing)** — `marketing/components/scenes/{capability,pricing}/*` with `CapabilityPanel`, `TierCard`, `parts/FeatureList`. Horizontal-within-vertical scroll on desktop, stacked on mobile. 3-tier pricing with NumberFlow on price digits, Growth tier subtle pulse (no "MOST POPULAR" badge).
+- **α4 (Denouement + cross-route FLIP)** — `marketing/components/scenes/denouement/{index,QuietBeat,CrescendoCTA,Footer}.tsx` + `lib/cross-route-handoff.ts` + `components/MotionRoot.tsx` (the canonical `<LazyMotion features={domAnimation} strict>` wrapper used by `app/(site)/layout.tsx`). One `expo.out` reveal on the Quiet Beat. CrescendoCTA's `layoutId="trialCta"` target FLIPs from α1's source on cross-route navigate.
+- **β2 (brand primitives)** — real `ember-seam.tsx` with `glow` prop, real `live-pulse-strip.tsx` ported from admin (respects `useReducedMotion`), `Logomark.tsx` SVG, `lib/fonts.ts` swapped to `localFont` for Mona Sans (~90 KB axis-cut WOFF2 in `public/fonts/`).
+- **β3 (lead form + edge A/B)** — `components/lead-form.tsx` (RHF + zod, blur-validation, sentence-form errors, "Start my 30-day trial" submit), `components/StickyCta.tsx` (reveal-on-scroll-up), `lib/ab.ts` (3 hero headline variants), `middleware.ts` (geo + A/B + canonical strip), `app/api/lead/route.ts` (edge runtime, HMAC-signed forward), `.env.example`.
+- **β4 (content)** — 3 blog MDX posts (`why-mindbody-fails-small-gyms`, `qr-poster-conversion`, `30-day-trial-design`), real `privacy` + `terms` page content, `app/sitemap.ts`, `app/robots.ts`, `lib/blog.ts`. **Note:** β4 ran out of API budget before writing the `/pricing` and `/blog` route templates themselves; re-spawning to finish.
+- **γ2 (audio)** — `lib/audio.ts` (Howler dynamic-loaded, sprite + ducking + visibility-pause), `components/sound/sound-toggle.tsx` (visible text label + `aria-pressed` + iOS unlock inside gesture), `lib/audio-licenses.md`, silent-Opus placeholder generator script. Real CC0 SFX sourcing deferred — placeholders ship muted.
+- **γ3 (a11y CI + preferences)** — `components/chrome/preferences-bar.tsx` + `MotionToggle.tsx` (tri-state System/Reduced/Full), `playwright.config.ts`, axe-core specs (`tests/a11y/{home,pricing,blog,keyboard}.spec.ts`), `lighthouserc.cjs` (perf ≥90, LCP ≤2500, CLS ≤0.1, INP ≤200, runs both motion modes), `.github/workflows/a11y.yml`, `docs/a11y-checklist.md`.
+- **γ4 (demo deep-link)** — backend `src/routes/demo.ts` (public `POST /demo/spawn`, rate-limited 5/min/IP, picks from `Demo Gym%` pool, 24h TTL token, redirect to console with `?demo_token=`), migration `048_demo_sessions.sql`, schema probe extended, mounted in `backend/src/index.ts`, `auth.ts` adds `/demo/spawn` to PUBLIC_PATHS.
+
+**What didn't land (re-spawning):**
+- **β1** — wrote nothing. Inline-finished the load-bearing pieces: `app/(site)/page.tsx` (composes all 6 scenes), `app/(site)/layout.tsx` (wraps in MotionRoot), `app/opengraph-image.tsx`, `lib/seo.ts`, `app/layout.tsx` polish (`<Analytics />` + `<SpeedInsights />` + Plausible). Navbar extraction deferred (header lives inline in layout).
+- **β4 partial** — `/pricing/page.tsx` and `/blog/{page,[slug]/page}.tsx` route templates not written. Re-spawning.
+- **γ1** — wrote nothing. EmberCanvas stub still returns null. Re-spawning. v1 hero ships with AVIF poster only; ember-particle layer adds in next pass.
+
+**Verified:** all 4 builds clean.
+- `npm run -w backend build` ✓
+- `npm run -w admin build` ✓
+- `npm run -w console build` ✓
+- `npm run -w marketing build` — 8 routes prerender, 165 kB First Load JS on `/` (within 200 kB performance budget), 32.5 kB middleware. Hero, all 6 scenes, /privacy, /terms, /robots.txt, /sitemap.xml, /api/lead edge, /opengraph-image edge generator.
+
+**Sprint mechanic notes (for the next 12-agent batch):**
+- Worktree fork-base race fix is `git update-ref refs/remotes/origin/master refs/heads/master` BEFORE spawning — the memory note `feedback_worktree_fork_base.md` was right; it was a partial fix in earlier attempts because we only updated `refs/heads/master` and not the remote ref the harness reads.
+- Anthropic API rate limit can hit mid-execution and freeze agents in mid-write. Salvageable via worktree `cp -r` because file ownership was partitioned. Useful pattern: have agents commit small WIP commits as they go so cap-out doesn't lose 30 minutes of work.
+- Several agents tripped path-duplication when the brief said `tests/a11y/...` and they `cp -r tests/ tests/` — `marketing/tests/tests/` and `marketing/docs/docs/` were the result; cleaned up at integration.
+
+**Next pass (small, focused):** β1 polish (Navbar extraction), β4 routes (/pricing, /blog), γ1 (WebGL ember canvas). After they land, push.
+
 ### 2026-05-10 · Marketing workspace pre-stage (foundation for 12-agent sprint)
 
 Founder asked to spin up the marketing site `ironpath.health`. The 10-lens marketing council had already produced a 3-PR plan (synthesis lives at the local-only `skills/SYNTHESIS.md`; the `skills/` folder is gitignored per founder direction since the council artifacts are reusable scaffolding, not project code). Founder confirmed locked decisions: Mona Sans display face, brand-400 #FF4566 added for a11y, demo deep-link in PR3, audio in PR4, WebGL ember layer **in PR4** (not deferred), 12 parallel agents next.

@@ -1,0 +1,108 @@
+name: marketing-a11y
+
+# Team Gamma γ3 — Accessibility CI gate.
+#
+# Runs Playwright + axe-core against the marketing site in BOTH motion modes,
+# then runs Lighthouse CI in BOTH motion modes. Fails the PR check if any
+# serious / critical axe violation is found, or if perf / a11y / vitals
+# budgets regress.
+#
+# Triggers on every push that changes the marketing workspace.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'marketing/**'
+      - '.github/workflows/a11y.yml'
+  pull_request:
+    paths:
+      - 'marketing/**'
+      - '.github/workflows/a11y.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: marketing-a11y-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright + axe (${{ matrix.motion }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        motion:
+          - chromium-default-motion
+          - chromium-reduced-motion
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: marketing
+        run: npx playwright install --with-deps chromium
+
+      - name: Build marketing
+        working-directory: marketing
+        run: npm run build
+
+      - name: Run a11y suite (${{ matrix.motion }})
+        working-directory: marketing
+        env:
+          CI: '1'
+        run: npx playwright test --project=${{ matrix.motion }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.motion }}
+          path: marketing/playwright-report
+          retention-days: 14
+
+  lighthouse:
+    name: Lighthouse CI (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    needs: playwright
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - default
+          - reduced
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build marketing
+        working-directory: marketing
+        run: npm run build
+
+      - name: Run Lighthouse CI (${{ matrix.mode }})
+        working-directory: marketing
+        env:
+          LHCI_MODE: ${{ matrix.mode }}
+        run: npx lhci autorun --config=./lighthouserc.cjs
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report-${{ matrix.mode }}
+          path: marketing/.lighthouseci
+          retention-days: 14

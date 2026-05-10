@@ -36,6 +36,10 @@ const PUBLIC_PATH_RES: { method?: string; re: RegExp }[] = [
   // super_admin GET/PATCH list endpoints sit under /api/v1/super-admin/leads
   // and are not affected by this exemption.
   { method: 'POST', re: /^\/api\/v1\/leads\/?(\?.*)?$/ },
+  // Phase C / γ4 — Marketing-site no-auth demo deep-link. Only POST
+  // /api/v1/demo/spawn is unauthenticated; rate-limited 5/min/IP inside
+  // the route handler.
+  { method: 'POST', re: /^\/api\/v1\/demo\/spawn\/?(\?.*)?$/ },
 ];
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
