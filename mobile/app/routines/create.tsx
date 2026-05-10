@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Plus, X, Search, Check } from 'lucide-react-native';
 import { api } from '../../src/lib/api';
 import { Header } from '../../src/components/Header';
@@ -65,8 +65,16 @@ function defaultSet(position: number): DraftSet {
 
 export default function CreateRoutineScreen() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  // /routines/prebuilt forwards a `suggestedName` so the new routine
+  // starts pre-named after the chosen template.
+  const { suggestedName, source } = useLocalSearchParams<{
+    suggestedName?: string;
+    source?: string;
+  }>();
+  const [name, setName] = useState(suggestedName ?? '');
+  const [description, setDescription] = useState(
+    source ? `Imported from the ${String(source).replace(/_/g, ' ')} template.` : '',
+  );
   const [isPublic, setIsPublic] = useState(false);
   const [exercises, setExercises] = useState<DraftExercise[]>([]);
   const [saving, setSaving] = useState(false);
