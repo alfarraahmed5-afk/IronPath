@@ -23,6 +23,8 @@ import { useAuthStore } from '../src/stores/authStore';
 import { api } from '../src/lib/api';
 import { initDB } from '../src/lib/db';
 import { ToastProvider } from '../src/components/Toast';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/lib/queryClient';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -140,12 +142,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ToastProvider>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-        </ToastProvider>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          </ToastProvider>
+        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
