@@ -15,21 +15,23 @@ export { Section } from './Section';
 export { EmberSeam } from './EmberSeam';
 export { LivePulseStrip } from './LivePulseStrip';
 export { RouteModal } from './Modal';
+export { Sheet } from './Sheet';
+export type { SheetDetent, SheetProps } from './Sheet';
+export { Button } from './Button';
+export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';
+export { Pressable } from './Pressable';
 
 // Re-exports of legacy primitives so consumers can pick a single
 // import path. Team B may upgrade these in place.
 export { Avatar } from '../../components/Avatar';
 export { BadgeChip } from '../../components/BadgeChip';
-export { Button } from '../../components/Button';
 export { Calendar } from '../../components/Calendar';
 export { EmptyState } from '../../components/EmptyState';
 export { Header } from '../../components/Header';
 export { Icon } from '../../components/Icon';
 export { Input } from '../../components/Input';
 export { LineChart } from '../../components/LineChart';
-export { Pressable } from '../../components/Pressable';
 export { ProgressRing } from '../../components/ProgressRing';
-export { Sheet } from '../../components/Sheet';
 export { Skeleton } from '../../components/Skeleton';
 export { StatCard } from '../../components/StatCard';
 export { Surface } from '../../components/Surface';
