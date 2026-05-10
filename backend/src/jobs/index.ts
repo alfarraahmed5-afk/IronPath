@@ -4,6 +4,8 @@ import { logger } from '../lib/logger';
 import { computeGymLeaderboards, resolveLeaderboardExercises } from '../lib/leaderboardCompute';
 import { runTrialEmailsJob } from './trialEmailsJob';
 import { runStreakTierCheck } from './streakTierCheck';
+import { runMonthlyRecapJob } from './monthlyRecapJob';
+import { runGoalsAutoComplete } from './goalsAutoComplete';
 
 export async function initJobs(): Promise<void> {
   await resolveLeaderboardExercises();
@@ -693,6 +695,32 @@ export function startJobs(): void {
       const result = await runStreakTierCheck();
       logger.info(result, 'Streak tier check complete');
     } catch (err) { logger.error({ err }, 'Streak tier check failed'); }
+  }, { timezone: 'UTC' });
+
+  // BE-E (cinematic overhaul) -- monthly recap generation.
+  // Runs the 1st of each month at 06:00 UTC. Produces one
+  // `monthly_recaps` row per active user who logged a workout in the
+  // prior month; sends a push notification on the pr-and-streak
+  // channel so mobile surfaces the cinematic 6-panel takeover on next
+  // app focus.
+  cron.schedule('0 6 1 * *', async () => {
+    try {
+      logger.info('Monthly recap job started');
+      const result = await runMonthlyRecapJob();
+      logger.info(result, 'Monthly recap job complete');
+    } catch (err) { logger.error({ err }, 'Monthly recap job failed'); }
+  }, { timezone: 'UTC' });
+
+  // BE-F (cinematic overhaul) -- goals auto-completion.
+  // Runs nightly at 02:30 UTC, after the streak tier check. Walks all
+  // active goals; marks completed any whose target has been met; sends
+  // a push notification on the pr-and-streak channel.
+  cron.schedule('30 2 * * *', async () => {
+    try {
+      logger.info('Goals auto-complete started');
+      const result = await runGoalsAutoComplete();
+      logger.info(result, 'Goals auto-complete complete');
+    } catch (err) { logger.error({ err }, 'Goals auto-complete failed'); }
   }, { timezone: 'UTC' });
 
   logger.info('All background jobs registered');

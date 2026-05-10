@@ -108,6 +108,12 @@ const PROBES: SchemaProbe[] = [
   // BE-N (cinematic overhaul) -- streak tier ladder.
   { migration: '052', description: 'streak_tier_thresholds table', run: probeTable('streak_tier_thresholds') },
   { migration: '052', description: 'streak_tier_thresholds.threshold_days column', run: probeColumn('streak_tier_thresholds', 'threshold_days') },
+  // BE-E (cinematic overhaul) -- monthly recaps.
+  { migration: '053', description: 'monthly_recaps table', run: probeTable('monthly_recaps') },
+  { migration: '053', description: 'monthly_recaps.period_key column', run: probeColumn('monthly_recaps', 'period_key') },
+  // BE-F (cinematic overhaul) -- user goals.
+  { migration: '054', description: 'user_goals table', run: probeTable('user_goals') },
+  { migration: '054', description: 'user_goals.goal_type column', run: probeColumn('user_goals', 'goal_type') },
 ];
 
 export interface SchemaCheckResult {

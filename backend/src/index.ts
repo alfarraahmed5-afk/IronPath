@@ -26,6 +26,8 @@ import milestonesRouter from './routes/milestones';
 import cancellationRouter from './routes/cancellation';
 import trainerRouter from './routes/trainer';
 import duelsRouter from './routes/duels';
+import goalsRouter from './routes/goals';
+import recapsRouter from './routes/recaps';
 import superAdminRouter from './routes/superAdmin';
 import { authTwoFactorRouter, superAdminTwoFactorRouter } from './routes/twoFactor';
 import leadsRouter from './routes/leads';
@@ -107,6 +109,8 @@ app.use('/api/v1/leads', leadsRouter);
 app.use('/api/v1/demo', demoRouter);
 app.use('/api/v1/trainer', trainerRouter);
 app.use('/api/v1/duels', duelsRouter);
+app.use('/api/v1/goals', goalsRouter);
+app.use('/api/v1/recaps', recapsRouter);
 
 app.use(errorHandler);
 
