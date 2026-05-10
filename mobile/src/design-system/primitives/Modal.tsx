@@ -90,7 +90,10 @@ export function RouteModal({
   const saveActive = !!onSave && !saving && !disabled;
 
   return (
-    <View style={[styles.root, style]}>
+    <View
+      style={[styles.root, style]}
+      accessibilityViewIsModal
+    >
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.side}>
           {closable && (
