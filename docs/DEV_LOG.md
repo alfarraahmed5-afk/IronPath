@@ -129,6 +129,55 @@ Salvaged the 10 worktrees' uncommitted work via `cp -r` per-worktree (file-owner
 
 **Next pass (small, focused):** β1 polish (Navbar extraction), β4 routes (/pricing, /blog), γ1 (WebGL ember canvas). After they land, push.
 
+### 2026-05-10 · Marketing sprint completion — β4 routes + γ1 WebGL ember
+
+Re-spawn pass for the 2 lenses that didn't finish. Both landed clean.
+
+**β4 finish — content routes:**
+- `marketing/app/(site)/pricing/page.tsx` — RSC + ISR 1h. Hero + 3-tier cards (Starter $49 / Growth $99 with subtle accent / Unlimited $199, no "MOST POPULAR" badge per conversion lens) + 15-row comparison table + 6-question FAQ (`<dl>`) + founder card with Cal.com + LinkedIn CTAs. All per-tier CTAs read "Start free trial" with `?tier=` parameter.
+- `marketing/app/(site)/blog/page.tsx` — RSC + ISR 60s. Lists posts by date desc, title links, formatted date, excerpt, reading time.
+- `marketing/app/(site)/blog/[slug]/page.tsx` — RSC + ISR 1h + `generateStaticParams` over 3 slugs + `generateMetadata` via `buildMetadata`. **MDX rendering caveat:** the spec called for `next-mdx-remote/rsc`, but it crashes at prerender on Next 15.1 + React 18.3.1 with "A React Element from an older version of React was rendered" — root cause is a React identity mismatch between user-space React and Next's bundled `react-server` build inside the RSC graph. β4 worked around it by importing `@mdx-js/mdx`'s `evaluate` directly with `react/jsx-runtime`. Same end result; `next-mdx-remote` stays in `package.json` for any future caller and can be removed in cleanup.
+- `marketing/app/(site)/for-gyms/page.tsx` — long-form value-prop page (~520 body words across 5 sections), RSC + ISR 1h.
+
+**γ1 — WebGL ember canvas (the layer that makes the photograph look like it caught fire):**
+- `marketing/lib/device-tier.ts` — A/B/C tier classifier. SSR-safe (returns 'C' on server). Decision tree: `saveData` → C; `deviceMemory < 2GB` or `cores < 2` → C; mobile + `memory < 4` or `cores < 4` → B; otherwise A.
+- `marketing/lib/canvas-bootstrap.tsx` — `'use client'` wrapper. Tier check, then `requestIdleCallback({ timeout: 1500 })` after LCP, then `next/dynamic` import of the real canvas with `ssr: false`.
+- `marketing/components/canvas/EmberShader.ts` — vertex + fragment GLSL. Per-particle age/seed, drift-up + horizontal sin jitter, fragment alpha falloff via `smoothstep` on `gl_PointCoord`, additive `gl.SRC_ALPHA, gl.ONE` blending.
+- `marketing/components/canvas/ember-canvas-real.tsx` — full OGL impl (Renderer / Geometry / Program / Mesh, rAF loop, ResizeObserver, opacity-only crossfade, `WEBGL_lose_context` cleanup, 60-frame fps watchdog that halves count once then unmounts on a second failure).
+- `marketing/components/canvas/ember-canvas.tsx` — public API replaced from null-stub to re-export of the bootstrap. `EmberCanvasProps` interface preserved so α1's existing `import { EmberCanvas }` keeps resolving.
+
+**Bundle math for ember layer:** total lazy chunk **~18 KB gz** (well under the 80 KB target). Initial `/` route gains only the bootstrap (a few hundred bytes). The OGL library (~12.9 KB gz) only loads after `requestIdleCallback` fires on tier A/B clients. Tier C clients get null — no GL context, no chunk download.
+
+**Final route table (14 prerendered):**
+```
+/                           29.8 kB / 166 kB First Load (cinematic landing, all 6 scenes)
+/blog                       182 B   / 109 kB
+/blog/[slug] × 3            182 B   / 109 kB each
+/for-gyms                   182 B   / 109 kB
+/pricing                    182 B   / 109 kB
+/privacy                    145 B   / 106 kB
+/terms                      145 B   / 106 kB
+/_not-found                 145 B   / 106 kB
+/api/lead                   edge
+/opengraph-image            edge
+/robots.txt                 generated
+/sitemap.xml                generated
+Middleware                  32.5 kB
+```
+
+**Verified:** all 4 builds clean — backend tsc, admin Vite (466 KB / 141 KB gz), console Vite (466 KB / 141 KB gz), marketing Next prerender (14 routes, 166 kB First Load on the cinematic page).
+
+**Sprint complete.** 12 lenses' work shipped (10 via salvage, β1 finished inline, β4 + γ1 in this re-spawn pass). Marketing site is ready to ship to production. Remaining for deploy:
+1. **Founder action — Namecheap DNS cleanup:** delete the existing parking-page records on `ironpath.health` (CNAME `www → parkingpage.namecheap.com`, URL Redirect `@ → http://www.ironpath.health/`) before assigning the Vercel custom domain.
+2. **Vercel project setup:** new project `ironpath-marketing`, root dir `marketing/`, regions `iad1` + `sfo1`, custom domain `ironpath.health` apex + `www.ironpath.health` 301 → apex.
+3. **Env vars on Vercel:** `NEXT_PUBLIC_BACKEND_URL`, `NEXT_PUBLIC_ADMIN_URL`, `LEAD_HMAC_SECRET` (generate 32B hex, set on Railway too for HMAC verify), `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`, `SENTRY_DSN`.
+4. **Backend env vars:** add the same `LEAD_HMAC_SECRET` to Railway so the leads endpoint can verify the marketing-side signature.
+5. **Supabase:** apply migration `048_demo_sessions.sql` BEFORE deploying the backend (the schema probe will refuse boot otherwise).
+6. **Seed at least one demo gym:** insert a row into `gyms` with `name LIKE 'Demo Gym%'` so γ4's demo-spawn endpoint has a pool to draw from. Without it the endpoint returns 503.
+7. **Mona Sans font** is downloaded to `marketing/public/fonts/mona-sans-variable.woff2` (~90 KB axis-cut WOFF2). Verify it's in the production build artifact.
+8. **CC0 SFX assets** for the audio sprite are placeholder silent Opus files. Replace with real CC0 audio at leisure (audio is muted-by-default; users opt in via the visible toggle).
+9. **CSP / CAA records** if registrar enforces — allow `letsencrypt.org` for the Vercel cert issuance.
+
 ### 2026-05-10 · Marketing workspace pre-stage (foundation for 12-agent sprint)
 
 Founder asked to spin up the marketing site `ironpath.health`. The 10-lens marketing council had already produced a 3-PR plan (synthesis lives at the local-only `skills/SYNTHESIS.md`; the `skills/` folder is gitignored per founder direction since the council artifacts are reusable scaffolding, not project code). Founder confirmed locked decisions: Mona Sans display face, brand-400 #FF4566 added for a11y, demo deep-link in PR3, audio in PR4, WebGL ember layer **in PR4** (not deferred), 12 parallel agents next.

@@ -1,12 +1,17 @@
 'use client';
 
-// STUB — Team Gamma γ1 owns the real implementation (OGL ember-particle layer).
-// Public API: a positioned <canvas> that crossfades over the AVIF poster
-// AFTER LCP. Mounts via dynamic import + requestIdleCallback. Returns null
-// on weak devices (per device-tier check); the AVIF poster stays as the
-// hero in that case.
+// EmberCanvas — public API for the cold-open scene.
 //
-// Until γ1 fills in: returns null. The hero is just the AVIF poster.
+// This file is a thin re-export of the bootstrap component, which itself
+// gates everything behind a device-tier check + requestIdleCallback +
+// dynamic-import. The real OGL implementation lives in
+// `./ember-canvas-real.tsx` and only loads on tier A/B clients after the
+// browser is idle (so it cannot contend with LCP for main-thread time).
+//
+// The shape of `EmberCanvasProps` is preserved so the cold-open scene's
+// existing import keeps working without changes.
+
+export { default as EmberCanvas } from '@/lib/canvas-bootstrap';
 
 export interface EmberCanvasProps {
   /** Class to apply to the canvas wrapper. Should set absolute positioning,
@@ -14,8 +19,4 @@ export interface EmberCanvasProps {
   className?: string;
   /** Crossfade-in trigger. When true, the canvas fades from 0 → 1 over 200ms. */
   visible?: boolean;
-}
-
-export function EmberCanvas(_props: EmberCanvasProps): null {
-  return null;
 }
