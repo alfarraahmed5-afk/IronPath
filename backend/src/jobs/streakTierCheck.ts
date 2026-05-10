@@ -25,7 +25,7 @@
  * just emits any newly-eligible rows.
  *
  * The job is registered in `jobs/index.ts` to run at 02:00 UTC. Push
- * notifications honor the user's `notif_badge_unlocked` setting.
+ * notifications honor the user's `notif_streak_milestones` setting.
  */
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
@@ -112,13 +112,15 @@ export async function runStreakTierCheck(): Promise<{
 
   // Look up notification preference per user. One round-trip is
   // cheaper than per-user fan-out when n is large.
+  // We read `notif_streak_milestones` which is the semantically
+  // correct toggle for the streak ladder per migration 022.
   const { data: settingsRows } = await supabase
     .from('user_settings')
-    .select('user_id, notif_badge_unlocked')
+    .select('user_id, notif_streak_milestones')
     .in('user_id', userIds);
   const userToNotif = new Map<string, boolean>();
   for (const row of settingsRows ?? []) {
-    userToNotif.set(row.user_id, (row as any).notif_badge_unlocked ?? true);
+    userToNotif.set(row.user_id, (row as any).notif_streak_milestones ?? true);
   }
 
   for (const streak of streaks) {
