@@ -1,8 +1,11 @@
 /**
- * STUB -- replaced by Team A in PR A.
+ * Motion fingerprint -- lens 1 spec.
  *
- * Lens 1 motion fingerprint: Vercel ease, asymmetric page transitions,
- * spring configs (modal/magnetic/rail), 60ms list stagger.
+ * Vercel ease curve, asymmetric page transitions, spring configs
+ * (modal/magnetic/rail), 60ms list stagger.
+ *
+ * Team B builds the actual primitives at `design-system/motion/primitives.ts`
+ * (already pre-staged with stubs); this file is the pure value layer.
  */
 import { Easing } from 'react-native-reanimated';
 
@@ -22,5 +25,13 @@ export const springRail = { stiffness: 520, damping: 36 };
 // List stagger between successive children.
 export const LIST_STAGGER_MS = 60;
 
-// Legacy duration tokens. Kept for backwards compat.
-export { motion as durations } from '../../theme/tokens';
+// Duration tokens. Kept for backwards compat with legacy callsites that
+// imported `motion` from `theme/tokens.ts`.
+export const motion = {
+  fast: 150,
+  base: 220,
+  slow: 320,
+} as const;
+
+// Older alias name -- some callsites import `durations`.
+export const durations = motion;

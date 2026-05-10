@@ -1,4 +1,12 @@
 /**
- * STUB -- replaced by Team A in PR A. Re-exports legacy radii.
+ * IronPath radius scale.
  */
-export { radii } from '../../theme/tokens';
+export const radii = {
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   24,
+  full: 9999,
+} as const;
+
+export type Radii = typeof radii;
