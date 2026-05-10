@@ -480,6 +480,94 @@ router.patch('/gyms/:id', async (req: Request, res: Response, next: NextFunction
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// DELETE /super-admin/gyms/:id — destructive cascade
+// ────────────────────────────────────────────────────────────────────────────
+// Schema reality (audited 2026-05-10): the FK graph from `gyms` is half-cascading.
+// `users.gym_id`, `exercises.gym_id`, and `gym_announcements.created_by` /
+// `leaderboard_challenges.created_by` are all NOT NULL with no cascade — a naive
+// `DELETE FROM gyms` fails with FK violation. Until a migration tightens this,
+// the order below is mandatory:
+//   1. clear gym tables that hold NOT-NULL refs to users (announcements,
+//      challenges) — otherwise the user cascade later fails
+//   2. delete auth users (cascades public.users via auth→public FK,
+//      which in turn cascades every user-scoped table: workouts, routines,
+//      PRs, settings, streaks, etc.)
+//   3. delete custom exercises (gym_id NO cascade; safe now since no
+//      routines/workouts/PRs reference them)
+//   4. delete the gym row (cascades the remaining gym-scoped tables that DO
+//      have ON DELETE CASCADE: leaderboard_snapshots, subscription_payments,
+//      gym_onboarding_steps, trial_emails_log, gym_milestones, cancellation_log)
+// Audit logged AFTER the gym row is gone so the audit `before` snapshot is the
+// last surviving record of the deleted gym.
+router.delete('/gyms/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const gymId = req.params.id;
+
+    const { data: gym, error: readErr } = await supabase.from('gyms').select('*').eq('id', gymId).single();
+    if (readErr && !isNotFoundError(readErr)) {
+      logger.error({ err: readErr, gymId }, 'gym delete read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    if (!gym) return next(new AppError('NOT_FOUND', 404, 'Gym not found'));
+
+    const { data: gymUsers, error: usersErr } = await supabase.from('users').select('id, email').eq('gym_id', gymId);
+    if (usersErr) {
+      logger.error({ err: usersErr, gymId }, 'gym delete user read failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+    const userIds = (gymUsers ?? []).map(u => u.id);
+
+    const { error: announcementsErr } = await supabase.from('gym_announcements').delete().eq('gym_id', gymId);
+    if (announcementsErr) {
+      logger.error({ err: announcementsErr, gymId }, 'gym delete announcements failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+
+    const { error: challengesErr } = await supabase.from('leaderboard_challenges').delete().eq('gym_id', gymId);
+    if (challengesErr) {
+      logger.error({ err: challengesErr, gymId }, 'gym delete challenges failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+
+    let authDeleteFailures = 0;
+    for (const id of userIds) {
+      try {
+        const { error: authErr } = await supabase.auth.admin.deleteUser(id);
+        if (authErr) {
+          authDeleteFailures += 1;
+          logger.warn({ err: authErr, userId: id, gymId }, 'gym delete: auth user delete failed (orphan-auth cron will retry)');
+        }
+      } catch (err) {
+        authDeleteFailures += 1;
+        logger.warn({ err, userId: id, gymId }, 'gym delete: auth user delete threw (orphan-auth cron will retry)');
+      }
+    }
+
+    const { error: exercisesErr } = await supabase.from('exercises').delete().eq('gym_id', gymId);
+    if (exercisesErr) {
+      logger.error({ err: exercisesErr, gymId }, 'gym delete exercises failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+
+    const { error: gymErr } = await supabase.from('gyms').delete().eq('id', gymId);
+    if (gymErr) {
+      logger.error({ err: gymErr, gymId }, 'gym delete gym row failed');
+      return next(new AppError('INTERNAL_ERROR', 500, 'Database error'));
+    }
+
+    await logAudit(req, {
+      action: 'gym.delete',
+      target_type: 'gym',
+      target_id: gymId,
+      before: gym,
+      after: { deleted_user_count: userIds.length, auth_delete_failures: authDeleteFailures },
+    });
+
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // GET /super-admin/leads — list
 // ────────────────────────────────────────────────────────────────────────────
 router.get('/leads', async (req: Request, res: Response, next: NextFunction) => {

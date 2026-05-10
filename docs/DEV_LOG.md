@@ -92,6 +92,37 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Delete gym endpoint + console Settings tab
+
+Founder asked for a destructive "delete gym" path so test/abandoned trial gyms can be cleared from production rather than left as zombie rows polluting analytics. Lands as a single backend route + a new console Settings tab gated by a type-DELETE confirmation modal.
+
+**Schema audit caught a quiet trap.** The user spec assumed `DELETE FROM gyms` would cascade everything via existing FKs. Reality (from grepping all 47 migrations): only 8 of the 23 gym-scoped tables actually cascade from `gyms` — `gym_announcements`, `leaderboard_snapshots`, `leaderboard_challenges`, `subscription_payments`, `gym_onboarding_steps`, `trial_emails_log`, `gym_milestones`, `cancellation_log`. The other 15 (`users.gym_id`, `exercises.gym_id`, plus all the user-scoped tables that reach the gym indirectly via `user_id`) have NOT NULL with no cascade. Worse, `gym_announcements.created_by` and `leaderboard_challenges.created_by` reference `users(id)` NOT NULL with no cascade — so even if we deleted users first, those rows would block the deletion. A naive single-statement gym delete would fail with FK violation in three places. No migration this commit; the deletion order in the route works around it.
+
+**Backend changes:**
+- `backend/src/routes/superAdmin.ts` — new `DELETE /super-admin/gyms/:id` (lines 482-571 after `PATCH /gyms/:id`). Behind the existing `requireActiveUser, requireSuperAdmin` chain on the router. Order, fixed by the FK reality:
+  1. Read gym row (existence check + audit `before` snapshot; 404 via `isNotFoundError` helper)
+  2. Read user IDs for the gym (capture for auth deletion)
+  3. Delete `gym_announcements WHERE gym_id` (clears the NOT-NULL `created_by` blocker)
+  4. Delete `leaderboard_challenges WHERE gym_id` (same blocker; cascades to `challenge_results`)
+  5. Loop `supabase.auth.admin.deleteUser(id)` per user — cascades `public.users` via `auth→public` FK, which in turn cascades every user-scoped table (workouts, routines, PRs, body measurements, follows, likes, comments, notifications, streaks, monthly reports, AI trainer programs, push tokens, settings, badges, 2fa rows). Each call is best-effort with a `logger.warn` on failure; a counter (`auth_delete_failures`) is recorded in the audit row, and the orphan-auth cron picks up any stragglers.
+  6. Delete `exercises WHERE gym_id` (custom exercises; safe now that no routine/workout/PR references them)
+  7. Delete the `gyms` row (cascades the remaining 6 gym-scoped tables that DO have ON DELETE CASCADE)
+  8. `logAudit({action: 'gym.delete', target_type: 'gym', target_id, before: gym, after: { deleted_user_count, auth_delete_failures }})`
+  9. `204 No Content`
+- The deletion order is annotated inline so the next person reading the route understands why it isn't a one-liner. No migration adds cascading FKs; deferred until the schema cleanup is bundled with another change.
+
+**Console changes:**
+- New `console/src/pages/gyms/SettingsTab.tsx` — danger-zone card + `DeleteGymModal`. Modal traps focus on the "type DELETE" input, blocks the submit until exact match, ESC-to-close (disabled while submitting), backdrop click to dismiss. Calls `api.delete('/super-admin/gyms/:id')`, invalidates the `['gyms']` list query and removes the `['gym', :id]` detail cache, then `navigate('/gyms', { replace: true })` so the back button can't surface a 404 detail page. Error path surfaces the backend `error.message` if present, otherwise a generic line.
+- `console/src/App.tsx` — `<Route path="settings" element={<SettingsTab />} />` added inside the `/gyms/:gymId` parent.
+- `console/src/pages/GymDetailPage.tsx` — added `{ to: 'settings', label: 'Settings' }` as the fifth tab.
+- Color tokens: console `tailwind.config.js` has no semantic `error` palette, so the modal uses Tailwind defaults (`red-500`/`red-400`/`red-300`/`red-600`) consistent with the existing `text-red-300` inline-error pattern in `OverviewTab.tsx`.
+
+**Verified:** `npm run -w backend build` clean. `npm run -w console build` clean (457 → 462.66 kB pre-gzip / 138 → 139.55 kB gz; +5 kB pre-gzip / +1.5 kB gz for the SettingsTab + modal).
+
+**Deploy notes:** no migration. Push triggers Railway (backend redeploy) + Vercel `iron-path-console` redeploy. The endpoint is irreversible — operator-grade only. Audit row is the only forensic trail; the gym row is gone, but `super_admin_audit_log` retains the full `before` snapshot under `action='gym.delete'` for post-mortem.
+
+**Phase B Tier 2 backlog item — schema cascade cleanup:** add a migration that tightens `users.gym_id` and `exercises.gym_id` to ON DELETE CASCADE and changes `gym_announcements.created_by` / `leaderboard_challenges.created_by` to nullable + ON DELETE SET NULL. Once that lands, the `DELETE` route collapses to `read → loop auth.admin.deleteUser → delete from gyms → audit → 204`. Deferred since the inline ordered deletes work today.
+
 ### 2026-05-10 · Phase C complete — 12-agent parallel sprint (3 teams × 4 agents)
 
 User asked to "deploy 3 teams of 4 top experts to finish this phase." Pre-staged 5 stub files for cross-team imports (4 onboarding step components — Step1Brand/Step2Poster/Step3Announcement/Step4Trainer/StepIndicator), then spawned 12 worktree-isolated agents in parallel for the remaining Phase C scope.

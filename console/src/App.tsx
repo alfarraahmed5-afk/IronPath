@@ -8,6 +8,7 @@ import OverviewTab from './pages/gyms/OverviewTab';
 import SubscriptionTab from './pages/gyms/SubscriptionTab';
 import AuditTab from './pages/gyms/AuditTab';
 import OnboardingTab from './pages/gyms/OnboardingTab';
+import SettingsTab from './pages/gyms/SettingsTab';
 import InboxPage from './pages/InboxPage';
 import PipelinePage from './pages/PipelinePage';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="subscription" element={<SubscriptionTab />} />
           <Route path="audit" element={<AuditTab />} />
           <Route path="onboarding" element={<OnboardingTab />} />
+          <Route path="settings" element={<SettingsTab />} />
         </Route>
         <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
 

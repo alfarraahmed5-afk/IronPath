@@ -18,6 +18,7 @@ const TABS: { to: string; label: string }[] = [
   { to: 'subscription', label: 'Subscription' },
   { to: 'audit', label: 'Audit' },
   { to: 'onboarding', label: 'Onboarding' },
+  { to: 'settings', label: 'Settings' },
 ];
 
 export default function GymDetailPage() {
