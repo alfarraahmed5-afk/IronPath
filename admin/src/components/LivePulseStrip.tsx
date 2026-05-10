@@ -53,7 +53,7 @@ export function LivePulseStrip() {
     <div
       aria-hidden="true"
       className="fixed top-0 left-0 right-0 h-1 z-50 pointer-events-none overflow-hidden"
-      style={{ background: 'rgba(255, 107, 53, 0.04)' }}
+      style={{ background: 'rgba(200, 16, 46, 0.04)' }}
     >
       {!reduced && <span key={pulseKey} className="pulse-travel" />}
       <div

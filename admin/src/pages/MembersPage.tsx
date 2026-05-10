@@ -204,7 +204,7 @@ function RosterTile({
             className="absolute -inset-[2px] rounded-full"
             style={{
               boxShadow:
-                '0 0 0 1px rgba(255, 107, 53, 0.55), 0 0 8px 1px rgba(255, 107, 53, 0.35)',
+                '0 0 0 1px rgba(200, 16, 46, 0.55), 0 0 8px 1px rgba(200, 16, 46, 0.35)',
             }}
           />
         )}

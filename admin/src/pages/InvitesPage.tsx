@@ -87,7 +87,7 @@ export default function InvitesPage() {
         <h1 className="text-2xl font-bold">Invite Codes</h1>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+          className="bg-brand-500 hover:bg-brand-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           Generate New
         </button>
@@ -106,7 +106,7 @@ export default function InvitesPage() {
                 placeholder="Unlimited"
                 value={maxUses}
                 onChange={(e) => setMaxUses(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-brand-500"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -115,14 +115,14 @@ export default function InvitesPage() {
                 type="date"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500"
               />
             </div>
             <div className="flex gap-3">
               <button
                 type="submit"
                 disabled={submitting}
-                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
               >
                 {submitting ? 'Creating…' : 'Create'}
               </button>
@@ -173,7 +173,7 @@ export default function InvitesPage() {
                   className={`border-b border-gray-800 last:border-0 ${idx % 2 === 0 ? '' : 'bg-gray-900/50'}`}
                 >
                   <td className="px-5 py-4">
-                    <span className="font-mono font-bold text-orange-500 tracking-wider">
+                    <span className="font-mono font-bold text-brand-500 tracking-wider">
                       {invite.code}
                     </span>
                   </td>

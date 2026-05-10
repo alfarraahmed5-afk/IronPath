@@ -162,7 +162,7 @@ export default function LoginPage() {
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              'radial-gradient(circle at 0% 0%, rgba(255,107,53,0.18), transparent 40%)',
+              'radial-gradient(circle at 0% 0%, rgba(200, 16, 46,0.18), transparent 40%)',
           }}
         />
         {/* Bottom-right fade to true black so the seam between photo and
@@ -190,7 +190,7 @@ export default function LoginPage() {
         className="relative lg:w-1/2 flex items-center justify-center px-6 py-12 lg:py-0 surface-shell"
         style={{
           backgroundImage:
-            'radial-gradient(120% 70% at 0% 0%, rgba(255,107,53,0.05) 0%, transparent 55%)',
+            'radial-gradient(120% 70% at 0% 0%, rgba(200, 16, 46,0.05) 0%, transparent 55%)',
         }}
       >
         <div className="w-full max-w-sm">
@@ -238,7 +238,7 @@ export default function LoginPage() {
                 role="alert"
                 className="rounded-md border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-400"
                 style={{
-                  boxShadow: 'inset 0 0 0 1px rgba(255,107,53,0.06)',
+                  boxShadow: 'inset 0 0 0 1px rgba(200, 16, 46,0.06)',
                 }}
               >
                 {error}

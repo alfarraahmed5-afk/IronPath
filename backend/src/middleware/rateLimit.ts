@@ -22,6 +22,23 @@ export const authLimiter = rateLimit({
   })
 });
 
+// Dedicated /auth/login limiter — looser than the catch-all authLimiter
+// because real users with browser autofill quirks, fat-fingered passwords,
+// or 2FA flow false-starts can burn through 5/15min in seconds. 10/15min
+// per IP keeps brute-force protection meaningful (still ~40/hour, well
+// below what credential-stuffing tools expect) without rage-quitting
+// legitimate users on a bad day. Phase B.5 follow-up.
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).set('Retry-After', '900').json({
+    error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Try again in 15 minutes.', status: 429 }
+  })
+});
+
 export const inviteLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,

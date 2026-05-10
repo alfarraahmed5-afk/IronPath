@@ -91,7 +91,7 @@ export const PrimaryButton = forwardRef<HTMLButtonElement, PrimaryButtonProps>(
           'transition-[background-color,box-shadow,transform] duration-150',
           // Subtle inner ember glow on hover — warm, low-opacity, doesn't
           // bleed past the button's edges.
-          'hover:shadow-[inset_0_0_12px_rgba(255,107,53,0.35)]',
+          'hover:shadow-[inset_0_0_12px_rgba(200, 16, 46,0.35)]',
           'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none',
           className
         )}

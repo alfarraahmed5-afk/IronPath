@@ -40,7 +40,7 @@ type PaperSize = 'a4' | 'a3';
 const CONCRETE_WALL_URL =
   'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=2400&q=80&auto=format&fit=crop';
 
-const DEFAULT_ACCENT = '#FF6B35';
+const DEFAULT_ACCENT = '#C8102E';
 
 export default function GrowPage() {
   const prefersReducedMotion = useReducedMotion();

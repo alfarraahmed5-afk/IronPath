@@ -147,10 +147,10 @@ function CardSkeleton() {
 }
 
 const inputCx =
-  'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 disabled:opacity-50';
+  'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 disabled:opacity-50';
 const labelCx = 'block text-sm text-gray-300 mb-1';
 const primaryBtnCx =
-  'px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors';
+  'px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors';
 const ghostBtnCx =
   'px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium transition-colors disabled:opacity-50';
 
@@ -181,7 +181,7 @@ function ProfileCard({
       name: gym.name ?? '',
       location: gym.location ?? '',
       description: gym.description ?? '',
-      accent_color: gym.accent_color ?? '#FF6B35',
+      accent_color: gym.accent_color ?? '#C8102E',
     },
   });
 
@@ -191,7 +191,7 @@ function ProfileCard({
       name: gym.name ?? '',
       location: gym.location ?? '',
       description: gym.description ?? '',
-      accent_color: gym.accent_color ?? '#FF6B35',
+      accent_color: gym.accent_color ?? '#C8102E',
     });
   }, [gym.name, gym.location, gym.description, gym.accent_color, reset]);
 
@@ -564,7 +564,7 @@ function ContactCard({
                 <input
                   type="radio"
                   value="metric"
-                  className="accent-orange-500"
+                  className="accent-brand-500"
                   {...register('units_default')}
                 />
                 Metric
@@ -573,7 +573,7 @@ function ContactCard({
                 <input
                   type="radio"
                   value="imperial"
-                  className="accent-orange-500"
+                  className="accent-brand-500"
                   {...register('units_default')}
                 />
                 Imperial
@@ -658,7 +658,7 @@ function InviteCodeCard() {
           <p className="text-gray-500 text-xs mt-1">Create one on the Invites page.</p>
           <a
             href="/invites"
-            className="inline-block mt-3 text-orange-500 hover:text-orange-400 text-sm font-medium"
+            className="inline-block mt-3 text-brand-500 hover:text-brand-400 text-sm font-medium"
           >
             Go to Invites
           </a>
@@ -666,7 +666,7 @@ function InviteCodeCard() {
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-bold text-orange-500 tracking-wider">
+            <span className="font-mono text-2xl font-bold text-brand-500 tracking-wider">
               {invite.code}
             </span>
             <span className="text-xs text-gray-500">

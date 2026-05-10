@@ -30,15 +30,15 @@
 
   .surface-card {
     background-color: #111114;
-    background-image: radial-gradient(120% 80% at 0% 0%, rgba(255, 107, 53, 0.04) 0%, transparent 50%);
+    background-image: radial-gradient(120% 80% at 0% 0%, rgba(200, 16, 46, 0.04) 0%, transparent 50%);
     @apply border border-ink-800 rounded-xl;
   }
 
   .surface-feature {
     background-color: #17171B;
-    background-image: radial-gradient(140% 90% at 0% 0%, rgba(255, 107, 53, 0.06) 0%, transparent 55%);
+    background-image: radial-gradient(140% 90% at 0% 0%, rgba(200, 16, 46, 0.06) 0%, transparent 55%);
     @apply border border-ink-800 rounded-xl;
-    box-shadow: inset 0 0 0 1px rgba(255, 107, 53, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(200, 16, 46, 0.08);
   }
 
   /* Skeleton shimmer — pure CSS, no JS. Used by <Skeleton/>. The 20%-width
@@ -80,15 +80,15 @@
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 107, 53, 0.04) 18%,
-      rgba(255, 107, 53, 0.45) 50%,
-      rgba(255, 107, 53, 0.04) 82%,
+      rgba(200, 16, 46, 0.04) 18%,
+      rgba(200, 16, 46, 0.45) 50%,
+      rgba(200, 16, 46, 0.04) 82%,
       transparent 100%
     );
     background-size: 200% 100%;
     background-position: 0% 0;
     animation: ember-breathe 8s ease-in-out infinite;
-    filter: drop-shadow(0 0 12px rgba(255, 107, 53, 0.18));
+    filter: drop-shadow(0 0 12px rgba(200, 16, 46, 0.18));
   }
 
   @keyframes ember-breathe {
@@ -155,10 +155,10 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 107, 53, 0.6) 50%,
+      rgba(200, 16, 46, 0.6) 50%,
       transparent 100%
     );
-    filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.5));
+    filter: drop-shadow(0 0 8px rgba(200, 16, 46, 0.5));
     animation: pulse-travel 1.2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   }
   @keyframes pulse-travel {

@@ -243,7 +243,7 @@ export default function DashboardPage() {
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              'linear-gradient(to top, rgba(255, 107, 53, 0.08) 0%, transparent 60%)',
+              'linear-gradient(to top, rgba(200, 16, 46, 0.08) 0%, transparent 60%)',
             mixBlendMode: 'multiply',
           }}
           aria-hidden="true"
@@ -313,10 +313,10 @@ export default function DashboardPage() {
                   tick={{ fill: '#8A8A95', fontSize: 11 }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255, 107, 53, 0.08)' }}
+                  cursor={{ fill: 'rgba(200, 16, 46, 0.08)' }}
                   content={<ChartTooltip />}
                 />
-                <Bar dataKey="count" fill="#FF6B35" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="count" fill="#C8102E" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

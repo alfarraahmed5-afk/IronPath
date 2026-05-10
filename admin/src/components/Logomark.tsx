@@ -25,6 +25,7 @@ export function Logomark({
   return (
     <img
       src="/ironpath-logo.png"
+      srcSet="/ironpath-logo.png 1x, /ironpath-logo-512.png 2x"
       width={size}
       height={size}
       alt={alt}

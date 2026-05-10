@@ -175,8 +175,8 @@ function Receipt({ sub, gymName, onCancel }: ReceiptProps) {
               <div
                 className="border-4 px-3 py-1 text-3xl font-extrabold tracking-wider"
                 style={{
-                  color: '#E55A28',
-                  borderColor: '#E55A28',
+                  color: '#A50D24',
+                  borderColor: '#A50D24',
                   opacity: 0.35,
                 }}
               >
@@ -383,7 +383,7 @@ function UpgradePicker({ sub, reduceMotion }: UpgradePickerProps) {
                   className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"
                   style={{
                     backgroundImage:
-                      'conic-gradient(from 0deg, #FF6B35, #FFD089, #FF6B35, #B53A18, #FF8A5C, #FF6B35)',
+                      'conic-gradient(from 0deg, #C8102E, #FFD089, #C8102E, #B53A18, #E63946, #C8102E)',
                     backgroundSize: '200% 200%',
                     animation: reduceMotion ? undefined : 'spin 12s linear infinite',
                   }}

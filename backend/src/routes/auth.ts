@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
-import { authLimiter, refreshLimiter } from '../middleware/rateLimit';
+import { authLimiter, loginLimiter, refreshLimiter } from '../middleware/rateLimit';
 import { requireActiveUser } from '../middleware/requireActiveUser';
 import { CHALLENGE_TTL_SECONDS, generateChallengeToken, hashChallengeToken } from '../lib/twoFactor';
 import { logger } from '../lib/logger';
@@ -102,7 +102,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
 });
 
 // POST /auth/login
-router.post('/login', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {

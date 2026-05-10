@@ -44,7 +44,7 @@ export function getStoredGymId(): string | null {
 /** Shared zod fragment for the gym profile / contact PATCH body. */
 export const accentColorSchema = z
   .string()
-  .regex(/^#[0-9a-fA-F]{6}$/, 'Use a 6-digit hex color, like #FF6B35');
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Use a 6-digit hex color, like #C8102E');
 
 export const optionalUrl = z
   .string()

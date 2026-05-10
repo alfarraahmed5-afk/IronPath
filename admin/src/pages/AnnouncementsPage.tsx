@@ -106,7 +106,7 @@ export default function AnnouncementsPage() {
         </div>
         <button
           onClick={openNew}
-          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
+          className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors"
         >
           + New Announcement
         </button>
@@ -122,7 +122,7 @@ export default function AnnouncementsPage() {
             <div>
               <label className="block text-gray-400 text-sm mb-1">Title</label>
               <input
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                 placeholder="Announcement title"
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -131,7 +131,7 @@ export default function AnnouncementsPage() {
             <div>
               <label className="block text-gray-400 text-sm mb-1">Body</label>
               <textarea
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 min-h-[6rem] resize-y"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500 min-h-[6rem] resize-y"
                 placeholder="Announcement content…"
                 value={form.body}
                 onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
@@ -140,7 +140,7 @@ export default function AnnouncementsPage() {
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 accent-orange-500"
+                className="w-4 h-4 accent-brand-500"
                 checked={form.is_pinned}
                 onChange={e => setForm(f => ({ ...f, is_pinned: e.target.checked }))}
               />
@@ -151,7 +151,7 @@ export default function AnnouncementsPage() {
             <button
               onClick={handleSave}
               disabled={saving || !form.title.trim() || !form.body.trim()}
-              className="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors"
+              className="px-5 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -190,7 +190,7 @@ export default function AnnouncementsPage() {
                 <div className="flex items-center gap-2">
                   {item.is_pinned && (
                     <span title="Pinned" className="inline-flex items-center">
-                      <Pin size={14} className="text-orange-400" />
+                      <Pin size={14} className="text-brand-400" />
                     </span>
                   )}
                   <h3 className="text-white font-semibold">{item.title}</h3>

@@ -147,7 +147,7 @@ export default function ChallengesPage() {
         </div>
         <button
           onClick={openNew}
-          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
+          className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors"
         >
           + New Challenge
         </button>
@@ -163,7 +163,7 @@ export default function ChallengesPage() {
             <div className="md:col-span-2">
               <label className="block text-gray-400 text-sm mb-1">Title</label>
               <input
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                 placeholder="Challenge title"
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -172,7 +172,7 @@ export default function ChallengesPage() {
             <div className="md:col-span-2">
               <label className="block text-gray-400 text-sm mb-1">Description (optional)</label>
               <textarea
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 resize-y"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500 resize-y"
                 rows={3}
                 placeholder="Describe the challenge…"
                 value={form.description}
@@ -183,7 +183,7 @@ export default function ChallengesPage() {
               <div>
                 <label className="block text-gray-400 text-sm mb-1">Metric</label>
                 <select
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                   value={form.metric}
                   onChange={e => setForm(f => ({ ...f, metric: e.target.value }))}
                 >
@@ -197,7 +197,7 @@ export default function ChallengesPage() {
               <label className="block text-gray-400 text-sm mb-1">Start Date</label>
               <input
                 type="datetime-local"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                 value={form.starts_at}
                 onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
               />
@@ -206,7 +206,7 @@ export default function ChallengesPage() {
               <label className="block text-gray-400 text-sm mb-1">End Date</label>
               <input
                 type="datetime-local"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                 value={form.ends_at}
                 onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
               />
@@ -216,7 +216,7 @@ export default function ChallengesPage() {
             <button
               onClick={handleSave}
               disabled={saving || !form.title.trim() || !form.starts_at || !form.ends_at}
-              className="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors"
+              className="px-5 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm transition-colors"
             >
               {saving ? 'Saving…' : 'Save Challenge'}
             </button>

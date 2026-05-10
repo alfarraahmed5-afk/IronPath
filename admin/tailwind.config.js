@@ -18,13 +18,14 @@ module.exports = {
           900: '#111114',
           950: '#0A0A0B',
         },
-        // Plan §3.2 brand orange. brand maps to brand-500 for backwards-compat
-        // with existing className references.
+        // Brand crimson — matches the deep red "P" in the IronPath app
+        // logomark. Replaces the original plan §3.2 orange (#FF6B35) so
+        // the UI accent and the brand artwork share the same color story.
         brand: {
-          DEFAULT: '#FF6B35',
-          400: '#FF8A5C',
-          500: '#FF6B35',
-          600: '#E55A28',
+          DEFAULT: '#C8102E',
+          400: '#E63946',
+          500: '#C8102E',
+          600: '#A50D24',
         },
       },
       fontFamily: {
