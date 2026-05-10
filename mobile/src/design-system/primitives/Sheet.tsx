@@ -72,7 +72,10 @@ export function Sheet({
   visible,
   onClose,
   detent = 0.5,
-  detents = [0.5, 0.9, 1.0],
+  // detents prop is reserved for the multi-detent settle (P1). Today
+  // the sheet opens at `detent` and drag-to-dismiss is the only
+  // interaction; multi-detent snap will land in the next sprint.
+  detents: _detents,
   scrollable = true,
   backdrop = 'blur',
   children,
@@ -250,11 +253,6 @@ export function Sheet({
     </Modal>
   );
 }
-
-// allowed detents reserved for future detent-snap (P1).
-// Placeholder so consumers can pass `detents` without breaking build.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _detentsRef = ([] as SheetDetent[]).slice();
 
 const styles = StyleSheet.create({
   overlay: {
