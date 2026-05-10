@@ -16,13 +16,15 @@ import { Header } from '../../src/components/Header';
 import { Text } from '../../src/components/Text';
 import { Surface } from '../../src/components/Surface';
 import { Avatar } from '../../src/components/Avatar';
-import { Button } from '../../src/components/Button';
+import { Button } from '../../src/design-system/primitives/Button';
 import { Icon } from '../../src/components/Icon';
-import { Pressable } from '../../src/components/Pressable';
+import { Pressable } from '../../src/design-system/primitives/Pressable';
 import { EmptyState } from '../../src/components/EmptyState';
 import { BadgeChip } from '../../src/components/BadgeChip';
 import { Sheet } from '../../src/components/Sheet';
+import { Hero } from '../../src/design-system/primitives/Hero';
 import { colors, spacing, radii } from '../../src/theme/tokens';
+import { haptic } from '../../src/lib/haptics';
 
 interface PublicUser {
   id: string;
@@ -231,7 +233,7 @@ export default function UserProfileScreen() {
       if (newId) router.push(`/duels/${newId}` as any);
     } catch (e: any) {
       // eslint-disable-next-line no-alert
-      alert(e?.error?.message ?? 'Could not send duel');
+      alert(e?.error?.message ?? "couldn't send duel.");
     } finally {
       setDuelSubmitting(false);
     }
@@ -242,6 +244,7 @@ export default function UserProfileScreen() {
     setFollowLoading(true);
     try {
       if (followStatus === 'none') {
+        haptic.likeOn();
         const res = await api.post<{ data: { status: 'active' | 'pending' } }>(`/users/${id}/follow`);
         setFollowStatus(res.data.status);
         if (res.data.status === 'active') {
@@ -250,6 +253,7 @@ export default function UserProfileScreen() {
           setUser(prev => prev ? { ...prev, follow_status: 'pending' } : prev);
         }
       } else if (followStatus === 'active') {
+        haptic.likeOff();
         await api.delete(`/users/${id}/follow`);
         setFollowStatus('none');
         setUser(prev => prev ? { ...prev, follower_count: Math.max(0, prev.follower_count - 1), follow_status: 'none', is_following: false } : prev);
@@ -281,18 +285,28 @@ export default function UserProfileScreen() {
         <Header title={user.username} back />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Avatar + bio */}
+          {/* Photo-hero band behind avatar (lens 5: cross-user profile depth) */}
+          <Hero
+            height={140}
+            source={undefined}
+            blurhash={'L13Im5xu00WB?wt7~qWBxujsR%t7'}
+            maskCoverage={0.85}
+            ember
+            kenBurns={false}
+          />
+          {/* Avatar + bio overlay */}
           <View style={styles.heroSection}>
-            <Avatar username={user.full_name || user.username} avatarUrl={user.avatar_url} size={80} />
+            <Avatar username={user.full_name || user.username} avatarUrl={user.avatar_url} size={88} />
             <Text variant="title2" color="textPrimary" style={styles.fullName}>{user.full_name}</Text>
             <Text variant="label" color="textTertiary">@{user.username}</Text>
             {user.bio ? (
               <Text variant="body" color="textSecondary" style={styles.bio}>{user.bio}</Text>
             ) : null}
-            {/* Achievement badges */}
+            {/* Achievement badges -- includes iron_streak_* tier ladder
+                from migration 052 (lens 6 Q6 founder lock).  */}
             {badges.length > 0 && (
               <View style={styles.badgeRow}>
-                {badges.slice(0, 4).map(b => (
+                {badges.slice(0, 6).map(b => (
                   <View key={b.id} style={{ marginRight: spacing.xs, marginBottom: spacing.xs }}>
                     <BadgeChip badge={b as any} size="sm" />
                   </View>
@@ -471,7 +485,13 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   centered: { alignItems: 'center', justifyContent: 'center' },
-  heroSection: { alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.xl },
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingTop: 0,
+    paddingBottom: spacing.xl,
+    marginTop: -56, // Pull avatar up so it overlaps the photo band
+  },
   fullName: { marginTop: spacing.md },
   bio: { marginTop: spacing.sm, textAlign: 'center', paddingHorizontal: spacing.xl },
   statsRow: { flexDirection: 'row', marginHorizontal: spacing.base, marginBottom: spacing.base },

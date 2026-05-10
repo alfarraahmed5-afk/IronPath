@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   View,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -103,6 +104,7 @@ export default function NotificationsScreen() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
 
   const fetchNotifications = useCallback(async (cursor?: string) => {
@@ -127,6 +129,17 @@ export default function NotificationsScreen() {
     setLoadingMore(false);
   }, [nextCursor, loadingMore, fetchNotifications]);
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    haptic.pullRefreshTrigger();
+    try {
+      await fetchNotifications();
+      haptic.pullRefreshLoaded();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchNotifications]);
+
   const handleNotificationPress = useCallback(async (n: Notification) => {
     // Optimistic mark-as-read
     if (!n.is_read) {
@@ -135,7 +148,8 @@ export default function NotificationsScreen() {
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: false } : x));
       });
     }
-    // Deep-link to the relevant screen
+    // Deep-link to the relevant screen via the shared notification
+    // router util (lens 5 P0 unify-router fix).
     const target = routeForNotification(n);
     if (target) router.push(target as any);
   }, []);
@@ -173,9 +187,18 @@ export default function NotificationsScreen() {
           keyExtractor={item => item.id}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.brand} />
+          }
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null}
-          ListEmptyComponent={<EmptyState illustration="notifications" title="All caught up" description="You'll see likes, comments, and PR alerts here." />}
+          ListEmptyComponent={
+            <EmptyState
+              illustration="notifications"
+              title="All caught up."
+              description="When members like or comment, you'll see it here."
+            />
+          }
           contentContainerStyle={notifications.length === 0 ? { flex: 1 } : undefined}
         />
       )}
