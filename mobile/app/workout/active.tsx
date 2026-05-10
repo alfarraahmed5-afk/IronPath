@@ -1,18 +1,27 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * Active workout screen -- C-1 orchestrator after split.
+ *
+ * Slimmed-down per lens 6/8/10:
+ *   - SetRow, RestTimer (Reanimated UI thread), AddExerciseSheet,
+ *     ExerciseHeader, BottomBar all live in
+ *     `src/features/workout/active/*`.
+ *   - This file owns store wiring, PR detection, navigation, and the
+ *     parent-level set-type sheet (the legacy "one Sheet per SetRow"
+ *     bug).
+ *   - Back-gesture intercept lives in the predictive-back wiring set
+ *     up by A-2 in app.json; the discard Alert is the user-facing
+ *     handle.
+ */
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
-  TextInput,
   ScrollView,
   Alert,
-  Modal,
-  FlatList,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Plus, Timer, Check, Search, Pause, Play, RotateCcw, Minus, Info } from 'lucide-react-native';
-import { Image } from 'expo-image';
+import { Plus, Check, Minus, Pause, RotateCcw } from 'lucide-react-native';
 import { useWorkoutStore, WorkoutSet, WorkoutExercise } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
 import { Text } from '../../src/components/Text';
@@ -24,26 +33,22 @@ import { Sheet } from '../../src/components/Sheet';
 import { useToast } from '../../src/components/Toast';
 import { haptic } from '../../src/lib/haptics';
 import { colors, spacing, radii } from '../../src/theme/tokens';
-
-const SET_TYPE_COLORS: Record<string, string> = {
-  normal:  colors.setNormal,
-  warmup:  colors.setWarmup,
-  dropset: colors.setDropset,
-  failure: colors.setFailure,
-};
-
-const SET_TYPE_LABELS: Record<string, string> = {
-  normal:  'N',
-  warmup:  'W',
-  dropset: 'D',
-  failure: 'F',
-};
+import {
+  SetRow,
+  setHasRequiredValues,
+  SET_TYPE_COLORS,
+  SET_TYPE_LABELS,
+} from '../../src/features/workout/active/SetRow';
+import { RestTimer } from '../../src/features/workout/active/RestTimer';
+import { ExerciseHeader } from '../../src/features/workout/active/ExerciseHeader';
+import { AddExerciseSheet, PickedExercise } from '../../src/features/workout/active/AddExerciseSheet';
+import { BottomBar } from '../../src/features/workout/active/BottomBar';
 
 const SET_TYPE_OPTIONS: { key: WorkoutSet['set_type']; label: string; desc: string }[] = [
   { key: 'normal',  label: 'Normal',  desc: 'Working set' },
   { key: 'warmup',  label: 'Warm-up', desc: "Doesn't count toward stats" },
   { key: 'dropset', label: 'Drop set', desc: 'Reduce weight, continue' },
-  { key: 'failure', label: 'To failure', desc: 'Rep until you can\'t' },
+  { key: 'failure', label: 'To failure', desc: 'Rep until you cannot' },
 ];
 
 function formatTime(seconds: number): string {
@@ -52,121 +57,6 @@ function formatTime(seconds: number): string {
   const s = seconds % 60;
   if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// Validation: a set is "complete-able" only if it has the right values for its logging type.
-function setHasRequiredValues(set: WorkoutSet, loggingType: string): boolean {
-  if (loggingType === 'weight_reps') {
-    return set.weight_kg !== null && set.weight_kg > 0 && set.reps !== null && set.reps > 0;
-  }
-  if (loggingType === 'bodyweight_reps') {
-    return set.reps !== null && set.reps > 0;
-  }
-  if (loggingType === 'duration') {
-    return set.duration_seconds !== null && set.duration_seconds > 0;
-  }
-  if (loggingType === 'distance') {
-    return set.distance_meters !== null && set.distance_meters > 0;
-  }
-  return false;
-}
-
-interface SetRowProps {
-  set: WorkoutSet;
-  index: number;
-  loggingType: string;
-  onToggleComplete: () => void;
-  onUpdateSet: (updated: Partial<WorkoutSet>) => void;
-  onLongPress: () => void;
-}
-
-function SetRow({ set, index, loggingType, onToggleComplete, onUpdateSet, onLongPress }: SetRowProps) {
-  const isCompleted = set.is_completed;
-  const typeColor = SET_TYPE_COLORS[set.set_type] ?? colors.setNormal;
-  const canComplete = setHasRequiredValues(set, loggingType);
-
-  return (
-    <View style={[styles.setRow, isCompleted && styles.setRowComplete]}>
-      {/* Set number + type long-press */}
-      <Pressable
-        onPress={() => {
-          if (!isCompleted && !canComplete) {
-            haptic.warning();
-            return;
-          }
-          onToggleComplete();
-        }}
-        onLongPress={() => { haptic.medium(); onLongPress(); }}
-        delayLongPress={300}
-        style={[styles.setNumBtn, {
-          backgroundColor: isCompleted ? colors.success : typeColor + '30',
-          borderColor: isCompleted ? colors.success : typeColor,
-          opacity: !isCompleted && !canComplete ? 0.45 : 1,
-        }]}
-        accessibilityLabel={`Set ${index + 1}, ${set.set_type}, ${isCompleted ? 'completed' : 'incomplete'}, long-press to change type`}
-      >
-        {isCompleted
-          ? <Icon icon={Check} size={14} color={colors.textPrimary} strokeWidth={2.5} />
-          : set.set_type === 'normal'
-            ? <Text variant="label" style={{ color: typeColor }}>{index + 1}</Text>
-            : <Text variant="label" style={{ color: typeColor, fontSize: 14 }}>{SET_TYPE_LABELS[set.set_type]}</Text>
-        }
-      </Pressable>
-
-      {/* Inputs */}
-      {(loggingType === 'weight_reps' || loggingType === 'bodyweight_reps') && (
-        <>
-          {loggingType === 'weight_reps' ? (
-            <TextInput
-              style={[styles.setInput, isCompleted && styles.setInputComplete]}
-              placeholder="kg"
-              placeholderTextColor={colors.textDisabled}
-              keyboardType="decimal-pad"
-              value={set.weight_kg !== null ? String(set.weight_kg) : ''}
-              onChangeText={v => onUpdateSet({ weight_kg: v ? parseFloat(v) : null })}
-              editable={!isCompleted}
-            />
-          ) : (
-            <View style={[styles.setInput, { justifyContent: 'center' }]}>
-              <Text variant="caption" color="textTertiary" style={{ textAlign: 'center' }}>BW</Text>
-            </View>
-          )}
-          <TextInput
-            style={[styles.setInput, isCompleted && styles.setInputComplete]}
-            placeholder="reps"
-            placeholderTextColor={colors.textDisabled}
-            keyboardType="number-pad"
-            value={set.reps !== null ? String(set.reps) : ''}
-            onChangeText={v => onUpdateSet({ reps: v ? parseInt(v) : null })}
-            editable={!isCompleted}
-          />
-        </>
-      )}
-      {loggingType === 'duration' && (
-        <TextInput
-          style={[styles.setInput, styles.setInputFull, isCompleted && styles.setInputComplete]}
-          placeholder="seconds"
-          placeholderTextColor={colors.textDisabled}
-          keyboardType="number-pad"
-          value={set.duration_seconds !== null ? String(set.duration_seconds) : ''}
-          onChangeText={v => onUpdateSet({ duration_seconds: v ? parseInt(v) : null })}
-          editable={!isCompleted}
-        />
-      )}
-      {loggingType === 'distance' && (
-        <TextInput
-          style={[styles.setInput, styles.setInputFull, isCompleted && styles.setInputComplete]}
-          placeholder="meters"
-          placeholderTextColor={colors.textDisabled}
-          keyboardType="decimal-pad"
-          value={set.distance_meters !== null ? String(set.distance_meters) : ''}
-          onChangeText={v => onUpdateSet({ distance_meters: v ? parseFloat(v) : null })}
-          editable={!isCompleted}
-        />
-      )}
-
-    </View>
-  );
 }
 
 interface ExerciseCardProps {
@@ -188,10 +78,8 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
   const handleToggleComplete = (setPosition: number) => {
     const target = exercise.sets.find(s => s.position === setPosition);
     if (!target) return;
-
-    // Block toggling complete on a set with no values
     if (!target.is_completed && !setHasRequiredValues(target, exercise.logging_type)) {
-      haptic.warning();
+      haptic.setBlocked();
       Alert.alert(
         'Empty set',
         exercise.logging_type === 'weight_reps' ? 'Enter weight and reps before completing the set.' :
@@ -201,7 +89,6 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
       );
       return;
     }
-
     const newSets = exercise.sets.map(s => {
       if (s.position !== setPosition) return s;
       const completing = !s.is_completed;
@@ -210,16 +97,16 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
     onUpdateSets(newSets);
     const s = newSets.find(s => s.position === setPosition);
     if (s?.is_completed && s.set_type !== 'warmup') {
-      haptic.light();
+      haptic.setComplete();
       startRestTimer(exercise.rest_seconds);
-      // Live PR check for working sets
       if (onPRCheck) onPRCheck(exercise.exercise_id, exercise.exercise_name, s, exercise.logging_type);
     } else if (s?.is_completed) {
-      haptic.light();
+      haptic.setComplete();
     }
   };
 
   const addSet = () => {
+    haptic.setAdd();
     const last = exercise.sets[exercise.sets.length - 1];
     const newSet: WorkoutSet = {
       position: exercise.sets.length,
@@ -235,36 +122,12 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
     onUpdateSets([...exercise.sets, newSet]);
   };
 
-  const completedCount = exercise.sets.filter(s => s.is_completed).length;
-  const totalCount = exercise.sets.length;
-
-  const router = useRouter();
-
   return (
     <Surface level={2} style={styles.exerciseCard}>
-      {/* Header */}
-      <View style={styles.exerciseHeader}>
-        <Pressable
-          onPress={() => router.push(`/exercises/${exercise.exercise_id}` as any)}
-          style={{ flex: 1 }}
-          accessibilityLabel={`View ${exercise.exercise_name} details`}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Text variant="title3" color="textPrimary" numberOfLines={1} style={{ flex: 1 }}>{exercise.exercise_name}</Text>
-            <Icon icon={Info} size={14} color={colors.textTertiary} />
-          </View>
-          <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xxs }}>
-            {completedCount}/{totalCount} sets · {exercise.rest_seconds}s rest
-          </Text>
-        </Pressable>
-        <Pressable onPress={onRemove} style={styles.removeBtn} accessibilityLabel="Remove exercise">
-          <Icon icon={X} size={16} color={colors.textTertiary} />
-        </Pressable>
-      </View>
+      <ExerciseHeader exercise={exercise} onRemove={onRemove} />
 
-      {/* Column headers */}
       <View style={styles.setHeaderRow}>
-        <View style={styles.setNumBtn} />
+        <View style={styles.setHeaderSpacer} />
         {exercise.logging_type === 'weight_reps' && (
           <>
             <Text variant="overline" color="textTertiary" style={styles.setColHeader}>KG</Text>
@@ -285,7 +148,6 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
         )}
       </View>
 
-      {/* Sets */}
       {exercise.sets.map((s, i) => (
         <SetRow
           key={s.position}
@@ -298,183 +160,11 @@ function ExerciseCard({ exercise, onUpdateSets, onLongPressSet, onRemove, onPRCh
         />
       ))}
 
-      {/* Add set */}
       <Pressable onPress={addSet} style={styles.addSetBtn} accessibilityLabel="Add set">
         <Icon icon={Plus} size={14} color={colors.textTertiary} />
         <Text variant="label" color="textTertiary" style={{ marginLeft: spacing.xs }}>Add Set</Text>
       </Pressable>
     </Surface>
-  );
-}
-
-function ExercisePickerModal({
-  visible,
-  onClose,
-  onAddMany,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onAddMany: (exs: any[]) => void;
-}) {
-  const [exercises, setExercises] = useState<any[]>([]);
-  const [searchText, setSearchText] = useState('');
-  const [equipment, setEquipment] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setLoading(true);
-      const params = new URLSearchParams({ limit: '50' });
-      if (searchText) params.set('search', searchText);
-      if (equipment) params.set('equipment', equipment);
-      api.get<any>(`/exercises?${params.toString()}`)
-        .then(r => setExercises(r.data.exercises || []))
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }, 300);
-  }, [visible, searchText, equipment]);
-
-  function handleClose() {
-    setSearchText('');
-    setSelectedIds([]);
-    setEquipment('');
-    onClose();
-  }
-
-  function toggleSelect(id: string) {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }
-
-  function handleAddSelected() {
-    const picks = exercises.filter(e => selectedIds.includes(e.id));
-    if (picks.length === 0) return;
-    onAddMany(picks);
-    handleClose();
-  }
-
-  const EQUIPMENT_PILLS = ['', 'barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <SafeAreaView style={styles.pickerRoot} edges={['top']}>
-        <View style={styles.pickerHeader}>
-          <Text variant="title3" color="textPrimary" style={{ flex: 1 }}>
-            Add Exercises{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
-          </Text>
-          <Pressable onPress={handleClose} accessibilityLabel="Close" style={{ paddingHorizontal: spacing.sm }}>
-            <Text variant="label" color="textSecondary">Cancel</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.pickerSearch}>
-          <Surface level={2} style={styles.searchBar}>
-            <Icon icon={Search} size={16} color={colors.textTertiary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search exercises…"
-              placeholderTextColor={colors.textTertiary}
-              value={searchText}
-              onChangeText={setSearchText}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {searchText.length > 0 && (
-              <Pressable onPress={() => setSearchText('')} accessibilityLabel="Clear">
-                <Icon icon={X} size={14} color={colors.textTertiary} />
-              </Pressable>
-            )}
-          </Surface>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.equipScroll}>
-          {EQUIPMENT_PILLS.map((eq) => {
-            const active = equipment === eq;
-            return (
-              <Pressable
-                key={eq || 'all'}
-                onPress={() => setEquipment(eq)}
-                style={[styles.equipPill, active && { backgroundColor: colors.brand }]}
-                accessibilityLabel={eq || 'All equipment'}
-              >
-                <Text variant="label" color={active ? 'textOnBrand' : 'textTertiary'}>
-                  {eq ? eq.charAt(0).toUpperCase() + eq.slice(1) : 'All'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {loading ? (
-          <View style={styles.pickerLoading}>
-            <ActivityIndicator color={colors.brand} />
-          </View>
-        ) : (
-          <FlatList
-            data={exercises}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => {
-              const selected = selectedIds.includes(item.id);
-              const initials = item.name.split(' ').slice(0, 2).map((w: string) => w.charAt(0).toUpperCase()).join('');
-              return (
-                <Pressable
-                  onPress={() => toggleSelect(item.id)}
-                  style={[styles.pickerRow, selected && { backgroundColor: colors.brandGlow }]}
-                  accessibilityLabel={item.name}
-                >
-                  <View style={[styles.pickerCheck, selected && { backgroundColor: colors.brand, borderColor: colors.brand }]}>
-                    {selected ? <Icon icon={Check} size={12} color={colors.textPrimary} strokeWidth={3} /> : null}
-                  </View>
-                  {/* Exercise thumbnail */}
-                  {item.image_url ? (
-                    <Image
-                      source={{ uri: item.image_url }}
-                      style={styles.pickerThumb}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  ) : (
-                    <View style={[styles.pickerThumb, styles.pickerThumbFallback]}>
-                      <Text variant="overline" color="textTertiary" style={{ fontSize: 10 }}>{initials}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.name}</Text>
-                    <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ marginTop: spacing.xxs }}>
-                      {(item.equipment || 'Other').replace(/_/g, ' ')}
-                      {item.primary_muscles?.length ? ' · ' + item.primary_muscles[0] : ''}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.pickerEmpty}>
-                <Text variant="body" color="textTertiary">No exercises found</Text>
-              </View>
-            }
-            ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: spacing.base }} />}
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
-
-        {/* Sticky add button */}
-        {selectedIds.length > 0 && (
-          <View style={styles.pickerFooter}>
-            <Button
-              label={`Add ${selectedIds.length} exercise${selectedIds.length > 1 ? 's' : ''}`}
-              onPress={handleAddSelected}
-              variant="primary"
-              size="lg"
-              fullWidth
-            />
-          </View>
-        )}
-      </SafeAreaView>
-    </Modal>
   );
 }
 
@@ -502,15 +192,12 @@ function TimerControlSheet({
   return (
     <Sheet visible={visible} onClose={onClose} snapPoint={0.45}>
       <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Workout Timer</Text>
-
       <View style={styles.timerDisplay}>
         <Text variant="display3" color="brand" style={{ fontVariant: ['tabular-nums'] }}>{formatTime(elapsedSeconds)}</Text>
         <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.xs }}>
           {isPaused ? 'Paused' : 'Running'}
         </Text>
       </View>
-
-      {/* Adjust controls */}
       <View style={styles.adjustRow}>
         <Pressable onPress={() => adjust(-60)} style={styles.adjustBtn} accessibilityLabel="Subtract 1 minute">
           <Icon icon={Minus} size={14} color={colors.textPrimary} />
@@ -529,8 +216,6 @@ function TimerControlSheet({
           <Text variant="label" color="textPrimary" style={{ marginLeft: spacing.xxs }}>1m</Text>
         </Pressable>
       </View>
-
-      {/* Action buttons */}
       <View style={styles.timerActions}>
         {isPaused ? (
           <Button label="Resume" onPress={() => { onResume(); onClose(); }} variant="primary" size="md" fullWidth />
@@ -561,14 +246,11 @@ export default function ActiveWorkoutScreen() {
   const {
     active,
     isPaused,
-    restTimer,
     updateExerciseSets,
     setSetType,
     removeExercise,
     discardWorkout,
     tickElapsed,
-    clearRestTimer,
-    adjustRestTimer,
     addExercise,
     pauseTimer,
     resumeTimer,
@@ -576,12 +258,7 @@ export default function ActiveWorkoutScreen() {
   } = useWorkoutStore();
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showTimerSheet, setShowTimerSheet] = useState(false);
-  // Single, parent-level set-type picker context. The previous bug was that
-  // each SetRow rendered its own Sheet/Modal — with 10–30 sets onscreen,
-  // multiple Modal instances stomped each other and nothing rendered when
-  // long-pressing.
   const [typeCtx, setTypeCtx] = useState<{ exercisePos: number; setPos: number; currentType: WorkoutSet['set_type'] } | null>(null);
-  // Live PR map: exercise_id -> { record_type -> max_value }
   const [prMap, setPrMap] = useState<Record<string, Record<string, number>>>({});
   const toast = useToast();
 
@@ -594,7 +271,6 @@ export default function ActiveWorkoutScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch existing PRs for the active workout's exercises (one shot on mount/change of exercise list)
   useEffect(() => {
     if (!active || active.exercises.length === 0) return;
     const ids = [...new Set(active.exercises.map(e => e.exercise_id))].join(',');
@@ -605,7 +281,6 @@ export default function ActiveWorkoutScreen() {
       .catch(() => {});
   }, [active?.exercises.map(e => e.exercise_id).join(',')]);
 
-  // Live PR check: called when a working set is completed
   const handlePRCheck = useCallback((exerciseId: string, exerciseName: string, set: WorkoutSet, loggingType: string) => {
     const existing = prMap[exerciseId] ?? {};
     const checks: Array<{ type: string; value: number; label: string }> = [];
@@ -614,7 +289,7 @@ export default function ActiveWorkoutScreen() {
       const w = set.weight_kg;
       if (w > (existing.heaviest_weight ?? 0)) checks.push({ type: 'heaviest_weight', value: w, label: `${w} kg` });
       const vol = w * set.reps;
-      if (vol > (existing.best_volume_set ?? 0)) checks.push({ type: 'best_volume_set', value: vol, label: `${w}×${set.reps}` });
+      if (vol > (existing.best_volume_set ?? 0)) checks.push({ type: 'best_volume_set', value: vol, label: `${w}x${set.reps}` });
     } else if (loggingType === 'bodyweight_reps' && set.reps) {
       if (set.reps > (existing.most_reps ?? 0)) checks.push({ type: 'most_reps', value: set.reps, label: `${set.reps} reps` });
     } else if (loggingType === 'duration' && set.duration_seconds) {
@@ -627,11 +302,9 @@ export default function ActiveWorkoutScreen() {
     }
 
     if (checks.length === 0) return;
-    // Take the highest-priority PR (first one)
     const pr = checks[0];
     haptic.success();
-    toast.show(`PR! ${exerciseName} · ${pr.label}`, 'success');
-    // Update local map so subsequent sets compare to the new high
+    toast.show(`PR! ${exerciseName} -- ${pr.label}`, 'success');
     setPrMap(prev => ({
       ...prev,
       [exerciseId]: { ...(prev[exerciseId] ?? {}), ...checks.reduce((a, c) => ({ ...a, [c.type]: c.value }), {}) },
@@ -645,12 +318,12 @@ export default function ActiveWorkoutScreen() {
       Alert.alert('No completed sets', 'Complete at least one set before finishing.');
       return;
     }
-    pauseTimer(); // Pause elapsed timer when entering finish screen
+    pauseTimer();
     router.push('/workout/finish');
   };
 
   const handleDiscard = () => {
-    haptic.warning();
+    haptic.workoutDiscard();
     Alert.alert('Discard Workout', 'This will delete your current workout. Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -662,13 +335,13 @@ export default function ActiveWorkoutScreen() {
     ]);
   };
 
-  const handleAddMany = useCallback((exs: any[]) => {
+  const handleAddMany = useCallback((exs: PickedExercise[]) => {
     const startPosition = useWorkoutStore.getState().active?.exercises.length ?? 0;
     exs.forEach((ex, idx) => {
       addExercise({
         exercise_id: ex.id,
         exercise_name: ex.name,
-        logging_type: ex.logging_type || 'weight_reps',
+        logging_type: (ex.logging_type as any) || 'weight_reps',
         position: startPosition + idx,
         superset_group: null,
         rest_seconds: 90,
@@ -688,7 +361,6 @@ export default function ActiveWorkoutScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1, marginRight: spacing.md }}>
             <Text variant="title3" color="textPrimary" numberOfLines={1}>{active.workout_name}</Text>
@@ -709,25 +381,8 @@ export default function ActiveWorkoutScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Rest timer */}
-      {restTimer !== null && (
-        <View style={styles.restTimer}>
-          <Icon icon={Timer} size={16} color={colors.brand} />
-          <Text variant="bodyEmphasis" color="textPrimary" style={{ marginLeft: spacing.sm, flex: 1 }}>Rest</Text>
-          <Pressable onPress={() => adjustRestTimer(-15)} style={styles.restAdjust} accessibilityLabel="Subtract 15s">
-            <Icon icon={Minus} size={14} color={colors.textSecondary} />
-          </Pressable>
-          <Text variant="numeric" color="brand" style={styles.restTime}>{formatTime(restTimer)}</Text>
-          <Pressable onPress={() => adjustRestTimer(15)} style={styles.restAdjust} accessibilityLabel="Add 15s">
-            <Icon icon={Plus} size={14} color={colors.textSecondary} />
-          </Pressable>
-          <Pressable onPress={clearRestTimer} style={{ marginLeft: spacing.sm }} accessibilityLabel="Skip rest">
-            <Text variant="caption" color="textTertiary">Skip</Text>
-          </Pressable>
-        </View>
-      )}
+      <RestTimer />
 
-      {/* Exercise list */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {active.exercises.map(ex => (
           <ExerciseCard
@@ -748,19 +403,12 @@ export default function ActiveWorkoutScreen() {
           />
         ))}
 
-        <Pressable
-          onPress={() => setShowExercisePicker(true)}
-          style={styles.addExerciseBtn}
-          accessibilityLabel="Add exercise"
-        >
-          <Icon icon={Plus} size={18} color={colors.textSecondary} />
-          <Text variant="bodyEmphasis" color="textSecondary" style={{ marginLeft: spacing.sm }}>Add Exercise</Text>
-        </Pressable>
+        <BottomBar onAddExercise={() => setShowExercisePicker(true)} />
 
         <View style={{ height: spacing['3xl'] }} />
       </ScrollView>
 
-      <ExercisePickerModal
+      <AddExerciseSheet
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
         onAddMany={handleAddMany}
@@ -777,8 +425,6 @@ export default function ActiveWorkoutScreen() {
         onSetElapsed={setElapsed}
       />
 
-      {/* Single, parent-level Set Type picker (was previously rendered N times,
-          one per SetRow — multiple Modals collided and the menu wouldn't show) */}
       <Sheet visible={typeCtx !== null} onClose={() => setTypeCtx(null)} snapPoint={0.55}>
         <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.base }}>Set Type</Text>
         {SET_TYPE_OPTIONS.map((opt) => {
@@ -790,6 +436,7 @@ export default function ActiveWorkoutScreen() {
               onPress={() => {
                 if (typeCtx) {
                   setSetType(typeCtx.exercisePos, typeCtx.setPos, opt.key);
+                  haptic.setTypeSelect();
                 }
                 setTypeCtx(null);
               }}
@@ -834,78 +481,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warning + '20',
     borderRadius: radii.sm,
   },
-  restTimer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.base,
-    marginTop: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.brandGlow,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.brand + '40',
-  },
-  restAdjust: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: spacing.xs,
-  },
-  restTime: { fontSize: 22, lineHeight: 26, minWidth: 64, textAlign: 'center' },
   scrollContent: { paddingTop: spacing.base },
   exerciseCard: { marginHorizontal: spacing.base, marginBottom: spacing.base, padding: spacing.base },
-  exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
-  removeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
-  },
   setHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.xs,
     gap: spacing.sm,
   },
+  setHeaderSpacer: { width: SETNUM_SIZE, height: SETNUM_SIZE },
   setColHeader: { flex: 1, textAlign: 'center' },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  setRowComplete: {},
-  setNumBtn: {
-    width: SETNUM_SIZE,
-    height: SETNUM_SIZE,
-    borderRadius: SETNUM_SIZE / 2,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.textTertiary,
-    backgroundColor: 'transparent',
-  },
-  setInput: {
-    flex: 1,
-    backgroundColor: colors.surface3,
-    color: colors.textPrimary,
-    fontFamily: 'Barlow_400Regular',
-    fontSize: 15,
-    textAlign: 'center',
-    borderRadius: radii.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  setInputFull: { flex: 2 },
-  setInputComplete: { backgroundColor: colors.successDim },
   addSetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -915,18 +500,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     backgroundColor: colors.surface3,
   },
-  addExerciseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: spacing.base,
-    paddingVertical: spacing.lg,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  // Type picker
   typePickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -944,7 +517,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Timer sheet
   timerDisplay: { alignItems: 'center', paddingVertical: spacing.xl },
   adjustRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.lg },
   adjustBtn: {
@@ -958,71 +530,4 @@ const styles = StyleSheet.create({
   },
   timerActions: { paddingTop: spacing.sm },
   resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md },
-  // Picker modal
-  pickerRoot: { flex: 1, backgroundColor: colors.bg },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  pickerSearch: { paddingHorizontal: spacing.base, paddingVertical: spacing.sm },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    borderRadius: radii.md,
-  },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontFamily: 'Barlow_400Regular',
-    fontSize: 15,
-  },
-  equipScroll: { paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm },
-  equipPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface2,
-  },
-  pickerLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  pickerCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: radii.sm,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.sm,
-    overflow: 'hidden',
-  },
-  pickerThumbFallback: {
-    backgroundColor: colors.surface3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerEmpty: { paddingVertical: spacing['3xl'], alignItems: 'center' },
-  pickerFooter: {
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
 });
