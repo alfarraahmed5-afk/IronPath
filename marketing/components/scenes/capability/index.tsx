@@ -100,10 +100,18 @@ function HorizontalPanels() {
 
       gsap.registerPlugin(ScrollTrigger);
 
-      // Total horizontal travel: distance from track right edge to viewport
-      // right edge. Computed live to avoid layout thrash on resize.
+      // RTL flip: under `dir="rtl"` the flex track lays out panel 0 on the
+      // right and extends leftward off-screen. To scroll panels into view we
+      // therefore translate POSITIVE x; LTR translates negative. Read off the
+      // computed style after mount so we react to the document's actual
+      // direction, not a build-time guess.
+      const isRtl = getComputedStyle(section).direction === 'rtl';
+      const sign = isRtl ? 1 : -1;
+
+      // Total horizontal travel: distance from track edge to viewport edge.
+      // Computed live to avoid layout thrash on resize.
       const tween = gsap.to(track, {
-        x: () => -(track.scrollWidth - section.clientWidth),
+        x: () => sign * (track.scrollWidth - section.clientWidth),
         ease: 'none',
         scrollTrigger: {
           trigger: section,

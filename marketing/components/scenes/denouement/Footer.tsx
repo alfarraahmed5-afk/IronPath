@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 const CONTACT_EMAIL = 'hello@ironpath.health';
-const CAL_LINK = 'https://cal.com/ironpath/15min';
+const WHATSAPP_HREF = 'https://wa.me/201036596238';
 
 export async function Footer() {
   const year = new Date().getFullYear();
@@ -60,15 +60,15 @@ export async function Footer() {
           </Link>
         </nav>
 
-        {/* Right -- single quiet CTA, no founder credit */}
+        {/* Right -- single quiet WhatsApp CTA, no founder credit */}
         <div className="flex flex-col gap-2 sm:items-end">
           <a
-            href={CAL_LINK}
+            href={WHATSAPP_HREF}
             target="_blank"
             rel="noreferrer noopener"
             className="hover:text-ink-100 transition-colors"
           >
-            {t('bookChat')}
+            {t('whatsapp')}
           </a>
         </div>
       </div>

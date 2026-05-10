@@ -16,7 +16,7 @@
       "terms": "Terms",
       "contact": "Contact",
       "blog": "Blog",
-      "bookChat": "Book a 15-min chat"
+      "whatsapp": "WhatsApp Ahmed"
     },
     "localeSwitcher": {
       "ariaLabel": "Language",
@@ -447,8 +447,8 @@
     "founder": {
       "eyebrow": "Talk to the founder before signing up",
       "name": "Ahmed, founder, IronPath",
-      "body": "After a year of in-person walkthroughs at independent gyms across Cairo, If you're weighing IronPath against your spreadsheets and WhatsApp groups, grab 15 minutes, I'll tell you honestly whether we're the right call.",
-      "cta_cal": "Book 15 min on Cal.com",
+      "body": "After a year of in-person walkthroughs at independent gyms across Cairo, if you're weighing IronPath against your spreadsheets and WhatsApp groups, message me on WhatsApp. I'll tell you honestly whether we're the right call.",
+      "cta_whatsapp": "WhatsApp Ahmed",
       "cta_linkedin": "LinkedIn",
       "section_aria": "Talk to the founder",
       "avatar_letter": "A"

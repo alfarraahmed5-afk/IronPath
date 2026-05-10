@@ -92,6 +92,40 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Marketing triage batch -- cal.com purge + RTL overflow + Capability RTL flip
+
+Founder triage. Three classes of bug rolled into one integration commit so we don't ping per fix.
+
+**1. cal.com / 15-min booking link purge.** Founder-mandated rule: the only contact channel for Cairo + WhatsApp-region visitors is `wa.me/201036596238`. Cal.com cannot appear anywhere in source. Seven source files touched:
+- `marketing/components/scenes/denouement/Footer.tsx` -- replaced `CAL_LINK = 'https://cal.com/ironpath/15min'` with `WHATSAPP_HREF = 'https://wa.me/201036596238'`. The right-column quiet CTA now reads `t('whatsapp')` instead of `t('bookChat')`.
+- `marketing/messages/en.json` -- renamed `chrome.footer.bookChat` -> `chrome.footer.whatsapp` ("WhatsApp Ahmed"); rewrote `scenes.founder.body` to drop "grab 15 minutes" -> "message me on WhatsApp"; renamed `scenes.founder.cta_cal` -> `cta_whatsapp`.
+- `marketing/messages/ar.json` -- same renames in Arabic. `bookChat` -> `whatsapp` ("كلّم أحمد على واتساب"); body rewritten to drop "خد 15 دقيقة معايا" -> "كلّمني على واتساب"; `cta_cal` -> `cta_whatsapp`.
+- `marketing/app/(site)/pricing/page.tsx` and `marketing/app/ar/pricing/page.tsx` -- founder-card primary CTA repointed from `https://cal.com/ironpath-ahmed/15min` to `https://wa.me/201036596238` (added `target="_blank" rel="noreferrer noopener"`); reads `t.founder.cta_whatsapp`.
+- `marketing/app/(site)/eg/page.tsx` -- comment "no founder name, no LinkedIn, no Cal.com" sanitized to "no booking link" so the rule grep catches no source mentions.
+- `marketing/scripts/audit-links.mjs` -- comment "External links (Cal.com, WhatsApp, etc.)" sanitized to "External links (WhatsApp, LinkedIn, etc.)".
+
+`docs/cairo-*` markdown still references Cal.com but those are explicitly excluded from the founder's grep gate (they document earlier strategic state, not user-facing copy). `lib/fonts.ts` matches the regex with the substring "Next 15 minor" -- false positive, left alone.
+
+**2. RTL horizontal page scroll + sticky-header drift.** On `/ar`, the document body was scrolling horizontally (root cause: any in-flow scene that briefly extends past viewport, or a transient layout flash on Capability mount). Because `LivePulseStrip` is `position: fixed` and the chrome header is `sticky top-px`, both are pinned only on the Y axis -- so when the body drifts horizontally, the header visually drifts with it. Defense-in-depth fix in `marketing/app/globals.css`: `html` and `body` both get `overflow-x: hidden; overflow-x: clip` (the `clip` line wins where supported; `hidden` is the Safari < 16 fallback). `clip` is preferred because, unlike `hidden`, it does not create a containing block for fixed-positioned descendants and does not interfere with scroll snap.
+
+**3. GSAP Capability scene RTL x-translate.** The `HorizontalPanels` GSAP tween in `marketing/components/scenes/capability/index.tsx` translated the track by `x: () => -(track.scrollWidth - section.clientWidth)`. Under `dir="rtl"` the flex track lays out panel 0 at the right edge with subsequent panels extending leftward off-screen, so to scroll panels into view we need POSITIVE x. Read direction off the section's computed style after mount (`getComputedStyle(section).direction === 'rtl'`); apply a `sign` of `+1` for RTL, `-1` for LTR. The rest of the ScrollTrigger config is direction-agnostic.
+
+**4. Inciting Incident pinned-stack -- already correct.** Verified `parts/pinned-stack.tsx` already implements the v3 spec the founder asked for: three side-by-side cards with all captions visible at all scroll positions, scroll progress driving WHICH card is "active" (full opacity / scale 1) vs dimmed (opacity 0.45 / scale 0.96). Mapping: 0.00-0.33 -> card 0 (Memberships), 0.33-0.66 -> card 1 (Schedule), 0.66-1.00 -> card 2 (Phone). Wired into both `app/(site)/page.tsx` and `app/ar/page.tsx`. Mobile (< 768px) and reduced-motion both fork to a stacked, all-active layout. No code change needed.
+
+**Hero clipping on /ar (founder-reported #4) -- not patched.** Without a browser I cannot verify the visual symptom. Most likely it was a downstream effect of the body's horizontal drift (fixed by item 2 above); if the headline is still cut off after the next deploy, the next pass would constrain `clamp(2.75rem, 8vw, 5.5rem)` for narrow viewports or shorten `pt-24`. Asking the founder to recheck before touching it.
+
+**Lead form "Server is not configured to accept leads" -- not a code bug.** Diagnosed at the source: `marketing/app/api/lead/route.ts:86` throws this exact 503 string when `process.env.LEAD_HMAC_SECRET` is unset. Founder action: set `LEAD_HMAC_SECRET` to a 32-byte hex on the Vercel `ironpath-marketing` project AND on the Railway backend (the backend HMAC-verifies the marketing edge handler's signature). Migrations 048 (`demo_sessions`) and 049 (`leads.member_count`) must be applied in Supabase BEFORE the next backend redeploy or the boot-time schema probe will refuse to start.
+
+**Verified:** all 4 builds clean.
+- `npm run -w backend build` ✓
+- `npm run -w admin build` ✓ (1013.71 kB / 299.71 kB gz, unchanged)
+- `npm run -w console build` ✓ (466.20 kB / 140.72 kB gz, unchanged)
+- `npm run -w marketing build` ✓ (27 routes, 178 kB First Load JS on `/` and `/ar`, 35.2 kB middleware)
+
+**Grep gates clean:**
+- `cal\.com|CAL_LINK|cta_cal|bookChat` across `**/*.{ts,tsx,json,mjs,css,mdx}` in marketing -> 0 hits.
+- `—|&mdash;` across `**/*.{tsx,ts,json,mdx,css,md}` in marketing -> 4 hits, all in `docs/cairo-*` (excluded by founder rule).
+
 ### 2026-05-10 · Marketing 12-agent sprint integration (10 of 12 landed)
 
 After the pre-stage at `a902d68`, spawned 12 worktree-isolated agents in parallel against the council-synthesized 3-PR plan. The first batch tripped the worktree fork-base race (origin/master locally was at `3c8b060` while local master was at `a902d68`; the harness picked origin/master for some agents); resolved with `git update-ref refs/remotes/origin/master refs/heads/master` and a re-spawn. The re-spawn ran into Anthropic API rate limits mid-execution — 10 of 12 agents wrote real work to their worktrees but never committed, 2 (β1 page composition + γ1 WebGL ember) wrote nothing.

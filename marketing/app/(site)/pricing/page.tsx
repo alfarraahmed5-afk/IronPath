@@ -300,10 +300,12 @@ export default async function PricingPage() {
             </p>
             <div className="flex flex-wrap gap-3 text-sm">
               <a
-                href="https://cal.com/ironpath-ahmed/15min"
+                href="https://wa.me/201036596238"
+                target="_blank"
+                rel="noreferrer noopener"
                 className="inline-flex items-center gap-2 rounded-md bg-brand-500 text-white px-4 py-2 font-medium hover:bg-brand-450 transition-colors"
               >
-                {t.founder.cta_cal}
+                {t.founder.cta_whatsapp}
               </a>
               <a
                 href="https://www.linkedin.com/in/ironpath-ahmed/"

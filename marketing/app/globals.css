@@ -7,12 +7,23 @@
     color-scheme: dark;
     background-color: theme(colors.ink.950);
     color: theme(colors.ink.50);
+    /* Defense-in-depth against horizontal page scroll. RTL pages and any
+       scene that briefly extends past viewport (GSAP horizontal-scroll
+       Capability act, Reveal scene's offset Bento, etc.) must NEVER let
+       the document body scroll horizontally -- if it did, the sticky
+       header would visually drift with the page on the X axis. `clip` is
+       preferred over `hidden` (no fixed-positioning containing block, no
+       scroll-snap interference); fallback to `hidden` for Safari < 16. */
+    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   body {
     font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* Arabic typography. When the document (or any subtree) is in Arabic,

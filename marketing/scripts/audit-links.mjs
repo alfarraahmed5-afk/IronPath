@@ -19,7 +19,7 @@
 //     in HTML even when JS is disabled (RSC + Next/Link both emit anchors).
 //   - We follow redirects but record the final status. A 308 chain that ends
 //     in 200 counts as healthy.
-//   - Same-origin only. External links (Cal.com, WhatsApp, etc.) are recorded
+//   - Same-origin only. External links (WhatsApp, LinkedIn, etc.) are recorded
 //     but not fetched -- they would slow the audit and we don't own them.
 
 import { setTimeout as sleep } from 'node:timers/promises';

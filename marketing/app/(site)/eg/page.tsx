@@ -339,7 +339,7 @@ export default function EgyptPage() {
         </div>
       </section>
 
-      {/* Quiet footer -- no founder name, no LinkedIn, no Cal.com.
+      {/* Quiet footer -- no founder name, no LinkedIn, no booking link.
           Just the basics + a way back to the international site. */}
       <footer className="border-t border-ink-900 px-4 sm:px-6 py-10 text-xs text-ink-400">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row gap-4 sm:justify-between">
