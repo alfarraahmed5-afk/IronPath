@@ -7,23 +7,21 @@
     color-scheme: dark;
     background-color: theme(colors.ink.950);
     color: theme(colors.ink.50);
-    /* Defense-in-depth against horizontal page scroll. RTL pages and any
-       scene that briefly extends past viewport (GSAP horizontal-scroll
-       Capability act, Reveal scene's offset Bento, etc.) must NEVER let
-       the document body scroll horizontally -- if it did, the sticky
-       header would visually drift with the page on the X axis. `clip` is
-       preferred over `hidden` (no fixed-positioning containing block, no
-       scroll-snap interference); fallback to `hidden` for Safari < 16. */
-    overflow-x: hidden;
-    overflow-x: clip;
+    /* Do NOT add `overflow-x: hidden` or `overflow-x: clip` here. Both turn
+       <html>/<body> into an overflow-establishing ancestor for `position:
+       sticky` descendants in Chromium, and the cinematic page depends
+       heavily on sticky (header, Inciting Incident pinned-stack, Reveal
+       sticky stage, Capability GSAP pin). Adding the rule causes /ar to
+       throw the global error boundary on hydration. The actual horizontal
+       scroll was caused by the Capability scene's GSAP x-translate sign
+       being wrong in RTL; that's fixed at the source in
+       components/scenes/capability/index.tsx. */
   }
 
   body {
     font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-    overflow-x: clip;
   }
 
   /* Arabic typography. When the document (or any subtree) is in Arabic,

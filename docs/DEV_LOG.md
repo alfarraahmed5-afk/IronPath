@@ -92,6 +92,20 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · revert body overflow-x rule -- it was crashing /ar
+
+The `overflow-x: hidden; overflow-x: clip` I added to `html` + `body` in `marketing/app/globals.css` (commit c1144f5) was crashing `/ar` with the global error boundary on hydration. Founder reported it.
+
+Root cause: Chromium treats any non-`visible` overflow on `<html>`/`<body>` as establishing a scroll container ancestor for `position: sticky` descendants, even when `clip` is supposed to be a non-scroll-context value. The cinematic page leans on sticky positioning in four places: the SharedShell header (`sticky top-px`), the Inciting Incident pinned-stack (`md:sticky md:top-0`), the Reveal scene's animated stage (`sticky top-0`), and Capability's GSAP `pin: true` (which under the hood synthesizes a sticky element). Breaking sticky on the cinematic scenes throws inside ScrollTrigger / framer's `useScroll`, and the React error boundary catches it.
+
+Local SSR was fine (`curl /ar` returned 200 with valid Arabic HTML); the error only surfaced on hydration in the browser. I confirmed by reading the build output: `/ar` is `ƒ` (dynamic) and the SSR path renders the AR-locale HTML correctly. The crash happens after JS hydrates the cinematic scene tree.
+
+**Fix:** dropped both rules. Left an explicit `Do NOT add` comment in `globals.css` so the next maintainer (or me) doesn't reintroduce the trap.
+
+The horizontal page scroll the original commit was defending against is genuinely fixed at the source by the Capability scene's RTL x-translate sign flip (also c1144f5, untouched here). If a *new* scene introduces horizontal overflow later, the right move is to give that scene's own outer wrapper `overflow-x: clip` -- not the document root.
+
+**Verified:** `npm run -w marketing build` clean. Pushing immediately so production /ar comes back.
+
 ### 2026-05-10 · /eg pure-English (founder rule: one language per page)
 
 Founder reviewed `www.ironpath.health/eg` and saw both English and Arabic on the same page. The original copywriter brief was "English-with-Arabic-flex" -- bilingual hero, Arabic taglines inline with English body, Arabic tier names alongside English tier names. Founder overrode that decision with a project-wide rule: **each language is its own website; visitors switch via the locale toggle**.
