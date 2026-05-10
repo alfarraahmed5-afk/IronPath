@@ -1,13 +1,14 @@
-// /eg -- Cairo wedge page.
+// /eg -- Cairo wedge page (English).
 //
 // Per the GTM strategist (council lens 4): ship a single static landing
 // page for Cairo BEFORE investing in full i18n architecture. One page,
 // one CTA (WhatsApp to Ahmed), one number (+20 10 3659 6238). Use it to
-// book 5 in-person Cairo demos in week 1. Architecture follows demand.
+// book in-person Cairo demos. Architecture follows demand.
 //
-// English-with-Arabic-flex per copywriter's deck -- Arabic key phrases
-// inline (`dir="rtl"` spans), English body copy. EGP pricing visible.
-// No founder photo, no last name (founder direction).
+// Founder rule (2026-05-10): each language lives in its own page. The
+// /eg page is pure English; the Arabic mirror at /ar/eg is pure Arabic.
+// Visitors switch via the locale toggle in the header. No bilingual mix
+// inside one container, ever.
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -25,43 +26,33 @@ export const metadata: Metadata = buildMetadata({
 const WHATSAPP_NUMBER = '+20 10 3659 6238';
 const WHATSAPP_LINK =
   'https://wa.me/201036596238?text=' +
-  encodeURIComponent("Hi Ahmed -- I run a gym in Cairo and I'd like to see IronPath.");
+  encodeURIComponent("Hi Ahmed, I run a gym in Cairo and I'd like to see IronPath.");
 
 interface Tier {
   name: string;
-  arName: string;
   priceEgp: number;
   cap: string;
-  arCap: string;
   tagline: string;
 }
 
-// Founder-confirmed EGP pricing (1350 / 2750 / 5300, monthly). Lens 1
-// recommended 799/1499/2999 based on EGP 500/mo benchmark; founder
-// chose higher tier to position above the GymFlow incumbent.
+// Founder-confirmed EGP pricing (1350 / 2750 / 5300, monthly).
 const TIERS: Tier[] = [
   {
     name: 'Starter',
-    arName: 'مبتدي',
     priceEgp: 1_350,
     cap: 'Up to 50 members',
-    arCap: 'لحد 50 عضو',
-    tagline: "Everything you need to run a small gym without spreadsheets.",
+    tagline: 'Everything you need to run a small gym without spreadsheets.',
   },
   {
     name: 'Growth',
-    arName: 'نمو',
     priceEgp: 2_750,
     cap: 'Up to 200 members',
-    arCap: 'لحد 200 عضو',
     tagline: 'For gyms past the first plateau, scaling staff and class load.',
   },
   {
     name: 'Pro',
-    arName: 'برو',
     priceEgp: 5_300,
     cap: 'No member cap',
-    arCap: 'بدون حد للأعضاء',
     tagline: 'For multi-location gyms and operators with their own stack.',
   },
 ];
@@ -93,22 +84,15 @@ export default function EgyptPage() {
         </div>
       </nav>
 
-      {/* Hero -- bilingual */}
+      {/* Hero */}
       <section className="px-4 sm:px-6 py-20 sm:py-28">
         <div className="mx-auto max-w-3xl">
           <p className="font-mono text-[11px] text-brand-400 mb-4 tracking-wider">
             FOR CAIRO GYMS
           </p>
-          <h1
-            dir="rtl"
-            lang="ar"
-            className="font-display text-3xl sm:text-5xl text-ink-50 mb-3 tracking-tight leading-tight"
-          >
-            شغّل الجيم، مش جروبات الواتساب.
-          </h1>
-          <p className="font-display text-2xl sm:text-3xl text-ink-200 mb-8 tracking-tight">
+          <h1 className="font-display text-3xl sm:text-5xl text-ink-50 mb-8 tracking-tight leading-tight">
             Run your gym, not WhatsApp groups.
-          </p>
+          </h1>
           <p className="text-base sm:text-lg text-ink-300 max-w-xl mb-10 leading-relaxed">
             For independent Cairo gyms tired of tracking memberships in Excel,
             chasing payments in DMs, and remembering everything themselves.
@@ -149,12 +133,9 @@ export default function EgyptPage() {
               sign-ups go to whoever follows up first, and you&rsquo;re the
               one running the front desk.
             </p>
-            <p
-              dir="rtl"
-              lang="ar"
-              className="text-ink-200 text-lg font-display"
-            >
-              النظام كله شغّال على إنك فاكر كل حاجة. لما تنسى، الجيم بيخسر.
+            <p className="text-ink-200 text-lg font-display">
+              The whole system runs on you remembering everything. When you
+              forget, the gym loses.
             </p>
           </div>
         </div>
@@ -251,13 +232,6 @@ export default function EgyptPage() {
                   <p className="font-mono text-[11px] text-ink-400 tracking-wider">
                     {tier.name.toUpperCase()}
                   </p>
-                  <p
-                    dir="rtl"
-                    lang="ar"
-                    className="font-display text-sm text-ink-300 mt-0.5"
-                  >
-                    {tier.arName}
-                  </p>
                 </div>
                 <div className="mb-3" data-numeric>
                   <span className="font-display text-4xl sm:text-5xl text-ink-50 font-semibold">
@@ -267,14 +241,7 @@ export default function EgyptPage() {
                     EGP/mo
                   </span>
                 </div>
-                <p className="text-ink-300 text-sm mb-1">{tier.cap}</p>
-                <p
-                  dir="rtl"
-                  lang="ar"
-                  className="text-ink-400 text-xs font-display mb-5"
-                >
-                  {tier.arCap}
-                </p>
+                <p className="text-ink-300 text-sm mb-5">{tier.cap}</p>
                 <p className="text-ink-300 text-sm leading-relaxed mb-6 flex-1">
                   {tier.tagline}
                 </p>
@@ -310,16 +277,9 @@ export default function EgyptPage() {
       {/* Closing CTA */}
       <section className="px-4 sm:px-6 py-24 sm:py-32">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-display text-3xl sm:text-4xl text-ink-50 mb-4 tracking-tight">
+          <h2 className="font-display text-3xl sm:text-4xl text-ink-50 mb-6 tracking-tight">
             Let&rsquo;s talk.
           </h2>
-          <p
-            dir="rtl"
-            lang="ar"
-            className="font-display text-xl sm:text-2xl text-ink-200 mb-8"
-          >
-            تعالى نتكلّم.
-          </p>
           <p className="text-ink-300 mb-10 leading-relaxed">
             Send Ahmed a WhatsApp. He&rsquo;ll come to your gym for a free
             in-person demo, usually within a week.

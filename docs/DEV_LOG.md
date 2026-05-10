@@ -92,6 +92,23 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · /eg pure-English (founder rule: one language per page)
+
+Founder reviewed `www.ironpath.health/eg` and saw both English and Arabic on the same page. The original copywriter brief was "English-with-Arabic-flex" -- bilingual hero, Arabic taglines inline with English body, Arabic tier names alongside English tier names. Founder overrode that decision with a project-wide rule: **each language is its own website; visitors switch via the locale toggle**.
+
+`/ar/eg` is already pure Arabic (Super Agent 1 shipped it that way during the AR overhaul), so the only file that violated the rule was `marketing/app/(site)/eg/page.tsx`. Stripped:
+- Hero: removed the Arabic h1 ("شغّل الجيم، مش جروبات الواتساب.") so only the English headline remains.
+- "BEFORE" section: removed the Arabic font-display tagline ("النظام كله شغّال على إنك فاكر كل حاجة. لما تنسى، الجيم بيخسر.") and replaced with an English equivalent ("The whole system runs on you remembering everything. When you forget, the gym loses.").
+- Tier interface: dropped `arName` + `arCap` fields; tier cards now render only the English name (uppercased mono eyebrow) + English cap.
+- Closing CTA: removed the Arabic "تعالى نتكلّم." line. English "Let's talk." stands alone.
+- File header comment updated to document the new founder rule so the next maintainer can't reintroduce mixing.
+
+The locale toggle in the SharedShell header already maps `/eg` <-> `/ar/eg` via `lib/locale.ts:localizedPath`. Verified the helper: `localizedPath('ar', '/eg')` returns `/ar/eg`; `localizedPath('en', '/ar/eg')` returns `/eg`. No router work needed.
+
+**Audit:** grepped `marketing/app/(site)` for any remaining `dir="rtl"` / `lang="ar"` markup -- zero hits. The `app/ar/*` pages still legitimately use RTL containers (that's the point); the `capability/index.tsx` mock rows still use per-row `lang/dir` to bidi-isolate names, but those switch all-EN or all-AR based on the visitor's active locale, never both at once on one page.
+
+**Verified:** `npm run -w marketing build` clean. Same 27 routes; `/eg` first-load JS unchanged at 105 kB.
+
 ### 2026-05-10 · Marketing triage batch -- cal.com purge + RTL overflow + Capability RTL flip
 
 Founder triage. Three classes of bug rolled into one integration commit so we don't ping per fix.
