@@ -81,7 +81,10 @@ export function ListRow({
   const reduceSv = useReanimatedReduceMotion();
   const armedConfirmRef = useRef<NodeJS.Timeout | null>(null);
   const [armedAction, setArmedAction] = useState<string | null>(null);
-  const revealedRef = useRef(false);
+  // Worklet-side revealed flag -- SharedValue so writes from the
+  // gesture worklet are safe. JS-side mirror unnecessary because the
+  // reveal haptic fires through runOnJS.
+  const revealed = useSharedValue(false);
 
   const action = rightActions?.[0];
   const totalActionWidth = action ? ACTION_WIDTH : 0;
@@ -130,8 +133,8 @@ export function ListRow({
       const next = Math.min(0, Math.max(-totalActionWidth * 1.4, e.translationX));
       tx.value = next;
       // One-shot haptic when the user crosses the reveal threshold.
-      if (!revealedRef.current && Math.abs(next) > REVEAL_THRESHOLD) {
-        revealedRef.current = true;
+      if (!revealed.value && Math.abs(next) > REVEAL_THRESHOLD) {
+        revealed.value = true;
         runOnJS(fireRevealHaptic)();
       }
     })
@@ -151,13 +154,9 @@ export function ListRow({
         } else {
           tx.value = withSpring(0, springModal);
         }
-        runOnJS(setRevealed)(false);
+        revealed.value = false;
       }
     });
-
-  function setRevealed(v: boolean) {
-    revealedRef.current = v;
-  }
 
   const rowStyle = useAnimatedStyle(() => {
     'worklet';
