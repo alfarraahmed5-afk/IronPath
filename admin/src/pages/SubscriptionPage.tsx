@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
 import api from '../lib/api';
 import { extractError, getStoredGymId } from '../lib/forms';
+import { EmberSeam } from '@/components/EmberSeam';
+import { cn } from '@/lib/utils';
 
 // ---------- types ----------
 
@@ -24,11 +27,12 @@ interface TierDef {
   name: string;
   price: number; // dollars
   blurb: string;
+  recommended?: boolean;
 }
 
 const TIERS: TierDef[] = [
   { key: 'starter', name: 'Starter', price: 49, blurb: 'Up to 50 members' },
-  { key: 'growth', name: 'Growth', price: 99, blurb: 'Up to 200 members' },
+  { key: 'growth', name: 'Growth', price: 99, blurb: 'Up to 200 members', recommended: true },
   { key: 'unlimited', name: 'Unlimited', price: 199, blurb: 'No member cap' },
 ];
 
@@ -41,15 +45,20 @@ function tierLabel(t: Tier | null): string {
   return 'No plan yet';
 }
 
+function tierPrice(t: Tier | null): number | null {
+  const def = TIERS.find((x) => x.key === t);
+  return def?.price ?? null;
+}
+
 function statusLabel(s: Status): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function statusPillCx(s: Status): string {
-  if (s === 'active') return 'bg-green-900/40 text-green-400 border-green-800';
-  if (s === 'trial') return 'bg-cyan-900/40 text-cyan-300 border-cyan-800';
-  if (s === 'expired') return 'bg-yellow-900/40 text-yellow-400 border-yellow-800';
-  return 'bg-gray-800 text-gray-400 border-gray-700'; // cancelled
+  if (s === 'active') return 'bg-green-100 text-green-800 border-green-300';
+  if (s === 'trial') return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+  if (s === 'expired') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+  return 'bg-ink-200 text-ink-700 border-ink-400';
 }
 
 function formatMrr(cents: number): string {
@@ -74,28 +83,6 @@ function daysUntil(iso: string): number {
 
 // ---------- shared UI ----------
 
-function Card({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-      <header className="mb-5">
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        {subtitle && (
-          <p className="text-gray-400 text-sm mt-1">{subtitle}</p>
-        )}
-      </header>
-      {children}
-    </section>
-  );
-}
-
 function InlineError({ message }: { message: string }) {
   return (
     <div className="bg-red-900/30 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
@@ -104,147 +91,330 @@ function InlineError({ message }: { message: string }) {
   );
 }
 
-function CardSkeleton() {
+function ReceiptSkeleton() {
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 space-y-4">
-      <div className="h-5 w-40 bg-gray-800 rounded animate-pulse" />
-      <div className="h-4 w-full bg-gray-800 rounded animate-pulse" />
-      <div className="h-4 w-2/3 bg-gray-800 rounded animate-pulse" />
+    <div className="max-w-md mx-auto bg-ink-50/90 rounded-sm p-6 space-y-3 animate-pulse">
+      <div className="h-3 w-2/3 mx-auto bg-ink-400/40 rounded" />
+      <div className="h-3 w-1/3 mx-auto bg-ink-400/40 rounded" />
+      <div className="h-px w-full bg-ink-400/30 my-3" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-3 w-full bg-ink-400/30 rounded" />
+      ))}
     </div>
   );
 }
 
-// ---------- current plan card ----------
+// ---------- THE RECEIPT ----------
 
-function CurrentPlanCard({ sub }: { sub: Subscription }) {
+/**
+ * Perforated edge — small triangular notches across the top/bottom of the
+ * receipt card. Implemented as repeating-radial-gradient bites taken out of
+ * the receipt's background. We mask the bite shape via an SVG row of
+ * triangles for crispness on hidpi.
+ */
+function PerforatedEdge({ position }: { position: 'top' | 'bottom' }) {
+  // Triangular notch row — alternating downward/upward triangles in negative
+  // space. The receipt's background (ink-50) shows through the SVG fill;
+  // the page background (ink-950) shows through the transparent notches.
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'h-3 w-full',
+        position === 'top' ? '-mb-px' : '-mt-px'
+      )}
+      style={{
+        backgroundColor: 'transparent',
+        backgroundImage:
+          position === 'top'
+            ? 'radial-gradient(circle at 6px 0px, transparent 4px, #FAFAFB 4.5px)'
+            : 'radial-gradient(circle at 6px 12px, transparent 4px, #FAFAFB 4.5px)',
+        backgroundSize: '12px 12px',
+        backgroundRepeat: 'repeat-x',
+      }}
+    />
+  );
+}
+
+interface ReceiptProps {
+  sub: Subscription;
+  gymName?: string;
+  onCancel?: () => void;
+}
+
+function Receipt({ sub, gymName, onCancel }: ReceiptProps) {
   const isUnlimited = sub.member_cap === null;
-  const usagePct = isUnlimited
-    ? 0
-    : Math.min(100, Math.round((sub.member_count / Math.max(1, sub.member_cap ?? 1)) * 100));
-
   const trialDaysLeft = sub.status === 'trial' ? daysUntil(sub.expires_at) : null;
+  const isPaid = sub.status === 'active';
+  const price = tierPrice(sub.tier);
+
+  const today = new Date().toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
-    <Card title="Current plan">
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <span
-          className={[
-            'inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold uppercase tracking-wider border',
-            sub.tier
-              ? 'bg-orange-500/10 text-orange-400 border-orange-500/40'
-              : 'bg-gray-800 text-gray-300 border-gray-700',
-          ].join(' ')}
-        >
-          {tierLabel(sub.tier)}
-        </span>
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusPillCx(sub.status)}`}
-        >
-          {statusLabel(sub.status)}
-        </span>
-      </div>
+    <div className="max-w-md mx-auto">
+      {/* Receipt body */}
+      <div className="relative">
+        <PerforatedEdge position="top" />
 
-      <div className="space-y-2">
-        {isUnlimited ? (
-          <p className="text-gray-200 text-sm">
-            <span className="font-semibold">{sub.member_count}</span>{' '}
-            members. Unlimited members on this plan.
-          </p>
-        ) : (
-          <>
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="text-gray-300">Members</span>
-              <span className="font-mono text-gray-200">
-                {sub.member_count} / {sub.member_cap}
-              </span>
-            </div>
+        <div className="relative bg-ink-50 text-ink-900 px-7 py-6 font-mono shadow-2xl overflow-hidden">
+          {/* PAID stamp */}
+          {isPaid && (
             <div
-              className="h-2 w-full bg-gray-800 rounded overflow-hidden"
-              role="progressbar"
-              aria-valuenow={usagePct}
-              aria-valuemin={0}
-              aria-valuemax={100}
+              aria-hidden="true"
+              className="pointer-events-none absolute"
+              style={{
+                top: '28%',
+                right: '8%',
+                transform: 'rotate(-12deg)',
+              }}
             >
               <div
-                className="h-full bg-orange-500 transition-all"
-                style={{ width: `${usagePct}%` }}
-              />
+                className="border-4 px-3 py-1 text-3xl font-extrabold tracking-wider"
+                style={{
+                  color: '#E55A28',
+                  borderColor: '#E55A28',
+                  opacity: 0.35,
+                }}
+              >
+                PAID
+              </div>
             </div>
-          </>
-        )}
-      </div>
+          )}
 
-      <div className="mt-5 pt-4 border-t border-gray-800 text-sm text-gray-300">
-        {trialDaysLeft !== null ? (
-          <p>
-            <span className="font-mono text-white">{trialDaysLeft}</span>{' '}
-            days left in trial. Trial ends {formatDate(sub.expires_at)}.
+          {/* Header */}
+          <div className="text-center mb-4">
+            <h2 className="text-base font-bold tracking-[0.18em] uppercase text-ink-900">
+              IRONPATH GYM
+            </h2>
+            {gymName && (
+              <p className="text-xs uppercase tracking-wider text-ink-700 mt-0.5">
+                {gymName}
+              </p>
+            )}
+            <p className="text-[10px] uppercase tracking-widest text-ink-600 mt-1">
+              {today}
+            </p>
+          </div>
+
+          <div className="border-t border-dashed border-ink-700/60 my-3" />
+
+          {/* Tier banner */}
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-[10px] uppercase tracking-widest text-ink-600">
+              Plan
+            </span>
+            <span className="text-base font-bold uppercase tracking-wider">
+              {tierLabel(sub.tier)}
+            </span>
+          </div>
+
+          {/* Line items */}
+          <div className="space-y-1.5 text-sm">
+            <Line label="Tier rate">
+              {price !== null ? (
+                <>
+                  <span className="font-semibold">${price.toFixed(2)}</span>
+                  <span className="text-ink-600 text-xs">/mo</span>
+                </>
+              ) : (
+                <span className="text-ink-600">—</span>
+              )}
+            </Line>
+            <Line label="Members">
+              <span className="font-semibold tabular-nums">
+                {sub.member_count}
+              </span>
+              <span className="text-ink-600">
+                {' '}
+                /{' '}
+                {isUnlimited ? '∞' : sub.member_cap}
+              </span>
+            </Line>
+            <Line label="Status">
+              <span
+                className={cn(
+                  'inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider border',
+                  statusPillCx(sub.status)
+                )}
+              >
+                {statusLabel(sub.status)}
+              </span>
+            </Line>
+            {sub.trial_started_at && (
+              <Line label="Trial started">
+                <span className="tabular-nums">
+                  {formatDate(sub.trial_started_at)}
+                </span>
+              </Line>
+            )}
+            <Line label="MRR">
+              <span className="font-semibold tabular-nums">
+                {formatMrr(sub.mrr_cents)}
+              </span>
+            </Line>
+          </div>
+
+          <div className="border-t border-dashed border-ink-700/60 my-4" />
+
+          {/* Total / next bill */}
+          <div className="space-y-1">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] uppercase tracking-widest text-ink-600">
+                {trialDaysLeft !== null
+                  ? 'Trial ends'
+                  : sub.status === 'active'
+                  ? 'Renews'
+                  : sub.status === 'expired'
+                  ? 'Expired'
+                  : 'Ends'}
+              </span>
+              <span className="text-base font-bold tabular-nums">
+                {formatDate(sub.expires_at)}
+              </span>
+            </div>
+            {trialDaysLeft !== null && (
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-ink-600 uppercase tracking-widest text-[10px]">
+                  Days left
+                </span>
+                <span className="tabular-nums font-semibold">
+                  {trialDaysLeft}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-dashed border-ink-700/60 my-4" />
+
+          <p className="text-center text-[9px] uppercase tracking-[0.2em] text-ink-600">
+            Thank you — keep lifting
           </p>
-        ) : sub.status === 'active' ? (
-          <p>Renews {formatDate(sub.expires_at)}.</p>
-        ) : sub.status === 'expired' ? (
-          <p className="text-yellow-400">Expired {formatDate(sub.expires_at)}.</p>
-        ) : sub.status === 'cancelled' ? (
-          <p className="text-gray-400">Cancelled. Ends {formatDate(sub.expires_at)}.</p>
-        ) : null}
+
+          {/* Tear-off corner — cancellation */}
+          {onCancel && sub.status !== 'cancelled' && (
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Cancel subscription"
+              title="Cancel subscription"
+              className="group absolute bottom-0 right-0 w-12 h-12 focus:outline-none"
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 transition-transform group-hover:translate-x-1 group-hover:translate-y-1"
+                style={{
+                  background:
+                    'linear-gradient(135deg, transparent 50%, #D4D4DA 50%, #8A8A95 100%)',
+                  clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                }}
+              />
+              <span className="absolute bottom-1 right-1 text-[8px] uppercase tracking-widest text-ink-700 font-semibold rotate-[-45deg] origin-bottom-right">
+                cancel
+              </span>
+            </button>
+          )}
+        </div>
+
+        <PerforatedEdge position="bottom" />
       </div>
-    </Card>
+    </div>
   );
 }
 
-// ---------- MRR card ----------
-
-function MrrCard({ sub }: { sub: Subscription }) {
+function Line({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card title="Recorded MRR" subtitle="What's recorded — not necessarily what's collected.">
-      <p className="font-mono text-3xl font-bold text-white">
-        {formatMrr(sub.mrr_cents)}
-      </p>
-    </Card>
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-[10px] uppercase tracking-widest text-ink-600 whitespace-nowrap">
+        {label}
+      </span>
+      <span className="flex-1 mx-2 border-b border-dotted border-ink-400/50 self-end mb-1" />
+      <span className="text-right tabular-nums">{children}</span>
+    </div>
   );
 }
 
-// ---------- upgrade card ----------
+// ---------- Upgrade tiers ----------
 
-function UpgradeCard({ sub }: { sub: Subscription }) {
+interface UpgradePickerProps {
+  sub: Subscription;
+  reduceMotion: boolean;
+}
+
+function UpgradePicker({ sub, reduceMotion }: UpgradePickerProps) {
   return (
-    <Card title="Plans" subtitle="Pick a plan that fits your member count.">
+    <section className="surface-card p-6">
+      <header className="mb-5">
+        <h2 className="text-lg font-semibold text-ink-50">Plans</h2>
+        <p className="text-ink-400 text-sm mt-1">
+          Pick a plan that fits your member count.
+        </p>
+      </header>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TIERS.map((t) => {
           const current = t.key === sub.tier;
+          const recommended = t.recommended && !current;
           // v1: mailto placeholder. Phase C will replace with a real upgrade flow.
           const mailto = `mailto:sales@ironpath.app?subject=Upgrade%20to%20${encodeURIComponent(t.name)}`;
           return (
             <div
               key={t.key}
-              className={[
-                'rounded-xl p-5 border bg-gray-950/40 flex flex-col',
+              className={cn(
+                'relative rounded-xl p-5 border bg-ink-950/40 flex flex-col overflow-hidden',
+                'transition-transform hover:-translate-y-0.5',
                 current
-                  ? 'border-orange-500 ring-1 ring-orange-500'
-                  : 'border-gray-800',
-              ].join(' ')}
+                  ? 'border-brand-500 ring-1 ring-brand-500'
+                  : 'border-ink-800'
+              )}
             >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-white font-semibold">{t.name}</h3>
+              {/* Foil overlay on recommended tier */}
+              {recommended && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"
+                  style={{
+                    backgroundImage:
+                      'conic-gradient(from 0deg, #FF6B35, #FFD089, #FF6B35, #B53A18, #FF8A5C, #FF6B35)',
+                    backgroundSize: '200% 200%',
+                    animation: reduceMotion ? undefined : 'spin 12s linear infinite',
+                  }}
+                />
+              )}
+              {recommended && (
+                <span className="absolute top-2 right-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand-500 text-ink-950">
+                  Recommended
+                </span>
+              )}
+              <div className="flex items-center justify-between mb-2 relative">
+                <h3 className="text-ink-50 font-semibold">{t.name}</h3>
                 {current && (
-                  <span className="text-xs font-medium text-orange-400">
+                  <span className="text-xs font-medium text-brand-500">
                     Current
                   </span>
                 )}
               </div>
-              <p className="font-mono text-2xl font-bold text-white">
+              <p className="font-mono text-2xl font-bold text-ink-50 relative">
                 ${t.price}
-                <span className="text-sm font-normal text-gray-500">/mo</span>
+                <span className="text-sm font-normal text-ink-400">/mo</span>
               </p>
-              <p className="text-sm text-gray-400 mt-1 mb-4">{t.blurb}</p>
+              <p className="text-sm text-ink-400 mt-1 mb-4 relative">{t.blurb}</p>
               <a
                 href={mailto}
-                className={[
-                  'mt-auto text-center px-3 py-2 rounded-lg text-sm font-semibold transition-colors',
+                className={cn(
+                  'mt-auto text-center px-3 py-2 rounded-lg text-sm font-semibold transition-colors relative',
                   current
-                    ? 'bg-gray-800 text-gray-400 cursor-default pointer-events-none'
-                    : 'bg-orange-500 hover:bg-orange-600 text-white',
-                ].join(' ')}
+                    ? 'bg-ink-800 text-ink-400 cursor-default pointer-events-none'
+                    : 'bg-brand-500 hover:bg-brand-600 text-ink-950'
+                )}
                 aria-disabled={current}
               >
                 {current ? 'On this plan' : 'Request upgrade'}
@@ -253,52 +423,65 @@ function UpgradeCard({ sub }: { sub: Subscription }) {
           );
         })}
       </div>
-      <p className="text-xs text-gray-500 mt-4">
+      <p className="text-xs text-ink-400 mt-4">
         Self-serve checkout arrives in Phase C. For now, sales handles upgrades.
       </p>
-    </Card>
+    </section>
   );
 }
 
-// ---------- invoices card ----------
+// ---------- invoices + export cards ----------
 
 function InvoicesCard() {
   return (
-    <Card title="Invoices">
+    <section className="surface-card p-6">
+      <header className="mb-5">
+        <h2 className="text-lg font-semibold text-ink-50">Invoices</h2>
+      </header>
       <div className="text-center py-8">
-        <FileText size={32} strokeWidth={1.5} className="mx-auto text-gray-600 mb-2" aria-hidden="true" />
-        <p className="text-gray-300 text-sm font-medium">No invoices yet</p>
-        <p className="text-gray-500 text-xs mt-1">
+        <FileText
+          size={32}
+          strokeWidth={1.5}
+          className="mx-auto text-ink-600 mb-2"
+          aria-hidden="true"
+        />
+        <p className="text-ink-200 text-sm font-medium">No invoices yet</p>
+        <p className="text-ink-400 text-xs mt-1">
           Phase C will surface payment history here.
         </p>
       </div>
-    </Card>
+    </section>
   );
 }
 
-// ---------- data export card ----------
-
 function DataExportCard() {
   return (
-    <Card title="Data export" subtitle="Export your members and workouts as CSV.">
+    <section className="surface-card p-6">
+      <header className="mb-5">
+        <h2 className="text-lg font-semibold text-ink-50">Data export</h2>
+        <p className="text-ink-400 text-sm mt-1">
+          Export your members and workouts as CSV.
+        </p>
+      </header>
       <button
         type="button"
         disabled
         title="Available after activation"
-        className="px-4 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm font-semibold cursor-not-allowed"
+        className="px-4 py-2 rounded-lg bg-ink-800 text-ink-400 text-sm font-semibold cursor-not-allowed"
       >
         Export CSV
       </button>
-      <p className="text-xs text-gray-500 mt-2">
+      <p className="text-xs text-ink-400 mt-2">
         Available after activation. Phase C will wire this up.
       </p>
-    </Card>
+    </section>
   );
 }
 
 // ---------- page ----------
 
 export default function SubscriptionPage() {
+  const reduceMotion = useReducedMotion() ?? false;
   const gymId = getStoredGymId();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -326,41 +509,51 @@ export default function SubscriptionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gymId]);
 
-  return (
-    <div className="max-w-4xl">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Subscription</h1>
-        <p className="text-gray-400 text-sm mt-1">Plan, usage, and billing.</p>
-      </header>
+  function handleCancel() {
+    // v1 placeholder — keep parity with mailto upgrade flow.
+    window.location.href =
+      'mailto:sales@ironpath.app?subject=Cancel%20subscription';
+  }
 
-      {!gymId ? (
-        <InlineError message="No gym is linked to this admin account. Sign out and back in to refresh." />
-      ) : loading ? (
-        <div className="space-y-6">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
-      ) : loadError ? (
-        <div className="space-y-3">
-          <InlineError message={loadError} />
-          <button
-            type="button"
-            onClick={() => load(gymId)}
-            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      ) : sub ? (
-        <div className="space-y-6">
-          <CurrentPlanCard sub={sub} />
-          <MrrCard sub={sub} />
-          <UpgradeCard sub={sub} />
-          <InvoicesCard />
-          <DataExportCard />
-        </div>
-      ) : null}
+  return (
+    <div className="surface-shell -mx-4 -my-4 px-4 py-4 min-h-full">
+      <div className="max-w-4xl mx-auto">
+        <header className="mb-3">
+          <h1 className="text-2xl font-bold text-ink-50">Subscription</h1>
+          <p className="text-ink-400 text-sm mt-1">Plan, usage, and billing.</p>
+        </header>
+
+        <EmberSeam className="mb-8 h-px bg-gradient-to-r from-transparent via-brand-500/40 to-transparent" />
+
+        {/* Spin keyframe for foil — defined once, reused by all foil overlays */}
+        <style>{`@keyframes spin { to { background-position: 200% 0; } }`}</style>
+
+        {!gymId ? (
+          <InlineError message="No gym is linked to this admin account. Sign out and back in to refresh." />
+        ) : loading ? (
+          <div className="space-y-6">
+            <ReceiptSkeleton />
+          </div>
+        ) : loadError ? (
+          <div className="space-y-3">
+            <InlineError message={loadError} />
+            <button
+              type="button"
+              onClick={() => load(gymId)}
+              className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-ink-950 font-semibold text-sm transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : sub ? (
+          <div className="space-y-8">
+            <Receipt sub={sub} onCancel={handleCancel} />
+            <UpgradePicker sub={sub} reduceMotion={reduceMotion} />
+            <InvoicesCard />
+            <DataExportCard />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
