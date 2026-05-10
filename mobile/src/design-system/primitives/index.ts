@@ -1,0 +1,38 @@
+/**
+ * Design-system primitives. Cinematic overhaul foundation.
+ *
+ * Existing primitives in `mobile/src/components/` are re-exported here
+ * for one cycle so screens can already migrate imports while Teams B
+ * land real implementations.
+ */
+export { Card } from './Card';
+export { Hero } from './Hero';
+export { ListRow } from './ListRow';
+export { Tile } from './Tile';
+export { Numeric } from './Numeric';
+export { Eyebrow } from './Eyebrow';
+export { Section } from './Section';
+export { EmberSeam } from './EmberSeam';
+export { LivePulseStrip } from './LivePulseStrip';
+export { RouteModal } from './Modal';
+
+// Re-exports of legacy primitives so consumers can pick a single
+// import path. Team B may upgrade these in place.
+export { Avatar } from '../../components/Avatar';
+export { BadgeChip } from '../../components/BadgeChip';
+export { Button } from '../../components/Button';
+export { Calendar } from '../../components/Calendar';
+export { EmptyState } from '../../components/EmptyState';
+export { Header } from '../../components/Header';
+export { Icon } from '../../components/Icon';
+export { Input } from '../../components/Input';
+export { LineChart } from '../../components/LineChart';
+export { Pressable } from '../../components/Pressable';
+export { ProgressRing } from '../../components/ProgressRing';
+export { Sheet } from '../../components/Sheet';
+export { Skeleton } from '../../components/Skeleton';
+export { StatCard } from '../../components/StatCard';
+export { Surface } from '../../components/Surface';
+export { TabBarIcon } from '../../components/TabBarIcon';
+export { Text } from '../../components/Text';
+export { ToastProvider, useToast } from '../../components/Toast';

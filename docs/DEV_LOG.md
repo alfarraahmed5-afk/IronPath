@@ -92,6 +92,44 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-10 · Mobile cinematic overhaul + progress tracking sprint -- pre-stage
+
+Founder requested a cinematic overhaul of the mobile app to match the marketing-site polish, plus the progress-tracking features that have been thin or absent (streaks, milestones, PR celebrations, weekly/monthly recap, heatmap-style consistency, body-measurement trends, adherence to assigned program, friend visibility).
+
+**Council pass complete.** Spawned 10 expert lenses in parallel via the Agent tool (general-purpose subagent, model `opus`). Each wrote an exhaustive markdown audit + plan to `skills/mobile-council/lens-NN-*.md` (gitignored). Synthesis at `skills/mobile-council/SYNTHESIS.md` reconciles overlapping recommendations and locks decisions. ~7,977 lines of council output.
+
+**Founder Q1-Q7 locked (2026-05-10):**
+1. Tab structure: **Option B** -- restructure to `Home / Train / Progress / Community / Me`. Promotes Progress out of the "everything bucket" Profile tab.
+2. Streak unit: **weeks** (kept; backend stays on `current_streak_weeks`). Heatmap cells stay daily but the headline counter is weekly.
+3. Goals (target weight / consistency / bodyweight): **ship in v1, NOT behind a flag**. "All main features strictly ship together in bundle."
+4. PR celebrate auto-dismiss: **kept** (6s default, dynamic up to 12s for multi-PR sessions, disabled under screen reader).
+5. Set-type recolor: dropset purple `#8B5CF6` -> warm orange `#FF7A3D`; failure red `#EF4444` -> brand-450 `#FF1A3D`. **Approved.**
+6. Streak flame warm-orange exception: **approved** + new tier ladder. `iron_streak_2w / iron_streak_1m / iron_streak_3m / iron_streak_6m / iron_streak_1y / iron_streak_2y / iron_streak_5y` replaces the existing `iron_month` + `iron_quarter` pair.
+7. Skia particle layer on PR celebrate: **approved** (~50 KB JS, 60+ fps on flagship).
+
+**Sprint structure: 4 teams of 2 agents each, 8 agents total.**
+- **Team A (PR A -- Foundation):** design-system folder, ThemeProvider, Mona Sans port, crimson tokens, splash + adaptive-icon recolor, ESLint + Prettier + scripts, simple backend migrations (BE-D streak fields, BE-H gym_volume_percentile, BE-M schema probes).
+- **Team B (PR B -- Primitives + Motion):** real Card / Hero / Numeric / EmberSeam / LivePulseStrip / Sheet rewrite / Toast rewrite / haptic map / motion primitives / React Query install, plus medium backend (BE-A calendar extension, BE-J workouts/finish enrichment, BE-K /users/me/aggregate, BE-L /analytics/all, BE-N streak tier ladder).
+- **Team C (PR C -- Screens):** workout finish + celebrate (cinematic peak), Progress + Profile + Train + Community + auth screen rebuilds, plus heavy backend (BE-B trainer period_summary, BE-C measurements photos, BE-E monthly_recaps, BE-F user_goals, BE-I per-metric series).
+- **Team D (PR D -- Polish):** a11y + RTL + reduce-motion audits, EAS preview build, photo-asset license manifest, performance baseline, founder side-load brief. Launches AFTER A+B+C integrate (Team D audits real screens; can't run truly parallel).
+
+**Pre-stage this commit:**
+- Created `mobile/src/design-system/` directory tree: `tokens/{colors, typography, spacing, radii, shadows, motion, index}.ts`, `theme/{ThemeProvider, useTheme, index}.{tsx,ts}`, `primitives/{Card, Hero, ListRow, Tile, Numeric, Eyebrow, Section, EmberSeam, LivePulseStrip, Modal, index}.tsx`, `motion/{primitives, transitions/index}.ts`. Stubs satisfy public API + re-export legacy primitives so cross-team imports already resolve.
+- Copied Mona Sans variable WOFF2 + IBM Plex Sans Arabic Regular/Medium/SemiBold/Bold from `marketing/public/fonts/` to `mobile/assets/fonts/`. Same axis-cut file shipping on web + mobile.
+- `mobile/app.json`: splash background `#FF6B35` -> `#0A0A0B` (warm-ink-950), Android `adaptiveIcon.backgroundColor` same change, version bumped 1.0.0 -> 1.1.0. Founder rule (crimson standardize) holds.
+- `mobile/package.json`: added `typecheck` / `lint` / `lint:fix` scripts; added deps `expo-status-bar`, `expo-sharing`, `react-native-draggable-flatlist`, `react-native-edge-to-edge`, `@react-native-menu/menu`, `@tanstack/react-query`; added devDeps `eslint`, `eslint-config-expo`, `prettier`. Team A runs `npm install` in their worktree.
+- `mobile/.eslintrc.cjs` + `.prettierrc` skeletons (Team A finalizes).
+
+This is the cross-team interface stub layer. Every agent's worktree forks from this commit and replaces stubs with real implementations against a strict file-ownership matrix (no two agents touch the same path).
+
+**No behavior change yet.** Existing screens still import from `mobile/src/components/*` and run unchanged. The design-system shim re-exports those legacy primitives so screens that migrate first can pull from `mobile/src/design-system` without breaking anything else.
+
+**Worktree fork-base discipline.** Will run `git update-ref refs/remotes/origin/master refs/heads/master` after this commit lands locally so the worktree agents fork from the right base (per the documented gotcha in `feedback_worktree_fork_base.md`).
+
+**Spawning Phase 1 next:** 6 agents (Teams A + B + C) via Agent tool with `isolation: 'worktree'`, `model: 'opus'`. Strict file-ownership matrix per the SYNTHESIS. Each prompt is self-contained, exhaustive, and instructs the agent to commit small WIP commits as they go so cap-out doesn't lose 30 min of work (per the Anthropic API rate-limit lesson from the marketing 12-agent sprint).
+
+Phase 2 (Team D, 2 agents) launches after Phase 1 integrates.
+
 ### 2026-05-10 · revert body overflow-x rule -- it was crashing /ar
 
 The `overflow-x: hidden; overflow-x: clip` I added to `html` + `body` in `marketing/app/globals.css` (commit c1144f5) was crashing `/ar` with the global error boundary on hydration. Founder reported it.
