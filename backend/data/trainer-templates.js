@@ -5,13 +5,15 @@
 // 2026-05-11: wger.de renumbered their catalog. The previous constants
 // (W.SQUAT = 110 etc.) pointed at exercises that no longer correspond
 // to the canonical big lifts in our exercises table after the latest
-// import. Found-by-name lookup (backend/scripts/find-trainer-ids.js)
-// against production produced the IDs below.
+// import. This second-pass audit (skills/exercise-cleanup/ID-MAPPING.md)
+// re-grounded every constant against an 881-row inventory using regex
+// priority + equipment/muscle filters, and surfaced the four IDs that
+// the naive search had missed (PUSHUP, PLANK, BURPEE, LAT_PD).
 //
-// A 0 value means we have no matching exercise in the catalog yet
-// (e.g. plain push-up / plank / burpee / lat pulldown were not in
-// wger's current dataset). trainer.ts gracefully skips wger_ids it
-// can't resolve, so these are inert until backfilled.
+// A 0 value means the canonical lift is genuinely not in the current
+// catalog (only BURPEE / LAT_PD were ever in this bucket and both are
+// now resolved; nothing is left at 0). trainer.ts gracefully skips
+// wger_ids it can't resolve, so a 0 here is inert.
 const W = {
   SQUAT: 1627,        // "Barbell squat"
   BENCH: 73,          // "Barbell Bench Press"
@@ -19,19 +21,19 @@ const W = {
   OHP: 687,           // "Overhead Press"
   ROW: 1698,          // "Barbell Row (Overhand)"
   RDLIFT: 1700,       // "Barbell Romanian Deadlift (RDL)"
-  PULLUP: 1929,       // "Assisted Pull-Up" -- closest in current catalog
-  LAT_PD: 0,          // not in catalog (TODO -- import or hand-seed)
-  CURL: 1290,         // "Reverse Grip Barbell Curls" -- closest in catalog
-  PUSHUP: 0,          // not in catalog (TODO)
+  PULLUP: 475,        // "Pull-ups" (was 1929 "Assisted Pull-Up" -- wrong)
+  LAT_PD: 1806,       // "Lat Pull Down" (was 0 -- it IS in the catalog)
+  CURL: 91,           // "Biceps Curls With Barbell" (was 1290 "Reverse Grip Barbell Curls")
+  PUSHUP: 1551,       // "Push-Up" (was 0)
   LUNGE: 46,          // "Barbell Lunge Standing"
-  PLANK: 0,           // not in catalog (TODO)
-  BURPEE: 0,          // not in catalog (TODO)
+  PLANK: 1317,        // "Plank" (was 0; duplicate row 458 also exists)
+  BURPEE: 132,        // "Burpee" (was 0)
   RUNNING: 908,       // "Zone 2 Running"
   GOBLET_SQ: 203,     // "Dumbbell Goblet Squat"
-  SPLIT_SQ: 988,      // "Bulgarian split squats left"
+  SPLIT_SQ: 988,      // "Bulgarian split squats left" (rename pending)
   DB_BENCH: 1676,     // "Dumbbell Bench Press"
   DB_SHOULDER: 1337,  // "Dumbbell Shoulder Press"
-  DB_ROW: 310,        // "Incline Dumbbell Row"
+  DB_ROW: 1085,       // "Dumbbell Bent Over Row" (was 310 "Incline Dumbbell Row")
   DB_CURL: 1931,      // "Dumbbell Curl"
 };
 

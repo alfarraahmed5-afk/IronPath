@@ -1,27 +1,36 @@
-// Run BEFORE import-wger.js to confirm all critical exercise IDs are correct.
-// Usage: node scripts/verify-wger-ids.js
+// Run BEFORE import-wger.js (or after a wger.de catalog refresh) to confirm
+// all critical exercise IDs still point at the right rows on wger.de's API.
+// Usage: node backend/scripts/verify-wger-ids.js
+//
+// 2026-05-11: updated to use the post-import catalog numbering.
+// See skills/exercise-cleanup/ID-MAPPING.md for the audit trail.
 
 const CRITICAL_IDS = [
-  { id: 110, expectedName: 'Barbell Squat', usage: 'leaderboard, strength standards, AI trainer' },
-  { id: 192, expectedName: 'Bench Press',   usage: 'leaderboard, strength standards, AI trainer' },
-  { id: 241, expectedName: 'Deadlift',      usage: 'leaderboard, strength standards, AI trainer' },
-  { id: 74,  expectedName: 'Overhead Press',usage: 'leaderboard, strength standards, AI trainer' },
-  { id: 63,  expectedName: 'Bent Over Row', usage: 'leaderboard, AI trainer' },
-  { id: 89,  expectedName: 'Romanian Deadlift', usage: 'AI trainer' },
-  { id: 31,  expectedName: 'Pull Up',       usage: 'AI trainer' },
-  { id: 122, expectedName: 'Lat Pulldown',  usage: 'AI trainer' },
-  { id: 99,  expectedName: 'Barbell Curl',  usage: 'AI trainer' },
-  { id: 91,  expectedName: 'Push Up',       usage: 'AI trainer' },
-  { id: 78,  expectedName: 'Lunge',         usage: 'AI trainer' },
-  { id: 95,  expectedName: 'Plank',         usage: 'AI trainer' },
-  { id: 156, expectedName: 'Burpees',       usage: 'AI trainer' },
-  { id: 215, expectedName: 'Running',       usage: 'AI trainer' },
-  { id: 118, expectedName: 'Goblet Squat',  usage: 'AI trainer' },
-  { id: 170, expectedName: 'Bulgarian Split Squat', usage: 'AI trainer' },
-  { id: 21,  expectedName: 'Dumbbell Bench Press',  usage: 'AI trainer' },
-  { id: 68,  expectedName: 'Dumbbell Shoulder Press', usage: 'AI trainer' },
-  { id: 72,  expectedName: 'Dumbbell Row',  usage: 'AI trainer' },
-  { id: 5,   expectedName: 'Dumbbell Curl', usage: 'AI trainer' },
+  // Compound barbell lifts (used by leaderboard, strength-standards, AI trainer)
+  { id: 1627, expectedName: 'Barbell squat',        usage: 'leaderboard, strength standards, AI trainer (SQUAT)' },
+  { id: 73,   expectedName: 'Barbell Bench Press',  usage: 'leaderboard, strength standards, AI trainer (BENCH)' },
+  { id: 184,  expectedName: 'Deadlifts',            usage: 'leaderboard, strength standards, AI trainer (DEADLIFT)' },
+  { id: 687,  expectedName: 'Overhead Press',       usage: 'leaderboard, strength standards, AI trainer (OHP)' },
+  { id: 1698, expectedName: 'Barbell Row',          usage: 'leaderboard, strength standards, AI trainer (ROW)' },
+  { id: 1700, expectedName: 'Romanian Deadlift',    usage: 'AI trainer (RDLIFT) + leaderboard (LB_RDL)' },
+
+  // Bodyweight + accessory (AI trainer)
+  { id: 475,  expectedName: 'Pull-ups',             usage: 'AI trainer (PULLUP) + leaderboard (LB_PULLUP)' },
+  { id: 1806, expectedName: 'Lat Pull Down',        usage: 'AI trainer (LAT_PD) + leaderboard (LB_LAT_PULLDOWN)' },
+  { id: 91,   expectedName: 'Biceps Curls With Barbell', usage: 'AI trainer (CURL) + leaderboard (LB_BB_CURL)' },
+  { id: 1551, expectedName: 'Push-Up',              usage: 'AI trainer (PUSHUP)' },
+  { id: 46,   expectedName: 'Barbell Lunge',        usage: 'AI trainer (LUNGE) + leaderboard (LB_BARBELL_LUNGE)' },
+  { id: 1317, expectedName: 'Plank',                usage: 'AI trainer (PLANK)' },
+  { id: 132,  expectedName: 'Burpee',               usage: 'AI trainer (BURPEE)' },
+  { id: 908,  expectedName: 'Zone 2 Running',       usage: 'AI trainer (RUNNING)' },
+
+  // Dumbbell variants (AI trainer)
+  { id: 203,  expectedName: 'Goblet Squat',         usage: 'AI trainer (GOBLET_SQ)' },
+  { id: 988,  expectedName: 'Bulgarian split squat',usage: 'AI trainer (SPLIT_SQ) + leaderboard (LB_BULGARIAN_SS)' },
+  { id: 1676, expectedName: 'Dumbbell Bench Press', usage: 'AI trainer (DB_BENCH) + leaderboard (LB_DB_BENCH)' },
+  { id: 1337, expectedName: 'Dumbbell Shoulder Press', usage: 'AI trainer (DB_SHOULDER) + leaderboard (LB_DB_SHOULDER)' },
+  { id: 1085, expectedName: 'Dumbbell Bent Over Row', usage: 'AI trainer (DB_ROW)' },
+  { id: 1931, expectedName: 'Dumbbell Curl',        usage: 'AI trainer (DB_CURL)' },
 ];
 
 async function verify() {
@@ -32,7 +41,7 @@ async function verify() {
     try {
       const res = await fetch(`https://wger.de/api/v2/exerciseinfo/${entry.id}/?format=json`);
       if (res.status === 404) {
-        console.error(`❌ ID ${entry.id} NOT FOUND — expected "${entry.expectedName}" (used by: ${entry.usage})`);
+        console.error(`MISS  ID ${entry.id} NOT FOUND -- expected "${entry.expectedName}" (used by: ${entry.usage})`);
         allGood = false;
         continue;
       }
@@ -41,23 +50,23 @@ async function verify() {
       const actualName = englishTranslation?.name || '(no English name)';
       const match = actualName.toLowerCase().includes(entry.expectedName.split(' ')[0].toLowerCase());
       if (match) {
-        console.log(`✅ ID ${entry.id} = "${actualName}"`);
+        console.log(`OK    ID ${entry.id} = "${actualName}"`);
       } else {
-        console.warn(`⚠️  ID ${entry.id} = "${actualName}" — expected "${entry.expectedName}" (used by: ${entry.usage})`);
-        console.warn(`   → Update the ID in leaderboard-exercises.js, strength-standards.js, and/or trainer-templates.js`);
+        console.warn(`WARN  ID ${entry.id} = "${actualName}" -- expected "${entry.expectedName}" (used by: ${entry.usage})`);
+        console.warn(`      -> review backend/data/* references`);
         allGood = false;
       }
       // Be polite to the API
       await new Promise(r => setTimeout(r, 150));
     } catch (e) {
-      console.error(`❌ ID ${entry.id} — network error: ${e.message}`);
+      console.error(`ERR   ID ${entry.id} -- network error: ${e.message}`);
       allGood = false;
     }
   }
 
   console.log('\n' + (allGood
-    ? '✅ All IDs verified. Safe to run import-wger.js'
-    : '⚠️  Some IDs need updating before running import-wger.js (see warnings above)'));
+    ? 'All IDs verified. Safe to run import-wger.js'
+    : 'Some IDs need updating before running import-wger.js (see warnings above)'));
 }
 
 verify().catch(err => { console.error(err); process.exit(1); });
