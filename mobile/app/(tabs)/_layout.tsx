@@ -69,7 +69,14 @@ const HIDDEN_ROUTES = new Set<string>([
 ]);
 
 const TAB_HEIGHT = 56;
-const PILL_PAD = 8;
+// Pill insets: 6pt top / 6pt bottom keep the brand-glow halo wrapped
+// around the icon + label cluster without bleeding into the bar's top
+// border or the safe-area inset below.
+const PILL_TOP = 6;
+const PILL_BOTTOM_INSET = 6;
+// Horizontal breathing room from each cell edge. The animated pill is
+// 100% of cell width minus 2 * PILL_HORIZONTAL_MARGIN.
+const PILL_HORIZONTAL_MARGIN = 10;
 
 // ---------------------------------------------------------------------------
 // Custom tab bar
@@ -300,12 +307,15 @@ const styles = StyleSheet.create({
   },
   pillBase: {
     position: 'absolute',
-    top: PILL_PAD,
-    bottom: undefined,
-    height: TAB_HEIGHT - PILL_PAD * 2,
+    top: PILL_TOP,
+    height: TAB_HEIGHT - PILL_TOP - PILL_BOTTOM_INSET,
     backgroundColor: colors.brandGlow,
     borderRadius: radii.full,
-    marginHorizontal: 4,
+    // Horizontal margin trims the pill in from each cell edge so it
+    // visually wraps the icon + label rather than touching the next
+    // cell. The animated `left` + `width` (set per cell) handle the
+    // slide; this margin handles the in-cell centering.
+    marginHorizontal: PILL_HORIZONTAL_MARGIN,
   },
   cell: {
     flex: 1,

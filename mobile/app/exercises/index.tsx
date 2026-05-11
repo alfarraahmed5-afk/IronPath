@@ -378,16 +378,25 @@ const styles = StyleSheet.create({
   },
   filtersScroll: {
     marginBottom: spacing.sm,
+    // Explicit max height + flexGrow:0 so the row can't collapse
+    // under flex pressure from the FlatList below. Without these the
+    // chips appeared slightly cropped on some Android layouts.
+    flexGrow: 0,
   },
   filtersContent: {
     paddingHorizontal: spacing.base,
+    paddingVertical: 2,
     gap: spacing.sm,
+    alignItems: 'center',
   },
   filterChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     borderRadius: radii.full,
     backgroundColor: colors.surface2,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterChipActive: {
     backgroundColor: colors.brand,
@@ -403,6 +412,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radii.sm,
+    // Many exercise images are transparent PNGs of dark line-art on
+    // an alpha channel. Without a contrasting backdrop the figure
+    // disappears against the dark surface. Use a warm-ink-100 wash
+    // so the silhouette reads cleanly.
+    backgroundColor: '#E5E5E7',
   },
   thumbnailFallback: {
     width: 40,

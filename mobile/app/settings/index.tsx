@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Info,
   User as UserIcon,
-  AtSign,
+  UserCog,
 } from 'lucide-react-native';
 import Constants from 'expo-constants';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -60,12 +60,12 @@ export default function SettingsScreen() {
 
   const sections: SettingSection[] = [
     {
-      title: 'Account',
+      title: 'Profile',
       rows: [
         {
-          icon: AtSign,
-          label: 'Email & Password',
-          description: 'Change your sign-in credentials',
+          icon: UserCog,
+          label: 'Edit profile',
+          description: 'Name, username, photo, bio',
           onPress: () => router.push('/profile/edit' as any),
         },
       ],
