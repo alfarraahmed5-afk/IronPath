@@ -91,7 +91,7 @@ export default function RoutineDetailScreen() {
 
   useEffect(() => {
     if (!id) { goBack(); return; }
-    // Backend returns { data: { id, name, exercises, ... } } — the routine is directly under data
+    // Backend returns { data: { id, name, exercises, ... } } -- the routine is directly under data
     api.get<{ data: RoutineDetail }>(`/routines/${id}`)
       .then(r => setRoutine(r.data))
       .catch(() => {/* show 404 below */})
@@ -245,7 +245,7 @@ export default function RoutineDetailScreen() {
         {/* Exercises */}
         <View style={styles.exerciseList}>
           {routine.exercises.map(exercise => {
-            const displayName = exercise.exercise_name ?? exercise.exercise?.name ?? '—';
+            const displayName = exercise.exercise_name ?? exercise.exercise?.name ?? '--';
             const logType = exercise.logging_type ?? exercise.exercise?.logging_type ?? 'weight_reps';
             return (
               <Surface key={exercise.position} level={2} style={styles.exerciseCard}>

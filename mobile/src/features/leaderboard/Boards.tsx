@@ -1,3 +1,9 @@
+/**
+ * Boards feature -- absorbed from legacy (tabs)/leaderboard.tsx during
+ * the Option B IA restructure. Renders the Lifts / Volume / Workouts /
+ * Streak sub-pills. Challenges has been split out into its own feature
+ * (Community.tsx routes it to Challenges sub-tab).
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,13 +17,13 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crown, ChevronRight } from 'lucide-react-native';
-import { api } from '../../src/lib/api';
-import { Text } from '../../src/components/Text';
-import { Surface } from '../../src/components/Surface';
-import { Avatar } from '../../src/components/Avatar';
-import { EmptyState } from '../../src/components/EmptyState';
-import { Button } from '../../src/components/Button';
-import { colors, spacing, radii } from '../../src/theme/tokens';
+import { api } from '../../lib/api';
+import { Text } from '../../components/Text';
+import { Surface } from '../../components/Surface';
+import { Avatar } from '../../components/Avatar';
+import { EmptyState } from '../../components/EmptyState';
+import { colors, spacing, radii } from '../../theme/tokens';
+import { haptic } from '../../lib/haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,16 +34,6 @@ interface Ranking {
   avatar_url: string | null;
   value: number;
   rank: number;
-}
-
-interface Challenge {
-  id: string;
-  title: string;
-  description: string | null;
-  metric: string;
-  starts_at: string;
-  ends_at: string;
-  status: 'active' | 'upcoming' | 'completed';
 }
 
 interface SnapshotResult {
@@ -54,14 +50,10 @@ interface LiftSummary {
   generated_at: string;
 }
 
-type TabKey = 'Lifts' | 'Volume' | 'Workouts' | 'Streak' | 'Challenges';
+export type BoardKey = 'Lifts' | 'Volume' | 'Workouts' | 'Streak';
 type Period = 'weekly' | 'monthly' | 'all_time';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
 
 function rankColor(rank: number): string {
   if (rank === 1) return '#FFD700';
@@ -90,7 +82,7 @@ function RankingsList({
     return (
       <EmptyState
         illustration="exercises"
-        title="Climb the board"
+        title="Climb the board."
         description="Log a workout to put yourself on the leaderboard."
       />
     );
@@ -105,7 +97,7 @@ function RankingsList({
         </Surface>
       )}
 
-      {rankings.map(item => {
+      {rankings.map((item) => {
         const isMe = myRank !== null && item.rank === myRank;
         return (
           <TouchableOpacity
@@ -177,48 +169,84 @@ function LiftsTab() {
     }
   };
 
-  if (loading) return <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>;
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.brand} size="large" />
+      </View>
+    );
+  }
 
   return (
     <>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={colors.brand}
+          />
+        }
         contentContainerStyle={styles.listPad}
       >
         {summaries.length === 0 ? (
           <EmptyState illustration="exercises" title="No lift leaderboards yet" />
-        ) : summaries.map(item => (
-          <TouchableOpacity key={item.exercise_id} onPress={() => openExercise(item)} activeOpacity={0.8}>
-            <Surface level={2} style={styles.liftRow}>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.exercise_name}</Text>
-                {item.top_user ? (
-                  <Text variant="caption" color="textTertiary">
-                    {item.top_user.full_name || item.top_user.username} — {item.top_user.value} kg
-                  </Text>
-                ) : (
-                  <Text variant="caption" color="textDisabled">No entries yet</Text>
-                )}
-              </View>
-              <ChevronRight size={16} color={colors.textTertiary} />
-            </Surface>
-          </TouchableOpacity>
-        ))}
+        ) : (
+          summaries.map((item) => (
+            <TouchableOpacity key={item.exercise_id} onPress={() => openExercise(item)} activeOpacity={0.8}>
+              <Surface level={2} style={styles.liftRow}>
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1}>{item.exercise_name}</Text>
+                  {item.top_user ? (
+                    <Text variant="caption" color="textTertiary">
+                      {item.top_user.full_name || item.top_user.username} -- {item.top_user.value} kg
+                    </Text>
+                  ) : (
+                    <Text variant="caption" color="textDisabled">No entries yet</Text>
+                  )}
+                </View>
+                <ChevronRight size={16} color={colors.textTertiary} />
+              </Surface>
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
 
-      <Modal visible={selectedExercise !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedExercise(null)}>
+      <Modal
+        visible={selectedExercise !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedExercise(null)}
+      >
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setSelectedExercise(null)}>
               <Text variant="label" color="brand">Close</Text>
             </TouchableOpacity>
-            <Text variant="title3" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text
+              variant="title3"
+              color="textPrimary"
+              numberOfLines={1}
+              style={{ flex: 1, marginLeft: spacing.md }}
+            >
               {selectedExercise?.exercise_name}
             </Text>
           </View>
           <ScrollView contentContainerStyle={styles.listPad}>
-            {detailLoading ? <ActivityIndicator color={colors.brand} style={{ marginTop: spacing['3xl'] }} /> : null}
-            {detailData ? <RankingsList rankings={detailData.rankings} myRank={detailData.my_rank} myValue={detailData.my_value} valueLabel={v => `${v} kg`} /> : null}
+            {detailLoading ? (
+              <ActivityIndicator color={colors.brand} style={{ marginTop: spacing['3xl'] }} />
+            ) : null}
+            {detailData ? (
+              <RankingsList
+                rankings={detailData.rankings}
+                myRank={detailData.my_rank}
+                myValue={detailData.my_value}
+                valueLabel={(v) => `${v} kg`}
+              />
+            ) : null}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -234,33 +262,50 @@ const PERIODS: { label: string; value: Period }[] = [
   { label: 'All Time', value: 'all_time' },
 ];
 
-function PeriodTab({ endpoint, valueLabel }: { endpoint: 'volume' | 'workouts' | 'streak'; valueLabel?: (v: number) => string }) {
+function PeriodTab({
+  endpoint,
+  valueLabel,
+}: {
+  endpoint: 'volume' | 'workouts' | 'streak';
+  valueLabel?: (v: number) => string;
+}) {
   const [period, setPeriod] = useState<Period>('weekly');
   const [data, setData] = useState<SnapshotResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (p: Period) => {
-    setLoading(true);
-    try {
-      const res = await api.get<{ data: SnapshotResult }>(`/leaderboards/${endpoint}?period=${p}`);
-      setData(res.data);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [endpoint]);
+  const load = useCallback(
+    async (p: Period) => {
+      setLoading(true);
+      try {
+        const res = await api.get<{ data: SnapshotResult }>(`/leaderboards/${endpoint}?period=${p}`);
+        setData(res.data);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [endpoint],
+  );
 
   useEffect(() => { load(period); }, [load, period]);
 
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.periodRow}>
-        {PERIODS.map(p => (
+        {PERIODS.map((p) => (
           <TouchableOpacity
             key={p.value}
-            onPress={() => { if (p.value !== period) setPeriod(p.value); }}
-            style={[styles.periodPill, { backgroundColor: period === p.value ? colors.brand : colors.surface2 }]}
+            onPress={() => {
+              if (p.value !== period) {
+                haptic.segmentChange();
+                setPeriod(p.value);
+              }
+            }}
+            style={[
+              styles.periodPill,
+              { backgroundColor: period === p.value ? colors.brand : colors.surface2 },
+            ]}
           >
             <Text variant="label" color={period === p.value ? 'textOnBrand' : 'textSecondary'}>{p.label}</Text>
           </TouchableOpacity>
@@ -268,156 +313,85 @@ function PeriodTab({ endpoint, valueLabel }: { endpoint: 'volume' | 'workouts' |
       </View>
 
       {loading ? (
-        <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.brand} size="large" />
+        </View>
       ) : (
         <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(period); }} tintColor={colors.brand} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); load(period); }}
+              tintColor={colors.brand}
+            />
+          }
           contentContainerStyle={styles.listPad}
         >
-          <RankingsList rankings={data?.rankings ?? []} myRank={data?.my_rank ?? null} myValue={data?.my_value ?? null} valueLabel={valueLabel} />
+          <RankingsList
+            rankings={data?.rankings ?? []}
+            myRank={data?.my_rank ?? null}
+            myValue={data?.my_value ?? null}
+            valueLabel={valueLabel}
+          />
         </ScrollView>
       )}
     </View>
   );
 }
 
-// ─── ChallengesTab ────────────────────────────────────────────────────────────
+// ─── Boards component ───────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<Challenge['status'], string> = {
-  active: colors.success,
-  upcoming: colors.info,
-  completed: colors.textDisabled,
-};
-
-function ChallengesTab() {
-  const router = useRouter();
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await api.get<{ data: Challenge[] }>('/leaderboards/challenges');
-      setChallenges(res.data);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  if (loading) return <View style={styles.centered}><ActivityIndicator color={colors.brand} size="large" /></View>;
-
-  return (
-    <ScrollView
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
-      contentContainerStyle={styles.listPad}
-    >
-      {/* Create challenge CTA */}
-      <View style={{ marginBottom: spacing.base }}>
-        <Button
-          label="+ Create Challenge"
-          onPress={() => router.push('/challenges/create' as any)}
-          variant="secondary"
-          size="md"
-          fullWidth
-        />
-      </View>
-
-      {challenges.length === 0 ? (
-        <EmptyState
-          illustration="notifications"
-          title="No challenges yet"
-          description="Create one and invite the gym to compete."
-        />
-      ) : challenges.map(challenge => (
-        <TouchableOpacity
-          key={challenge.id}
-          onPress={() => router.push(`/challenges/${challenge.id}` as any)}
-          activeOpacity={0.8}
-        >
-          <Surface level={2} style={styles.challengeCard}>
-            <View style={styles.challengeTop}>
-              <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginRight: spacing.sm }}>
-                {challenge.title}
-              </Text>
-              <View style={[styles.statusPill, { borderColor: STATUS_COLORS[challenge.status] }]}>
-                <Text variant="overline" style={{ color: STATUS_COLORS[challenge.status] }}>{challenge.status}</Text>
-              </View>
-            </View>
-            {challenge.description ? (
-              <Text variant="body" color="textSecondary" numberOfLines={2} style={{ marginTop: spacing.xs }}>
-                {challenge.description}
-              </Text>
-            ) : null}
-            <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.sm }}>
-              {formatDate(challenge.starts_at)} – {formatDate(challenge.ends_at)}
-            </Text>
-          </Surface>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+export interface BoardsProps {
+  initialBoard?: BoardKey;
 }
 
-// ─── Root Screen ─────────────────────────────────────────────────────────────
+export default function Boards({ initialBoard = 'Lifts' }: BoardsProps) {
+  const [activeBoard, setActiveBoard] = useState<BoardKey>(initialBoard);
 
-const TABS: TabKey[] = ['Lifts', 'Volume', 'Workouts', 'Streak', 'Challenges'];
+  const PILLS: BoardKey[] = ['Lifts', 'Volume', 'Workouts', 'Streak'];
 
-export default function LeaderboardScreen() {
-  const [activeTab, setActiveTab] = useState<TabKey>('Lifts');
-
-  function renderTab() {
-    switch (activeTab) {
+  function renderBody() {
+    switch (activeBoard) {
       case 'Lifts':    return <LiftsTab />;
-      case 'Volume':   return <PeriodTab endpoint="volume" valueLabel={v => `${(v / 1000).toFixed(1)}k kg`} />;
-      case 'Workouts': return <PeriodTab endpoint="workouts" valueLabel={v => `${v} sessions`} />;
-      case 'Streak':   return <PeriodTab endpoint="streak" valueLabel={v => `${v} days`} />;
-      case 'Challenges': return <ChallengesTab />;
+      case 'Volume':   return <PeriodTab endpoint="volume" valueLabel={(v) => `${(v / 1000).toFixed(1)}k kg`} />;
+      case 'Workouts': return <PeriodTab endpoint="workouts" valueLabel={(v) => `${v} sessions`} />;
+      case 'Streak':   return <PeriodTab endpoint="streak" valueLabel={(v) => `${v} days`} />;
     }
   }
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
-      <View style={styles.topBar}>
-        <Text variant="title2" color="textPrimary">Leaderboard</Text>
-      </View>
-
+    <View style={{ flex: 1 }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.tabScrollWrap}
         contentContainerStyle={styles.tabScroll}
       >
-        {TABS.map(tab => (
+        {PILLS.map((pill) => (
           <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            style={[styles.tabPill, { backgroundColor: activeTab === tab ? colors.brand : colors.surface2 }]}
+            key={pill}
+            onPress={() => {
+              if (pill !== activeBoard) {
+                haptic.segmentChange();
+                setActiveBoard(pill);
+              }
+            }}
+            style={[
+              styles.tabPill,
+              { backgroundColor: activeBoard === pill ? colors.brand : colors.surface2 },
+            ]}
           >
-            <Text variant="label" color={activeTab === tab ? 'textOnBrand' : 'textSecondary'}>{tab}</Text>
+            <Text variant="label" color={activeBoard === pill ? 'textOnBrand' : 'textSecondary'}>{pill}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
-
-      <View style={{ flex: 1 }}>{renderTab()}</View>
-    </SafeAreaView>
+      <View style={{ flex: 1 }}>{renderBody()}</View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  topBar: {
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  tabScrollWrap: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
+  tabScrollWrap: { flexGrow: 0, flexShrink: 0 },
   tabScroll: {
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.md,
@@ -463,17 +437,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderRadius: radii.full,
-  },
-  challengeCard: {
-    padding: spacing.base,
-    marginBottom: spacing.sm,
-  },
-  challengeTop: { flexDirection: 'row', alignItems: 'center' },
-  statusPill: {
-    borderWidth: 1,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
   },
   modalHeader: {
     flexDirection: 'row',

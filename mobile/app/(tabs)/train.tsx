@@ -1,4 +1,18 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+/**
+ * Train tab -- renamed from legacy (tabs)/workouts.tsx.
+ *
+ * Option B IA per lens 5: Train absorbs the old Workouts tab and adds
+ * a "Browse exercises" entry (lens 5 P1: makes /exercises globally
+ * reachable). Trainer collapses INTO this tab as a sub-route: the
+ * Trainer surface still lives at /(tabs)/trainer (legacy file kept)
+ * but a Trainer entry-row is rendered here so users can dive into it
+ * without a top-level tab slot.
+ *
+ * Founder rule: NO em dashes. The previous workouts.tsx had em-dash
+ * copy in the empty state -- replaced with the lens-5 voice ("Your
+ * first workout starts here.") and a period instead of an em dash.
+ */
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -9,7 +23,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Play, Clock, Hash, Weight, Calendar as CalendarIcon, X, ChevronRight, BookOpen } from 'lucide-react-native';
+import {
+  Clock, Hash, Weight, Calendar as CalendarIcon, ChevronRight, BookOpen,
+  Sparkles, Search,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore, ActiveWorkout } from '../../src/stores/workoutStore';
 import { api } from '../../src/lib/api';
@@ -22,6 +39,7 @@ import { Pressable } from '../../src/components/Pressable';
 import { Calendar } from '../../src/components/Calendar';
 import { Sheet } from '../../src/components/Sheet';
 import { colors, spacing, radii } from '../../src/theme/tokens';
+import { haptic } from '../../src/lib/haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +87,9 @@ function formatTimeAgo(iso: string): string {
   return 'Just now';
 }
 
-function pad2(n: number): string { return n < 10 ? `0${n}` : String(n); }
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
 
 // ─── WorkoutCard ──────────────────────────────────────────────────────────────
 
@@ -78,7 +98,12 @@ function WorkoutCard({ workout, onPress }: { workout: WorkoutSummary; onPress: (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
       <Surface level={2} style={styles.card}>
         <View style={styles.cardTop}>
-          <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ flex: 1, marginRight: spacing.md }}>
+          <Text
+            variant="bodyEmphasis"
+            color="textPrimary"
+            numberOfLines={1}
+            style={{ flex: 1, marginRight: spacing.md }}
+          >
             {workout.name}
           </Text>
           <Text variant="caption" color="textTertiary">{formatRelativeDate(workout.started_at)}</Text>
@@ -119,8 +144,15 @@ function ResumeModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <Surface level={3} style={styles.modalBox}>
-          <Text variant="title2" color="textPrimary" style={{ marginBottom: spacing.xs }}>Resume Workout?</Text>
-          <Text variant="bodyEmphasis" color="textSecondary" numberOfLines={1} style={{ marginBottom: spacing.xs }}>
+          <Text variant="title2" color="textPrimary" style={{ marginBottom: spacing.xs }}>
+            Resume Workout?
+          </Text>
+          <Text
+            variant="bodyEmphasis"
+            color="textSecondary"
+            numberOfLines={1}
+            style={{ marginBottom: spacing.xs }}
+          >
             {draft.workout_name}
           </Text>
           <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.xl }}>
@@ -137,9 +169,9 @@ function ResumeModal({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export default function WorkoutsScreen() {
+export default function TrainScreen() {
   const router = useRouter();
-  const startWorkout = useWorkoutStore(s => s.startWorkout);
+  const startWorkout = useWorkoutStore((s) => s.startWorkout);
 
   // List view state
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
@@ -174,7 +206,6 @@ export default function WorkoutsScreen() {
     fetchRoutines();
   }, []);
 
-  // Fetch calendar dates whenever calView is enabled or month changes
   useEffect(() => {
     if (!calView) return;
     const y = calMonth.getFullYear();
@@ -183,10 +214,11 @@ export default function WorkoutsScreen() {
     const lastDay = new Date(y, m + 1, 0).getDate();
     const end = `${y}-${pad2(m + 1)}-${pad2(lastDay)}`;
     setCalLoading(true);
-    api.get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
-      `/workouts/calendar?start=${start}&end=${end}`
-    )
-      .then(res => {
+    api
+      .get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
+        `/workouts/calendar?start=${start}&end=${end}`,
+      )
+      .then((res) => {
         const dates = new Set<string>();
         for (const d of res.data?.days ?? []) dates.add(d.date);
         setWorkoutDates(dates);
@@ -202,7 +234,7 @@ export default function WorkoutsScreen() {
       const result = await api.get<{ data: { workouts: WorkoutSummary[]; next_cursor: string | null } }>(url);
       const fetched = result.data?.workouts ?? [];
       const nextCursor = result.data?.next_cursor ?? null;
-      setWorkouts(prev => reset ? fetched : [...prev, ...fetched]);
+      setWorkouts((prev) => (reset ? fetched : [...prev, ...fetched]));
       setCursor(nextCursor);
       setHasMore(nextCursor !== null);
     } catch {}
@@ -214,7 +246,9 @@ export default function WorkoutsScreen() {
 
   const fetchRoutines = async () => {
     try {
-      const result = await api.get<{ data: { folders: Array<{ routines: Routine[] }>; ungrouped: Routine[] } }>('/routines');
+      const result = await api.get<{
+        data: { folders: Array<{ routines: Routine[] }>; ungrouped: Routine[] };
+      }>('/routines');
       const ungrouped = result.data?.ungrouped ?? [];
       const fromFolders = (result.data?.folders ?? []).flatMap((f) => f.routines ?? []);
       setRoutines([...ungrouped, ...fromFolders].slice(0, 3));
@@ -222,14 +256,35 @@ export default function WorkoutsScreen() {
   };
 
   function handleStartWorkout() {
+    haptic.buttonPrimary();
     startWorkout('New Workout');
     router.push('/workout/active');
   }
 
   async function handleStartRoutine(routine: Routine) {
-    // Load routine exercises so the active workout is pre-populated
     try {
-      const res = await api.get<{ data: { exercises: Array<{ exercise_id: string; exercise_name?: string; exercise?: { name: string; logging_type: string }; logging_type?: string; position: number; superset_group: number | null; rest_seconds: number; notes: string; sets: Array<{ position: number; set_type: string; target_weight_kg: number | null; target_reps: number | null; target_duration_seconds: number | null; target_distance_meters: number | null }> }> } }>(`/routines/${routine.id}`);
+      const res = await api.get<{
+        data: {
+          exercises: Array<{
+            exercise_id: string;
+            exercise_name?: string;
+            exercise?: { name: string; logging_type: string };
+            logging_type?: string;
+            position: number;
+            superset_group: number | null;
+            rest_seconds: number;
+            notes: string;
+            sets: Array<{
+              position: number;
+              set_type: string;
+              target_weight_kg: number | null;
+              target_reps: number | null;
+              target_duration_seconds: number | null;
+              target_distance_meters: number | null;
+            }>;
+          }>;
+        };
+      }>(`/routines/${routine.id}`);
       const exRows = res.data?.exercises ?? [];
       const exercises = exRows.map((ex) => ({
         exercise_id: ex.exercise_id,
@@ -240,17 +295,33 @@ export default function WorkoutsScreen() {
         rest_seconds: ex.rest_seconds,
         notes: ex.notes,
         sets: ex.sets.length > 0
-          ? ex.sets.map(s => ({
-              position: s.position, set_type: (s.set_type || 'normal') as any,
-              weight_kg: s.target_weight_kg, reps: s.target_reps,
-              duration_seconds: s.target_duration_seconds, distance_meters: s.target_distance_meters,
-              rpe: null, is_completed: false, completed_at: null,
+          ? ex.sets.map((s) => ({
+              position: s.position,
+              set_type: (s.set_type || 'normal') as any,
+              weight_kg: s.target_weight_kg,
+              reps: s.target_reps,
+              duration_seconds: s.target_duration_seconds,
+              distance_meters: s.target_distance_meters,
+              rpe: null,
+              is_completed: false,
+              completed_at: null,
             }))
-          : [{ position: 0, set_type: 'normal' as const, weight_kg: null, reps: null, duration_seconds: null, distance_meters: null, rpe: null, is_completed: false, completed_at: null }],
+          : [
+              {
+                position: 0,
+                set_type: 'normal' as const,
+                weight_kg: null,
+                reps: null,
+                duration_seconds: null,
+                distance_meters: null,
+                rpe: null,
+                is_completed: false,
+                completed_at: null,
+              },
+            ],
       }));
       startWorkout(routine.name, routine.id, exercises);
     } catch {
-      // Fallback: start with empty exercises if fetch fails
       startWorkout(routine.name, routine.id, []);
     }
     router.push('/workout/active');
@@ -264,18 +335,19 @@ export default function WorkoutsScreen() {
   }
 
   function handleDiscard() {
+    haptic.workoutDiscard();
     useWorkoutStore.getState().clearDraft();
     setDraftData(null);
     setShowResumeModal(false);
   }
 
   async function handleDayPress(date: string) {
-    const y = calMonth.getFullYear();
-    const m = calMonth.getMonth();
-    const res = await api.get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
-      `/workouts/calendar?start=${date}&end=${date}`
-    ).catch(() => null);
-    const ids = res?.data?.days?.find(d => d.date === date)?.workout_ids ?? [];
+    const res = await api
+      .get<{ data: { days: { date: string; workout_ids: string[] }[] } }>(
+        `/workouts/calendar?start=${date}&end=${date}`,
+      )
+      .catch(() => null);
+    const ids = res?.data?.days?.find((d) => d.date === date)?.workout_ids ?? [];
     if (ids.length === 1) {
       router.push(`/workouts/${ids[0]}` as any);
     } else if (ids.length > 1) {
@@ -293,21 +365,25 @@ export default function WorkoutsScreen() {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* Header */}
       <View style={styles.topBar}>
-        <Text variant="title2" color="textPrimary">Workouts</Text>
+        <Text variant="title2" color="textPrimary">Train</Text>
         <TouchableOpacity
-          onPress={() => setCalView(v => !v)}
+          onPress={() => setCalView((v) => !v)}
           style={[styles.calToggle, calView && styles.calToggleActive]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel={calView ? 'Switch to list view' : 'Switch to calendar view'}
         >
-          <CalendarIcon size={18} color={calView ? colors.brand : colors.textSecondary} strokeWidth={2} />
+          <CalendarIcon
+            size={18}
+            color={calView ? colors.brand : colors.textSecondary}
+            strokeWidth={2}
+          />
         </TouchableOpacity>
       </View>
 
       {/* Start workout actions */}
       <View style={styles.topActions}>
         <Button
-          label="Start Workout"
+          label="Start workout"
           onPress={handleStartWorkout}
           variant="primary"
           size="lg"
@@ -315,21 +391,37 @@ export default function WorkoutsScreen() {
         />
 
         <View style={{ marginTop: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: spacing.sm,
+            }}
+          >
             <Text variant="overline" color="textTertiary">My Routines</Text>
-            <TouchableOpacity onPress={() => router.push('/routines' as any)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/routines' as any)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
               <Text variant="label" color="brand">See all</Text>
             </TouchableOpacity>
           </View>
           {routines.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
-              {routines.map(routine => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing.sm }}
+            >
+              {routines.map((routine) => (
                 <TouchableOpacity
                   key={routine.id}
                   onPress={() => handleStartRoutine(routine)}
                   style={styles.routinePill}
                 >
-                  <Text variant="label" color="textPrimary" numberOfLines={1}>{routine.name}</Text>
+                  <Text variant="label" color="textPrimary" numberOfLines={1}>
+                    {routine.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -340,18 +432,56 @@ export default function WorkoutsScreen() {
               </TouchableOpacity>
             </ScrollView>
           ) : (
-            <TouchableOpacity onPress={() => router.push('/routines' as any)} style={styles.routinesEmptyRow}>
+            <TouchableOpacity
+              onPress={() => router.push('/routines' as any)}
+              style={styles.routinesEmptyRow}
+            >
               <BookOpen size={14} color={colors.textTertiary} strokeWidth={2} />
-              <Text variant="caption" color="textTertiary" style={{ marginLeft: spacing.xs }}>No routines yet — tap to create one</Text>
-              <ChevronRight size={14} color={colors.textTertiary} strokeWidth={2} style={{ marginLeft: 'auto' }} />
+              <Text variant="caption" color="textTertiary" style={{ marginLeft: spacing.xs }}>
+                No routines yet. Tap to create one.
+              </Text>
+              <ChevronRight
+                size={14}
+                color={colors.textTertiary}
+                strokeWidth={2}
+                style={{ marginLeft: 'auto' }}
+              />
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Browse exercises + Trainer entry rows */}
+        <View style={styles.entryRow}>
+          <TouchableOpacity
+            onPress={() => router.push('/exercises' as any)}
+            style={styles.entryCell}
+            accessibilityLabel="Browse exercises"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            <View style={styles.entryIconWrap}>
+              <Search size={16} color={colors.textSecondary} strokeWidth={2} />
+            </View>
+            <Text variant="label" color="textPrimary">Browse exercises</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/trainer' as any)}
+            style={styles.entryCell}
+            accessibilityLabel="AI Trainer"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            <View style={styles.entryIconWrap}>
+              <Sparkles size={16} color={colors.brand} strokeWidth={2} />
+            </View>
+            <Text variant="label" color="textPrimary">AI Trainer</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {calView ? (
-        /* ── Calendar view ─────────────────────────────────────────────── */
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
           {calLoading ? (
             <View style={styles.centered}>
               <ActivityIndicator color={colors.brand} />
@@ -365,39 +495,42 @@ export default function WorkoutsScreen() {
             />
           )}
         </ScrollView>
+      ) : loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.brand} size="large" />
+        </View>
       ) : (
-        /* ── List view ─────────────────────────────────────────────────── */
-        loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color={colors.brand} size="large" />
-          </View>
-        ) : (
-          <FlatList
-            data={workouts}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <WorkoutCard workout={item} onPress={() => router.push(`/workouts/${item.id}` as any)} />
-            )}
-            ListHeaderComponent={
-              <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>Recent Workouts</Text>
-            }
-            ListEmptyComponent={
-              <EmptyState
-                illustration="workouts"
-                title="Your first workout starts here"
-                description="Tap Start to log a session."
-                action={{ label: 'Start Workout', onPress: handleStartWorkout }}
-              />
-            }
-            ListFooterComponent={
-              loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null
-            }
-            onEndReached={() => { if (hasMore && !loadingMore && !loading) fetchWorkouts(cursor); }}
-            onEndReachedThreshold={0.3}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 32 }}
-          />
-        )
+        <FlatList
+          data={workouts}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <WorkoutCard workout={item} onPress={() => router.push(`/workouts/${item.id}` as any)} />
+          )}
+          ListHeaderComponent={
+            <Text variant="overline" color="textTertiary" style={styles.sectionLabel}>
+              Recent Workouts
+            </Text>
+          }
+          ListEmptyComponent={
+            <EmptyState
+              illustration="workouts"
+              title="Your first workout starts here."
+              description="Tap Start to log a session. We'll save every set."
+              action={{ label: 'Start workout', onPress: handleStartWorkout }}
+            />
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} />
+            ) : null
+          }
+          onEndReached={() => {
+            if (hasMore && !loadingMore && !loading) fetchWorkouts(cursor);
+          }}
+          onEndReachedThreshold={0.3}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        />
       )}
 
       {showResumeModal && draftData && (
@@ -411,7 +544,9 @@ export default function WorkoutsScreen() {
 
       {/* Day workouts sheet (when a day has multiple workouts) */}
       <Sheet visible={daySheetVisible} onClose={() => setDaySheetVisible(false)} snapPoint={0.5}>
-        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.xs }}>{daySheetDate}</Text>
+        <Text variant="title3" color="textPrimary" style={{ marginBottom: spacing.xs }}>
+          {daySheetDate}
+        </Text>
         <Text variant="caption" color="textTertiary" style={{ marginBottom: spacing.base }}>
           {daySheetIds.length} workout{daySheetIds.length !== 1 ? 's' : ''} this day
         </Text>
@@ -419,10 +554,21 @@ export default function WorkoutsScreen() {
           <Pressable
             key={id}
             accessibilityLabel={`Workout ${idx + 1}`}
-            onPress={() => { setDaySheetVisible(false); router.push(`/workouts/${id}` as any); }}
-            style={[styles.daySheetRow, idx < daySheetIds.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+            onPress={() => {
+              setDaySheetVisible(false);
+              router.push(`/workouts/${id}` as any);
+            }}
+            style={[
+              styles.daySheetRow,
+              idx < daySheetIds.length - 1 && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: colors.border,
+              },
+            ]}
           >
-            <Text variant="body" color="textPrimary" style={{ flex: 1 }}>Workout {idx + 1}</Text>
+            <Text variant="body" color="textPrimary" style={{ flex: 1 }}>
+              Workout {idx + 1}
+            </Text>
             <Icon icon={ChevronRight} size={16} color={colors.textTertiary} />
           </Pressable>
         ))}
@@ -478,12 +624,41 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderStyle: 'dashed',
   },
+  entryRow: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  entryCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface2,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    minHeight: 48,
+  },
+  entryIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surface3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionLabel: {
     paddingHorizontal: spacing.base,
     paddingTop: spacing.base,
     paddingBottom: spacing.sm,
   },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['3xl'] },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['3xl'],
+  },
   card: {
     marginHorizontal: spacing.base,
     marginBottom: spacing.sm,

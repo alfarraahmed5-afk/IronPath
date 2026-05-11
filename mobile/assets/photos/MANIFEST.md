@@ -42,18 +42,22 @@ Status legend: `STAGED` = file path reserved, photo not yet committed.
 
 | File | Source | License | Used on | Blurhash | Action | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `mobile/assets/photos/concrete-wall@2x.avif` | https://unsplash.com/photos/photo-1617791160505-6f00504e3519 (Anchor Lee) | Unsplash License | `app/(auth)/login.tsx`, `app/(tabs)/profile.tsx` (fallback) | TBD | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/concrete-wall@2x.avif` | https://unsplash.com/photos/photo-1617791160505-6f00504e3519 (Anchor Lee) | Unsplash License | `app/(tabs)/profile.tsx` (fallback) | TBD | REQUIRES_ATTRIBUTION | STAGED |
 | `mobile/assets/photos/concrete-wall@3x.avif` | (same source) | Unsplash License | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/chalk-hands@2x.avif` | https://unsplash.com/photos/photo-1517836357463-d25dfeac3438 (Anastase Maragos) | Unsplash License | `app/(auth)/register.tsx`, `app/workout/finish.tsx`, `app/(tabs)/workouts.tsx` empty state | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/chalk-hands@3x.avif` | (same source) | Unsplash License | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/barbell-macro@2x.avif` | https://unsplash.com/photos/photo-1583454110551-21f2fa2afe61 (Logan Weaver) | Unsplash License | `app/(tabs)/index.tsx` feed top band, `app/workout/celebrate.tsx` | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/barbell-macro@3x.avif` | (same source) | Unsplash License | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/morning-gym@2x.avif` | TBD (Lens 2 brief calls for "Morning gym wide shot"; founder selects via Unsplash search "empty gym morning") | Unsplash License (assumed) | `app/analytics/index.tsx` streak heatmap header | TBD | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/chalk-hands@2x.avif` | https://unsplash.com/photos/photo-1517836357463-d25dfeac3438 (Anastase Maragos) | Unsplash License | `app/(auth)/register.tsx`, `app/(auth)/forgot-password.tsx`, `app/(tabs)/train.tsx` empty state, `app/workout/finish.tsx` | L37LfgMx00R*?wt7~qWBxujsR%t7 | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/chalk-hands@3x.avif` | (same source) | Unsplash License | (same) | (same) | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/login-barbell@2x.avif` | https://unsplash.com/photos/photo-1583454110551-21f2fa2afe61 (Logan Weaver) | Unsplash License | `app/(auth)/login.tsx` hero, `app/(tabs)/index.tsx` Home hero, `app/workout/celebrate.tsx` | L13Im5xu00WB?wt7~qWBxujsR%t7 | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/login-barbell@3x.avif` | (same source) | Unsplash License | (same) | (same) | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/morning-gym@2x.avif` | TBD (Lens 2 brief calls for "Morning gym wide shot"; founder selects via Unsplash search "empty gym morning") | Unsplash License (assumed) | `app/analytics/index.tsx` streak heatmap header, `app/(tabs)/community.tsx` Community hero band (future) | TBD | REQUIRES_ATTRIBUTION | STAGED |
 | `mobile/assets/photos/morning-gym@3x.avif` | (same source) | Unsplash License (assumed) | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
-| `mobile/assets/photos/coach-portrait@2x.avif` | TBD (Lens 2 brief: "Coach-style portrait, B&W"; founder selects) | Unsplash License (assumed) | `app/(tabs)/trainer.tsx` empty state | TBD | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/coach-portrait@2x.avif` | TBD (Lens 2 brief: "Coach-style portrait, B&W"; founder selects) | Unsplash License (assumed) | `app/(tabs)/trainer.tsx` empty state, `app/users/[id].tsx` portrait fallback | TBD | REQUIRES_ATTRIBUTION | STAGED |
 | `mobile/assets/photos/coach-portrait@3x.avif` | (same source) | Unsplash License (assumed) | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/bumper-plate@2x.avif` | TBD (Lens 2 brief: macro detail of a bumper plate; founder selects via Unsplash) | Unsplash License (assumed) | `app/exercises/index.tsx` empty state, `app/routines/index.tsx` empty state | TBD | REQUIRES_ATTRIBUTION | STAGED |
+| `mobile/assets/photos/bumper-plate@3x.avif` | (same source) | Unsplash License (assumed) | (same) | TBD | REQUIRES_ATTRIBUTION | STAGED |
 
-Total staged: 10 entries (5 photos x 2 sizes), targeting ~1.6 MB total.
+Total staged: 12 entries (6 photos x 2 sizes), targeting ~2.0 MB total.
+Renamed `barbell-macro` -> `login-barbell` to match the per-screen brief
+in lens 2 (login as primary consumer) and the C-2 implementation.
 
 ### Avatar fallbacks
 

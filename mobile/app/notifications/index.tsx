@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   View,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +16,8 @@ import { Text } from '../../src/components/Text';
 import { Header } from '../../src/components/Header';
 import { EmptyState } from '../../src/components/EmptyState';
 import { colors, spacing, radii } from '../../src/theme/tokens';
+import { routeFromNotificationData } from '../../src/lib/notificationRouter';
+import { haptic } from '../../src/lib/haptics';
 
 interface Notification {
   id: string;
@@ -27,32 +30,12 @@ interface Notification {
 }
 
 // Deep-link a notification's data payload to its target screen.
-function routeForNotification(n: Notification) {
-  const d = (n.data ?? {}) as Record<string, any>;
-  switch (n.type) {
-    case 'like':
-    case 'comment':
-    case 'pr':
-    case 'mention':
-      if (d.workout_id) return `/workouts/${d.workout_id}`;
-      break;
-    case 'follow':
-    case 'follow_request':
-    case 'follow_request_approved':
-      if (d.actor_user_id) return `/users/${d.actor_user_id}`;
-      break;
-    case 'challenge_started':
-    case 'challenge_ended':
-      if (d.challenge_id) return `/challenges/${d.challenge_id}`;
-      break;
-    case 'duel_invite':
-    case 'duel_accepted':
-    case 'duel_won':
-    case 'duel_lost':
-      if (d.duel_id) return `/duels/${d.duel_id}`;
-      break;
-  }
-  return null;
+// Both the in-app handler (here) and the cold-start handler in
+// _layout.tsx route through `routeFromNotificationData` -- one source
+// of truth per lens 5 P0.
+function routeForNotification(n: Notification): string | null {
+  const data = { ...(n.data ?? {}), type: n.type } as Record<string, unknown>;
+  return routeFromNotificationData(data);
 }
 
 function formatRelative(iso: string): string {
@@ -121,6 +104,7 @@ export default function NotificationsScreen() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
 
   const fetchNotifications = useCallback(async (cursor?: string) => {
@@ -145,6 +129,17 @@ export default function NotificationsScreen() {
     setLoadingMore(false);
   }, [nextCursor, loadingMore, fetchNotifications]);
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    haptic.pullRefreshTrigger();
+    try {
+      await fetchNotifications();
+      haptic.pullRefreshLoaded();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchNotifications]);
+
   const handleNotificationPress = useCallback(async (n: Notification) => {
     // Optimistic mark-as-read
     if (!n.is_read) {
@@ -153,7 +148,8 @@ export default function NotificationsScreen() {
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: false } : x));
       });
     }
-    // Deep-link to the relevant screen
+    // Deep-link to the relevant screen via the shared notification
+    // router util (lens 5 P0 unify-router fix).
     const target = routeForNotification(n);
     if (target) router.push(target as any);
   }, []);
@@ -191,9 +187,18 @@ export default function NotificationsScreen() {
           keyExtractor={item => item.id}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.brand} />
+          }
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ paddingVertical: spacing.base }} /> : null}
-          ListEmptyComponent={<EmptyState illustration="notifications" title="All caught up" description="You'll see likes, comments, and PR alerts here." />}
+          ListEmptyComponent={
+            <EmptyState
+              illustration="notifications"
+              title="All caught up."
+              description="When members like or comment, you'll see it here."
+            />
+          }
           contentContainerStyle={notifications.length === 0 ? { flex: 1 } : undefined}
         />
       )}

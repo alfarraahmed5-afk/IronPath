@@ -50,7 +50,7 @@ const METRIC_LABEL: Record<string, string> = {
 };
 
 function formatValue(metric: string, v: number | null | undefined): string {
-  if (v == null) return '—';
+  if (v == null) return '--';
   if (metric.includes('reps')) return `${Math.round(v)}`;
   return `${Math.round(v * 10) / 10} kg`;
 }
@@ -184,7 +184,7 @@ export default function DuelDetailScreen() {
           <View style={styles.versusSide}>
             <Avatar username={challenger?.username ?? '?'} avatarUrl={challenger?.avatar_url ?? null} size={56} />
             <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ marginTop: spacing.sm }}>
-              {challenger?.username ?? '—'}
+              {challenger?.username ?? '--'}
             </Text>
             <Text variant="numeric" color="brand" style={{ fontSize: 22, lineHeight: 26, marginTop: spacing.xs }}>
               {formatValue(duel.metric, duel.live_challenger_value ?? duel.challenger_value)}
@@ -204,7 +204,7 @@ export default function DuelDetailScreen() {
           <View style={styles.versusSide}>
             <Avatar username={opponent?.username ?? '?'} avatarUrl={opponent?.avatar_url ?? null} size={56} />
             <Text variant="bodyEmphasis" color="textPrimary" numberOfLines={1} style={{ marginTop: spacing.sm }}>
-              {opponent?.username ?? '—'}
+              {opponent?.username ?? '--'}
             </Text>
             <Text variant="numeric" color="brand" style={{ fontSize: 22, lineHeight: 26, marginTop: spacing.xs }}>
               {formatValue(duel.metric, duel.live_opponent_value ?? duel.opponent_value)}
@@ -224,7 +224,7 @@ export default function DuelDetailScreen() {
           <Text variant="caption" color="textSecondary" style={{ marginLeft: spacing.sm, flex: 1 }}>
             {duel.status === 'pending' && (meIsOpponent ? 'They challenged you. Accept or decline.' : 'Waiting for opponent to accept.')}
             {duel.status === 'accepted' && (canResolve ? 'Time is up. Anyone can resolve.' : `Ends ${new Date(duel.ends_at).toLocaleString()}`)}
-            {duel.status === 'completed' && (meWon ? 'You won!' : meLost ? 'You lost — get them next time.' : tied ? 'Tied' : 'Completed')}
+            {duel.status === 'completed' && (meWon ? 'You won!' : meLost ? 'You lost. Get them next time.' : tied ? 'Tied' : 'Completed')}
             {duel.status === 'declined' && 'Duel declined.'}
             {duel.status === 'expired' && 'Duel expired without resolution.'}
           </Text>

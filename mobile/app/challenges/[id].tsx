@@ -165,7 +165,7 @@ export default function ChallengeDetailScreen() {
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Icon icon={Calendar} size={14} color={colors.textTertiary} />
-              <Text variant="caption" color="textSecondary">{formatDate(challenge.starts_at)} – {formatDate(challenge.ends_at)}</Text>
+              <Text variant="caption" color="textSecondary">{formatDate(challenge.starts_at)} - {formatDate(challenge.ends_at)}</Text>
             </View>
             <View style={styles.metaItem}>
               <Icon icon={Users} size={14} color={colors.textTertiary} />
