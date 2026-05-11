@@ -1,26 +1,38 @@
-// wger exercise IDs used in templates
-// These are resolved to internal UUIDs at runtime via exercises.wger_id column
+// wger exercise IDs used in templates.
+// Resolved to internal exercise UUIDs at runtime via the
+// exercises.wger_id column.
+//
+// 2026-05-11: wger.de renumbered their catalog. The previous constants
+// (W.SQUAT = 110 etc.) pointed at exercises that no longer correspond
+// to the canonical big lifts in our exercises table after the latest
+// import. Found-by-name lookup (backend/scripts/find-trainer-ids.js)
+// against production produced the IDs below.
+//
+// A 0 value means we have no matching exercise in the catalog yet
+// (e.g. plain push-up / plank / burpee / lat pulldown were not in
+// wger's current dataset). trainer.ts gracefully skips wger_ids it
+// can't resolve, so these are inert until backfilled.
 const W = {
-  SQUAT: 110,
-  BENCH: 192,
-  DEADLIFT: 241,
-  OHP: 74,
-  ROW: 63,
-  RDLIFT: 89,
-  PULLUP: 31,
-  LAT_PD: 122,
-  CURL: 99,
-  PUSHUP: 91,
-  LUNGE: 78,
-  PLANK: 95,
-  BURPEE: 156,
-  RUNNING: 215,
-  GOBLET_SQ: 118,
-  SPLIT_SQ: 170,
-  DB_BENCH: 21,
-  DB_SHOULDER: 68,
-  DB_ROW: 72,
-  DB_CURL: 5,
+  SQUAT: 1627,        // "Barbell squat"
+  BENCH: 73,          // "Barbell Bench Press"
+  DEADLIFT: 184,      // "Deadlifts"
+  OHP: 687,           // "Overhead Press"
+  ROW: 1698,          // "Barbell Row (Overhand)"
+  RDLIFT: 1700,       // "Barbell Romanian Deadlift (RDL)"
+  PULLUP: 1929,       // "Assisted Pull-Up" -- closest in current catalog
+  LAT_PD: 0,          // not in catalog (TODO -- import or hand-seed)
+  CURL: 1290,         // "Reverse Grip Barbell Curls" -- closest in catalog
+  PUSHUP: 0,          // not in catalog (TODO)
+  LUNGE: 46,          // "Barbell Lunge Standing"
+  PLANK: 0,           // not in catalog (TODO)
+  BURPEE: 0,          // not in catalog (TODO)
+  RUNNING: 908,       // "Zone 2 Running"
+  GOBLET_SQ: 203,     // "Dumbbell Goblet Squat"
+  SPLIT_SQ: 988,      // "Bulgarian split squats left"
+  DB_BENCH: 1676,     // "Dumbbell Bench Press"
+  DB_SHOULDER: 1337,  // "Dumbbell Shoulder Press"
+  DB_ROW: 310,        // "Incline Dumbbell Row"
+  DB_CURL: 1931,      // "Dumbbell Curl"
 };
 
 const TEMPLATES = {

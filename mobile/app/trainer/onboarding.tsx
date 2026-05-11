@@ -45,27 +45,31 @@ const EQUIPMENT_OPTIONS: { key: Equipment; label: string; desc: string }[] = [
 
 const DAYS_OPTIONS = [2, 3, 4, 5, 6];
 
+// wger.de renumbered their exercise catalog at some point. These IDs
+// match the canonical big-5 lifts in our exercises table as of the
+// 2026-05-11 wger import (see backend/scripts/find-trainer-ids.js).
+// They MUST stay in sync with backend/data/trainer-templates.js W.*.
 const DEFAULT_WEIGHTS: Record<Experience, { label: string; wger_id: number; weight_kg: number }[]> = {
   beginner: [
-    { label: 'Squat', wger_id: 110, weight_kg: 60 },
-    { label: 'Bench Press', wger_id: 192, weight_kg: 40 },
-    { label: 'Deadlift', wger_id: 241, weight_kg: 80 },
-    { label: 'Overhead Press', wger_id: 74, weight_kg: 30 },
-    { label: 'Barbell Row', wger_id: 63, weight_kg: 50 },
+    { label: 'Squat',          wger_id: 1627, weight_kg: 60 },
+    { label: 'Bench Press',    wger_id: 73,   weight_kg: 40 },
+    { label: 'Deadlift',       wger_id: 184,  weight_kg: 80 },
+    { label: 'Overhead Press', wger_id: 687,  weight_kg: 30 },
+    { label: 'Barbell Row',    wger_id: 1698, weight_kg: 50 },
   ],
   intermediate: [
-    { label: 'Squat', wger_id: 110, weight_kg: 100 },
-    { label: 'Bench Press', wger_id: 192, weight_kg: 70 },
-    { label: 'Deadlift', wger_id: 241, weight_kg: 130 },
-    { label: 'Overhead Press', wger_id: 74, weight_kg: 50 },
-    { label: 'Barbell Row', wger_id: 63, weight_kg: 80 },
+    { label: 'Squat',          wger_id: 1627, weight_kg: 100 },
+    { label: 'Bench Press',    wger_id: 73,   weight_kg: 70 },
+    { label: 'Deadlift',       wger_id: 184,  weight_kg: 130 },
+    { label: 'Overhead Press', wger_id: 687,  weight_kg: 50 },
+    { label: 'Barbell Row',    wger_id: 1698, weight_kg: 80 },
   ],
   advanced: [
-    { label: 'Squat', wger_id: 110, weight_kg: 140 },
-    { label: 'Bench Press', wger_id: 192, weight_kg: 100 },
-    { label: 'Deadlift', wger_id: 241, weight_kg: 180 },
-    { label: 'Overhead Press', wger_id: 74, weight_kg: 70 },
-    { label: 'Barbell Row', wger_id: 63, weight_kg: 110 },
+    { label: 'Squat',          wger_id: 1627, weight_kg: 140 },
+    { label: 'Bench Press',    wger_id: 73,   weight_kg: 100 },
+    { label: 'Deadlift',       wger_id: 184,  weight_kg: 180 },
+    { label: 'Overhead Press', wger_id: 687,  weight_kg: 70 },
+    { label: 'Barbell Row',    wger_id: 1698, weight_kg: 110 },
   ],
 };
 
