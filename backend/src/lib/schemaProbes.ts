@@ -150,7 +150,19 @@ export async function assertSchemaReady(opts: { failHard: boolean }): Promise<vo
     logger.info({ probes: result.total }, 'Schema check passed');
     return;
   }
-  logger.error({ failures: result.failures }, `Schema check failed: ${result.failures.length}/${result.total} probes returned an error — production may be missing migrations`);
+  // Inline each failure into its own log line so it surfaces in Railway's
+  // log viewer (which truncates pino's structured `failures` field).
+  // Without this, the only visible message was the count, leaving the
+  // operator to wonder which migration is missing.
+  for (const f of result.failures) {
+    logger.error(
+      `Schema probe FAIL · migration ${f.migration} (${f.description}) -- ${f.reason}`,
+    );
+  }
+  logger.error(
+    { failures: result.failures },
+    `Schema check failed: ${result.failures.length}/${result.total} probes returned an error -- production may be missing migrations`,
+  );
   if (opts.failHard) {
     process.exit(1);
   }
