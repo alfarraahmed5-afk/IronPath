@@ -92,6 +92,151 @@ Single source of truth for development progress on the platform plan. Read this 
 ## Activity log
 *Reverse chronological — newest at top.*
 
+### 2026-05-11 · Mobile cinematic overhaul -- 8-agent sprint integration
+
+All 8 worktree agents merged. 4 teams of 2 per founder direction. Sequence:
+A-2 fast-forwarded; A-1, B-1, B-2, D-1, D-2 merged --no-ff sequentially;
+B-2 needed conflict resolution on `_layout.tsx` (ThemeProvider + QueryClient
+ordering), `motion/transitions/shared-element.ts` (B-1 + B-2 both authored;
+kept both APIs), and `primitives/index.ts` (both added new exports; combined).
+C-1 + C-2 hit Anthropic rate limits mid-execution, but each shipped real
+commits to its worktree before capping (C-1: 5 commits, C-2: 10 commits).
+Salvaged via worktree merge -- same pattern as the marketing 12-agent sprint.
+
+C-2 conflicted on 3 files: `(tabs)/_layout.tsx` (C-1 added Progress + Me
+additively, C-2 did full Option B 5-tab restructure -- resolved in favor
+of C-2's full restructure), `(tabs)/me.tsx` and `(tabs)/progress.tsx`
+(C-2 left placeholder stubs deferring to C-1, C-1 wrote real bodies --
+resolved in favor of C-1).
+
+**What's now on master at c087b54:**
+
+PR A foundation:
+- A-1: design-system/tokens/* with full crimson palette (brand-50..900 +
+  semantic role aliases brandDisplay/Text/Focus/Pressed), warm-ink scale
+  ink-50..950, set-type recolor per Q5 (dropset orange, failure brand-450),
+  flame #FF7A3D documented exception per Q6, lightened textTertiary +
+  textDisabled + borderSubtle for WCAG AA. ThemeProvider with
+  AccessibilityInfo + Dimensions + I18nManager + expo-secure-store
+  persisted reduceMotion override. Mona Sans variable WOFF2 + IBM Plex
+  Sans Arabic 4-cut load. 3000ms splash auto-hide fallback.
+- A-2: app.json edge-to-edge + predictive back + 3 notification channels
+  (active-workout / social / pr-and-streak), components/index.ts shim,
+  migrations 050 (streak day fields) + 051 (gym_volume_percentile)
+  + schema probes, /users/<id>/stats + /analytics/stats endpoint
+  extensions.
+
+PR B primitives + motion + medium backend:
+- B-1: Card (5 variants: solid/photo/glass/receipt/live), Hero (Ken Burns),
+  ListRow (swipe-actions 88pt + accessibilityActions), Tile, EmberSeam
+  (Skia hairline + breathing radial gradient + 12px halo), Sheet rewrite
+  (drag-to-dismiss + detents + BlurView + focus trap), Button (magnetic
+  + icon variant), Pressable (onPress not onPressIn haptic fix +
+  android_ripple). Motion primitives library (useListStagger, usePageEnter,
+  useSpringSheet, useMagnetic, usePressScale, useShake, useReduceMotion,
+  useReanimatedReduceMotion). Shared-element SHARED_TAGS. Canonical 57-row
+  haptic map. Backend /workouts/calendar?include= + /users/me/aggregate.
+- B-2: Numeric (Reanimated text-column digit roll), Eyebrow, Section,
+  RouteModal, Toast (queue + swipe-up dismiss + live regions), Skeleton
+  (Skia shimmer), LivePulseStrip (Skia hairline + 12% sliver sweep +
+  6-12s random gap), Avatar (monogram fallback + canonical sizes).
+  Motion transitions (page/modal/shared-element). React Query provider.
+  Share-card export pipeline (captureShareCardRef + IG Stories fallback).
+  Backend /workouts/finish enriched (previous_best_kg + gym_percentile
+  + newly_unlocked_badges), /analytics/all aggregate, migration 052
+  streak tier ladder + nightly streakTierCheck cron.
+
+PR C screens + heavy backend:
+- C-1: workout/finish.tsx + celebrate.tsx cinematic 5-beat redesign
+  (hero Ken Burns + ember multiply -> NumberRoll stats -> staggered PR
+  cards with Skia particle puff -> percentile callout -> share-card
+  preview), auto-dismiss 6s base + 1s/PR cap 12s disabled under screen
+  reader. workout/active.tsx split into features/workout/active/{SetRow,
+  RestTimer, ExerciseHeader, AddExerciseSheet, BottomBar}.tsx with
+  RestTimer on UI thread via Reanimated shared values. Full
+  features/progress/* suite: StreakHeatmap (Skia 7x12 grid with 5-step
+  crimson ramp + diagonal sweep fill), StreakCard (weeks per Q2 + flame
+  exception per Q6), PRBadge, PRBadgeParticles (Skia ~50KB per Q7),
+  MilestoneToast (full-screen takeover for 14 badges + 7 new streak-tier
+  badges from migration 052), VolumeComparison, FriendSparkline,
+  PerExercisePRSparkline, MonthlyRecap (Spotify-Wrapped 6-panel pager),
+  AdherenceCard (75% completion ring), BodyTrend (per-metric chart +
+  ghost overlay + photo before/after), ShareCard. Goals system per Q3
+  (ships in v1, NOT flagged): GoalsList, GoalCard, GoalCreate,
+  GoalCelebrate. (tabs)/progress.tsx + (tabs)/me.tsx routes. Backend
+  BE-B (trainer period_summary), BE-C (measurement photos endpoint +
+  storage bucket + RLS), BE-E (monthly_recaps job + table + endpoints),
+  BE-F (user_goals table + CRUD + nightly auto-completion cron), BE-I
+  (per-metric series). Migrations 053 + 054.
+- C-2: (tabs)/_layout.tsx full Option B 5-tab restructure (Home /
+  Train / Progress / Community / Me) with custom tab bar (shared
+  layout pill + icon stroke 1.75 idle -> 2.25 active + label tracking
+  shift). (tabs)/index.tsx as NEW Home landing. (tabs)/community.tsx
+  with Feed | Boards | Challenges sub-tabs (Feed + Boards extracted
+  to features/). (tabs)/train.tsx renamed from workouts.tsx. Cinematic
+  auth screens (login + register + forgot) with barbell macro hero
+  + Ken Burns + ember overlay + logomark first-visit animation +
+  magnetic button + lowercase voice copy. users/[id] photo hero with
+  new streak-tier badges. notifications/index.tsx pull-to-refresh.
+  routeFromNotificationData unified (picks up streak_broken,
+  monthly_report, yearly_report, duel_won/lost, follow_request,
+  follow_request_approved, mention -- previously silently dropped
+  on cold start). routines/ drag-to-reorder + /routines/prebuilt
+  dead-link fix. exercises/ globally reachable. duels + challenges
+  with new primitives. settings/help.tsx WhatsApp + .health fixes.
+  5 P0 photos bundled in mobile/assets/photos/ with MANIFEST.
+
+PR D polish infrastructure:
+- D-1: 6 audit scripts (em-dashes, banned-strings, contrast, RTL,
+  touch-target, a11y) wired in package.json. mobile/src/lib/a11y.ts
+  with useReduceMotion / useReduceTransparency / useScreenReader /
+  useFontScale / useHighContrast / useLargeFontLayout +
+  announceForAccessibility + getMaxFontScaleForVariant. Phase 2
+  audit-run section reserved in mobile/docs/A11Y_CHECKLIST.md.
+- D-2: eas.json 3 profiles (development / preview / production) with
+  Apple credentials renamed PLACEHOLDER_* to make founder gate visible.
+  build-preview.ps1 + .sh. measure-cold-start.mjs (Pixel 8 adb harness
+  + iPhone Xcode Instruments runbook). measure-apk-size.sh. Photo
+  MANIFEST framework. CREDITS.md for in-app About. PERF_BUDGETS.md
+  documenting lens 6 targets. FOUNDER_SIDELOAD.md 15-item acceptance
+  gate + install paths + per-screen "what to look for."
+
+**Verification:**
+- `npm run -w backend build` clean.
+- `mobile/` typecheck: pre-existing baseline + ~509 upstream React 19 /
+  RN 0.83 type-drift errors (TS2786 "X cannot be used as JSX component"
+  -- React 19 added bigint to ReactNode union, RN's bundled types
+  pre-date that). NO new errors introduced by sprint code. Documented
+  as Phase 2 dep-pinning task.
+- Audit scripts (em-dashes, banned-strings) find 14 legacy hits across
+  pre-sprint files (active.tsx legacy comments, LineChart.tsx, api.ts,
+  authStore.ts). Sprint code is clean; legacy debt deferred to Phase 2.
+
+**Phase 2 (after founder side-load + sign-off):**
+- Re-spawn D-1 + D-2 for the actual audit run (currently they shipped
+  infrastructure only -- the scripts and docs).
+- Legacy em-dash + banned-string purge across the 14 known hit-sites.
+- React 19 / RN 0.83 type-drift fix (pin @types/react or downgrade).
+- Apple Developer credentials in eas.json (founder action item AI-1).
+- Mona Sans + IBM Plex Sans Arabic license payment (founder action items
+  F-1..F-5 in photo MANIFEST).
+- Actual EAS preview build + Pixel 8 + iPhone 15 Pro side-load.
+- Founder runs the 15-item acceptance gate in FOUNDER_SIDELOAD.md.
+- Then `eas submit --platform all` to production.
+
+**Sprint mechanics worth carrying forward:**
+- Worktree fork-base discipline (`git update-ref refs/remotes/origin/master
+  refs/heads/master`) after every integration step kept all 8 agents
+  forking from current state.
+- "Total tokens: 0" in the harness rate-limit error is misleading;
+  the agent did real work for ~30 min. Always inspect the worktree
+  branch via `git log <worktree-branch>` before assuming nothing
+  shipped.
+- C-1 + C-2 are the biggest agents in any sprint -- they read 5000+
+  lines of council files + npm install + write 5000+ lines of code
+  in their slice. Plan for them to hit rate limits; the worktree
+  salvage pattern is THE answer.
+
 ### 2026-05-10 · Mobile cinematic overhaul + progress tracking sprint -- pre-stage
 
 Founder requested a cinematic overhaul of the mobile app to match the marketing-site polish, plus the progress-tracking features that have been thin or absent (streaks, milestones, PR celebrations, weekly/monthly recap, heatmap-style consistency, body-measurement trends, adherence to assigned program, friend visibility).
