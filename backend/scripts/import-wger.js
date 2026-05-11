@@ -82,11 +82,27 @@ async function importWger() {
       const mainImage = exercise.images?.find(img => img.is_main) ?? exercise.images?.[0];
       if (mainImage?.image) {
         try {
-          const imgRes = await fetchWithRetry(mainImage.image);
+          // wger sometimes returns absolute URLs (https://wger.de/...) and
+          // sometimes returns relative paths (/media/exercise-images/...).
+          // Node's fetch can't parse relative URLs; prepend the host when
+          // we detect a leading slash.
+          const rawUrl = mainImage.image;
+          const absoluteUrl = /^https?:\/\//i.test(rawUrl)
+            ? rawUrl
+            : 'https://wger.de' + (rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl);
+
+          const imgRes = await fetchWithRetry(absoluteUrl);
           const arrayBuffer = await imgRes.arrayBuffer();
           const imgBuffer = Buffer.from(arrayBuffer);
           const contentType = imgRes.headers.get('content-type') ?? 'image/jpeg';
-          const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : 'jpg';
+          // Extension map. We pass content-type to Supabase Storage on
+          // upload so the served Content-Type header matches, regardless
+          // of the file extension we choose for the storage path.
+          const ext = contentType.includes('png')  ? 'png'
+                    : contentType.includes('gif')  ? 'gif'
+                    : contentType.includes('webp') ? 'webp'
+                    : contentType.includes('svg')  ? 'svg'
+                    : 'jpg';
           const storagePath = 'global/' + exercise.id + '/image_0.' + ext;
           const { error: uploadError } = await supabase.storage
             .from('exercise-assets').upload(storagePath, imgBuffer, { contentType, upsert: true });
