@@ -236,7 +236,7 @@ export default function FinishWorkoutScreen() {
         if (gymPercentile != null) params.gym_percentile = String(gymPercentile);
         router.replace({ pathname: '/workout/celebrate', params } as any);
       } else {
-        router.replace('/(tabs)/workouts');
+        router.replace('/(tabs)/train');
       }
     } catch {
       Alert.alert('Error', 'Failed to save workout. Please try again.');

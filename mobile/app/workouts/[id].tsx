@@ -91,12 +91,12 @@ export default function WorkoutDetailScreen() {
 
   function goBack() {
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/workouts');
+    else router.replace('/(tabs)/train');
   }
 
   useEffect(() => {
     if (!id) {
-      router.replace('/(tabs)/workouts');
+      router.replace('/(tabs)/train');
       return;
     }
     setLoading(true);

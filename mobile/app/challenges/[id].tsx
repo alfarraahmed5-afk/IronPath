@@ -109,7 +109,7 @@ export default function ChallengeDetailScreen() {
 
   function goBack() {
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/leaderboard');
+    else router.replace('/(tabs)/community');
   }
 
   if (loading) {

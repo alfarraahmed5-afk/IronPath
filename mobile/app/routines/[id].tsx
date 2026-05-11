@@ -86,7 +86,7 @@ export default function RoutineDetailScreen() {
 
   function goBack() {
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/workouts');
+    else router.replace('/(tabs)/train');
   }
 
   useEffect(() => {

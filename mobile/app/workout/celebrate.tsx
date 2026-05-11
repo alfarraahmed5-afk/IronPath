@@ -189,7 +189,7 @@ export default function CelebrateScreen() {
     if (milestoneActive) return;
     if (srOn) return;
     const t = setTimeout(() => {
-      router.replace('/(tabs)/workouts');
+      router.replace('/(tabs)/train');
     }, dismissMs);
     return () => clearTimeout(t);
   }, [milestoneActive, srOn, dismissMs]);
@@ -197,7 +197,7 @@ export default function CelebrateScreen() {
   // Empty state -- if no PRs at all (and no badges), bounce.
   useEffect(() => {
     if (prs.length === 0 && newlyUnlocked.length === 0) {
-      const t = setTimeout(() => router.replace('/(tabs)/workouts'), 1200);
+      const t = setTimeout(() => router.replace('/(tabs)/train'), 1200);
       return () => clearTimeout(t);
     }
   }, [prs.length, newlyUnlocked.length]);
@@ -351,7 +351,7 @@ export default function CelebrateScreen() {
         <View style={styles.footer}>
           <Button
             label="Done"
-            onPress={() => router.replace('/(tabs)/workouts')}
+            onPress={() => router.replace('/(tabs)/train')}
             variant="primary"
             size="lg"
             fullWidth

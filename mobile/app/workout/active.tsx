@@ -263,7 +263,7 @@ export default function ActiveWorkoutScreen() {
   const toast = useToast();
 
   useEffect(() => {
-    if (!active) router.replace('/(tabs)/workouts');
+    if (!active) router.replace('/(tabs)/train');
   }, [active]);
 
   useEffect(() => {
@@ -329,7 +329,7 @@ export default function ActiveWorkoutScreen() {
       {
         text: 'Discard', style: 'destructive', onPress: () => {
           discardWorkout();
-          router.replace('/(tabs)/workouts');
+          router.replace('/(tabs)/train');
         }
       },
     ]);

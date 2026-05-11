@@ -56,7 +56,7 @@ export default function CreateChallengeScreen() {
       if (newId) {
         router.replace(`/challenges/${newId}` as any);
       } else {
-        router.replace('/(tabs)/leaderboard');
+        router.replace('/(tabs)/community');
       }
     } catch (e: any) {
       Alert.alert('Could not create', e?.error?.message ?? 'Try again.');
