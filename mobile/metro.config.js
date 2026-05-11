@@ -12,7 +12,13 @@ const workspaceRoot = path.resolve(projectRoot, '..');
 const config = getDefaultConfig(projectRoot);
 
 // 1. Watch the entire monorepo so HMR picks up shared/ changes.
-config.watchFolders = [workspaceRoot];
+//    Preserve Expo's default watchFolders (projectRoot) so doctor's
+//    config check doesn't flag a missing entry.
+config.watchFolders = Array.from(new Set([
+  ...(config.watchFolders ?? []),
+  workspaceRoot,
+  projectRoot,
+]));
 
 // 2. Resolve modules from mobile FIRST, then root. nodeModulesPaths is
 //    walked AFTER hierarchical lookup, so this acts as a fallback for

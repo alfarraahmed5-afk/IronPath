@@ -26,8 +26,6 @@
     "android": {
       "package": "com.ironpath.app",
       "versionCode": 1,
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0B"
@@ -72,7 +70,8 @@
           "savePhotosPermission": "Allow IronPath to save shareable workout cards to your photos.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
