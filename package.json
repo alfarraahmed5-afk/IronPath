@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": ["mobile", "backend", "admin", "console", "marketing", "shared"],
   "scripts": {
+    "postinstall": "node scripts/ensure-rn-at-root.js",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:admin": "npm run dev --workspace=admin",
     "dev:console": "npm run dev --workspace=console",
