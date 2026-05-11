@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { AppError } from '../middleware/errorHandler';
@@ -1234,6 +1235,223 @@ router.get('/bodyweight-history', cacheControl(60), async (req: Request, res: Re
 // focus. /analytics/all bundles the period summary into one payload
 // so React Query mounts once. Caches at 60s aligned with /stats.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// BE-C (cinematic overhaul) -- measurement photo upload + recent.
+// ---------------------------------------------------------------------------
+
+const measurementPhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 },
+});
+
+/**
+ * POST /analytics/measurements/:id/photos
+ * Multipart form-data: field `photo`, optional `pose` ('front'|'side'|'back').
+ * Stores in the `progress-photos` bucket under userId/measurementId/uuid.jpg.
+ * Per lens 7 P0-4 spec.
+ */
+router.post(
+  '/measurements/:id/photos',
+  measurementPhotoUpload.single('photo'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.id;
+      const measurementId = req.params.id;
+      if (!req.file) return next(new AppError('VALIDATION_ERROR', 422, 'No photo uploaded'));
+      const pose = (req.body?.pose as string | undefined) ?? null;
+      if (pose && !['front', 'side', 'back'].includes(pose)) {
+        return next(new AppError('VALIDATION_ERROR', 422, 'pose must be front/side/back'));
+      }
+
+      // Ownership check.
+      const { data: m, error: findErr } = await supabase
+        .from('body_measurements')
+        .select('id, user_id')
+        .eq('id', measurementId)
+        .maybeSingle();
+      if (findErr) return next(new AppError('DB_ERROR', 500, findErr.message));
+      if (!m) return next(new AppError('NOT_FOUND', 404, 'Measurement not found'));
+      if (m.user_id !== userId) return next(new AppError('FORBIDDEN', 403, 'Access denied'));
+
+      const ext = req.file.originalname?.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const uuid = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const storagePath = `${userId}/${measurementId}/${uuid}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('progress-photos')
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: false,
+        });
+      if (upErr) return next(new AppError('STORAGE_ERROR', 500, upErr.message));
+
+      // Signed-URL is 1h per lens 7 spec.
+      const { data: signed } = await supabase.storage
+        .from('progress-photos')
+        .createSignedUrl(storagePath, 3600);
+
+      const { data: row, error: insErr } = await supabase
+        .from('measurement_photos')
+        .insert({
+          measurement_id: measurementId,
+          user_id: userId,
+          photo_url: signed?.signedUrl ?? '',
+          storage_path: storagePath,
+        })
+        .select()
+        .single();
+      if (insErr) return next(new AppError('DB_ERROR', 500, insErr.message));
+
+      return res.status(201).json({ data: { photo: row, pose } });
+    } catch (err: any) {
+      return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+    }
+  },
+);
+
+/**
+ * GET /analytics/measurements/photos/recent?limit=2
+ * Returns the user's most recent photos with signed URLs. Used by the
+ * before/after card on the redesigned measurements screen.
+ */
+router.get('/measurements/photos/recent', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const limit = Math.min(10, Math.max(1, parseInt((req.query.limit as string) ?? '2', 10) || 2));
+
+    const { data: photos, error } = await supabase
+      .from('measurement_photos')
+      .select('id, measurement_id, photo_url, storage_path, created_at, body_measurements(measured_at)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) return next(new AppError('DB_ERROR', 500, error.message));
+
+    // Refresh signed URLs (1h ttl).
+    const out: any[] = [];
+    for (const p of photos ?? []) {
+      const { data: signed } = await supabase.storage
+        .from('progress-photos')
+        .createSignedUrl(p.storage_path, 3600);
+      out.push({
+        id: p.id,
+        measurement_id: p.measurement_id,
+        photo_url: signed?.signedUrl ?? p.photo_url,
+        storage_path: p.storage_path,
+        created_at: p.created_at,
+        measured_at: (p as any).body_measurements?.measured_at ?? null,
+      });
+    }
+
+    return res.json({ data: { photos: out } });
+  } catch (err: any) {
+    return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// BE-I (cinematic overhaul) -- per-metric body-measurement series.
+// ---------------------------------------------------------------------------
+
+const METRIC_COLUMNS: Record<string, { col: string; isAverageOfPair?: [string, string] }> = {
+  weight:    { col: 'bodyweight_kg' },
+  bodyfat:   { col: 'body_fat_percentage' },
+  neck:      { col: 'neck_cm' },
+  chest:     { col: 'chest_cm' },
+  waist:     { col: 'waist_cm' },
+  hips:      { col: 'hips_cm' },
+  arm:       { col: '', isAverageOfPair: ['left_arm_cm', 'right_arm_cm'] },
+  forearm:   { col: '', isAverageOfPair: ['left_forearm_cm', 'right_forearm_cm'] },
+  thigh:     { col: '', isAverageOfPair: ['left_thigh_cm', 'right_thigh_cm'] },
+  calf:      { col: '', isAverageOfPair: ['left_calf_cm', 'right_calf_cm'] },
+};
+
+router.get('/measurements/series', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const metric = String(req.query.metric ?? 'weight').toLowerCase();
+    const period = String(req.query.period ?? '90d');
+    const def = METRIC_COLUMNS[metric];
+    if (!def) {
+      return next(new AppError('VALIDATION_ERROR', 422, `unknown metric: ${metric}`));
+    }
+
+    // Period cutoff. Reuses analytics-period values but adds 90d.
+    let cutoff: string | null = null;
+    const now = new Date();
+    switch (period) {
+      case '30d': cutoff = new Date(now.getTime() - 30 * 86400000).toISOString(); break;
+      case '90d': cutoff = new Date(now.getTime() - 90 * 86400000).toISOString(); break;
+      case '1y':  cutoff = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate())).toISOString(); break;
+      case 'all': cutoff = null; break;
+      default: return next(new AppError('VALIDATION_ERROR', 422, 'period must be 30d|90d|1y|all'));
+    }
+
+    const cols = def.isAverageOfPair
+      ? `measured_at, ${def.isAverageOfPair[0]}, ${def.isAverageOfPair[1]}`
+      : `measured_at, ${def.col}`;
+    let q = supabase
+      .from('body_measurements')
+      .select(cols)
+      .eq('user_id', userId)
+      .order('measured_at', { ascending: true });
+    if (cutoff) q = q.gte('measured_at', cutoff);
+    const { data: rows, error } = await q;
+    if (error) return next(new AppError('DB_ERROR', 500, error.message));
+
+    const points: { date: string; value: number }[] = [];
+    for (const r of (rows ?? []) as any[]) {
+      let v: number | null = null;
+      if (def.isAverageOfPair) {
+        const a = r[def.isAverageOfPair[0]];
+        const b = r[def.isAverageOfPair[1]];
+        if (a != null && b != null) v = (Number(a) + Number(b)) / 2;
+        else if (a != null) v = Number(a);
+        else if (b != null) v = Number(b);
+      } else {
+        v = r[def.col] != null ? Number(r[def.col]) : null;
+      }
+      if (v == null) continue;
+      points.push({
+        date: String(r.measured_at).slice(0, 10),
+        value: Math.round(v * 100) / 100,
+      });
+    }
+
+    // Compute "30 days ago" reference value. Approximate -- closest
+    // datapoint within +/- 7 days. Null if none.
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).getTime();
+    let thirty: number | null = null;
+    let bestDelta = Infinity;
+    for (const p of points) {
+      const t = new Date(p.date).getTime();
+      const d = Math.abs(t - thirtyDaysAgo);
+      if (d <= 7 * 86400000 && d < bestDelta) {
+        bestDelta = d;
+        thirty = p.value;
+      }
+    }
+
+    // Optional goal-line lookup if the user set a bodyweight or target_weight goal.
+    let goal: { value: number; type: string } | null = null;
+    if (metric === 'weight') {
+      const { data: g } = await supabase
+        .from('user_goals')
+        .select('target_value, goal_type')
+        .eq('user_id', userId)
+        .eq('goal_type', 'bodyweight')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (g) goal = { value: Number(g.target_value), type: 'bodyweight' };
+    }
+
+    return res.json({ data: { metric, period, points, thirty_days_ago: thirty, goal } });
+  } catch (err: any) {
+    return next(new AppError('INTERNAL_ERROR', 500, err.message ?? 'Unexpected error'));
+  }
+});
 
 router.get('/all', cacheControl(60), async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -196,16 +196,116 @@ router.get('/progress', requireActiveUser, async (req: Request, res: Response, n
       };
     });
 
+    // BE-B (mobile cinematic overhaul) -- period_summary aggregate.
+    // Per lens 7 P0-3. Mobile renders an adherence card on Trainer
+    // that needs: this month's prescribed vs completed sessions,
+    // consecutive-session count, and a 4-week breakdown for the
+    // sparkline. Computed from the existing workouts table + the
+    // program's prescribed sessions/week (days_per_week).
+    const periodSummary = await computeTrainerPeriodSummary({
+      userId: req.user.id,
+      daysPerWeek: program.days_per_week ?? 4,
+    });
+
     res.json({
       data: {
         program_name: TEMPLATES[program.program_template_key]?.name ?? program.program_template_key,
         total_sessions: pd.total_program_sessions_completed,
         increment_multiplier: pd.increment_multiplier,
         exercises,
+        period_summary: periodSummary,
       },
     });
   } catch (err) { next(err); }
 });
+
+/**
+ * BE-B helper -- assembles the adherence summary for the current
+ * calendar month + the past 4 weeks. `prescribed_sessions` is derived
+ * from `days_per_week * weeks_in_month` (clipped to whole weeks the
+ * user has been on the program).
+ */
+async function computeTrainerPeriodSummary(params: {
+  userId: string;
+  daysPerWeek: number;
+}): Promise<{
+  period: string;
+  prescribed_sessions: number;
+  completed_sessions: number;
+  consecutive_completed: number;
+  weekly_breakdown: { week: string; prescribed: number; completed: number }[];
+}> {
+  const { userId, daysPerWeek } = params;
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const period = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`;
+
+  const { data: monthWorkouts } = await supabase
+    .from('workouts')
+    .select('started_at')
+    .eq('user_id', userId)
+    .eq('is_completed', true)
+    .gte('started_at', monthStart.toISOString())
+    .lt('started_at', monthEnd.toISOString())
+    .order('started_at', { ascending: true });
+
+  const completed = monthWorkouts ?? [];
+  // Whole weeks elapsed (including the current week). Cap at 5.
+  const daysIntoMonth = Math.ceil((now.getTime() - monthStart.getTime()) / 86400000);
+  const weeksElapsed = Math.max(1, Math.min(5, Math.ceil(daysIntoMonth / 7)));
+  const prescribed = daysPerWeek * weeksElapsed;
+
+  // Consecutive sessions -- walk back from today; require <= 4 days between
+  // sessions to count as "consecutive".
+  let consecutive = 0;
+  const sorted = [...completed].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+  let prev: number | null = null;
+  for (const w of sorted) {
+    const t = new Date(w.started_at).getTime();
+    if (prev == null) { consecutive = 1; prev = t; continue; }
+    if ((prev - t) / 86400000 <= 4) { consecutive++; prev = t; } else { break; }
+  }
+
+  // Weekly breakdown -- last 4 ISO weeks.
+  const breakdownMap = new Map<string, number>();
+  const fourWeeksAgo = new Date(now.getTime() - 28 * 86400000);
+  const { data: recentWorkouts } = await supabase
+    .from('workouts')
+    .select('started_at')
+    .eq('user_id', userId)
+    .eq('is_completed', true)
+    .gte('started_at', fourWeeksAgo.toISOString());
+  for (const w of recentWorkouts ?? []) {
+    const d = new Date(w.started_at);
+    const day = (d.getUTCDay() + 6) % 7;
+    const monday = new Date(d);
+    monday.setUTCDate(d.getUTCDate() - day);
+    const key = monday.toISOString().slice(0, 10);
+    breakdownMap.set(key, (breakdownMap.get(key) ?? 0) + 1);
+  }
+  // Always emit exactly 4 cells (oldest first), filling missing weeks with 0.
+  const weekly_breakdown: { week: string; prescribed: number; completed: number }[] = [];
+  for (let i = 3; i >= 0; i--) {
+    const monday = new Date(now);
+    const day = (monday.getUTCDay() + 6) % 7;
+    monday.setUTCDate(now.getUTCDate() - day - 7 * i);
+    const key = monday.toISOString().slice(0, 10);
+    weekly_breakdown.push({
+      week: key,
+      prescribed: daysPerWeek,
+      completed: breakdownMap.get(key) ?? 0,
+    });
+  }
+
+  return {
+    period,
+    prescribed_sessions: prescribed,
+    completed_sessions: completed.length,
+    consecutive_completed: consecutive,
+    weekly_breakdown,
+  };
+}
 
 // POST /trainer/feedback — override learning
 router.post('/feedback', requireActiveUser, async (req: Request, res: Response, next: NextFunction) => {
