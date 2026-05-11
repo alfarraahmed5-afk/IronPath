@@ -9,7 +9,7 @@ interface ModalProps {
   description?: string;
   children: ReactNode;
   size?: 'md' | 'lg';
-  initialFocusRef?: React.RefObject<HTMLElement>;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 const FOCUSABLE_SELECTOR = [
