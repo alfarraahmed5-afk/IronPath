@@ -110,6 +110,18 @@ export default function LoginScreen() {
         email: email.trim().toLowerCase(),
         password,
       });
+      // super_admins with TOTP enrolled go through a 2FA challenge (Phase
+      // B.5). The backend stashes the freshly-minted Supabase tokens in a
+      // `super_admin_2fa_challenges` row keyed by hashed challenge_token;
+      // /auth/2fa/verify exchanges challenge_token + code for the real
+      // session. Mirror console's flow on mobile.
+      if (res.data?.requires_2fa) {
+        router.push({
+          pathname: '/(auth)/2fa',
+          params: { token: res.data.challenge_token },
+        } as any);
+        return;
+      }
       await login(res.data.user, res.data.access_token, res.data.refresh_token);
       router.replace('/(tabs)');
     } catch (err: any) {
