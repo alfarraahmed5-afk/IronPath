@@ -20,7 +20,9 @@
   "dependencies": {
     "@expo-google-fonts/barlow": "^0.2.3",
     "@expo-google-fonts/barlow-condensed": "^0.2.3",
+    "@expo-google-fonts/ibm-plex-sans-arabic": "^0.4.2",
     "@expo-google-fonts/jetbrains-mono": "^0.2.3",
+    "@expo-google-fonts/mona-sans": "^0.4.1",
     "@react-native-menu/menu": "^1.2.3",
     "@shopify/react-native-skia": "2.4.18",
     "@supabase/supabase-js": "^2.0.0",

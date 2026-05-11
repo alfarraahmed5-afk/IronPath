@@ -10,6 +10,18 @@ import {
   Barlow_700Bold,
 } from '@expo-google-fonts/barlow';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
+import {
+  MonaSans_400Regular,
+  MonaSans_500Medium,
+  MonaSans_600SemiBold,
+  MonaSans_700Bold,
+} from '@expo-google-fonts/mona-sans';
+import {
+  IBMPlexSansArabic_400Regular,
+  IBMPlexSansArabic_500Medium,
+  IBMPlexSansArabic_600SemiBold,
+  IBMPlexSansArabic_700Bold,
+} from '@expo-google-fonts/ibm-plex-sans-arabic';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -144,31 +156,31 @@ async function registerPushTokenIfGranted() {
 export default function RootLayout() {
   const { loadFromStorage, isAuthenticated } = useAuthStore();
 
-  // Mona Sans + IBM Plex Sans Arabic load from local WOFF2 assets.
-  // Mona Sans is shipped as ONE variable WOFF2 with 4 named-weight
-  // aliases (Reg/Med/SemiBold/Bold). expo-font + RN snap to the nearest
-  // static instance based on the requested weight; variable-axis
-  // interpolation is iOS-only and deferred to P2 (lens 10 risk #6).
+  // All fonts load via @expo-google-fonts. These packages ship TTF
+  // files that Metro bundles + Android/iOS can render natively. The
+  // earlier WOFF2 approach (copied from marketing/public/fonts/) was a
+  // dead end: WOFF2 is a web-only format.
   //
-  // Barlow + JetBrainsMono stay on @expo-google-fonts (working today;
-  // moving to local assets is a separate optimization).
+  // Token aliases (MonaSans-Regular / MonaSans-Medium / etc.) match
+  // the names in design-system/tokens/typography.ts so screens keep
+  // referencing fontFamily strings unchanged.
   const [fontsLoaded] = useFonts({
-    // Mona Sans -- 4 weight aliases pointing at the same variable file.
-    'MonaSans-Regular':  require('../assets/fonts/mona-sans-variable.woff2'),
-    'MonaSans-Medium':   require('../assets/fonts/mona-sans-variable.woff2'),
-    'MonaSans-SemiBold': require('../assets/fonts/mona-sans-variable.woff2'),
-    'MonaSans-Bold':     require('../assets/fonts/mona-sans-variable.woff2'),
-    // IBM Plex Sans Arabic -- AR locale companion (4 static cuts).
-    'IBMPlexSansArabic-Regular':  require('../assets/fonts/ibm-plex-sans-arabic-regular.woff2'),
-    'IBMPlexSansArabic-Medium':   require('../assets/fonts/ibm-plex-sans-arabic-medium.woff2'),
-    'IBMPlexSansArabic-SemiBold': require('../assets/fonts/ibm-plex-sans-arabic-semibold.woff2'),
-    'IBMPlexSansArabic-Bold':     require('../assets/fonts/ibm-plex-sans-arabic-bold.woff2'),
-    // Barlow body face (kept).
+    // Mona Sans -- display + title roles.
+    'MonaSans-Regular':  MonaSans_400Regular,
+    'MonaSans-Medium':   MonaSans_500Medium,
+    'MonaSans-SemiBold': MonaSans_600SemiBold,
+    'MonaSans-Bold':     MonaSans_700Bold,
+    // IBM Plex Sans Arabic -- AR locale companion.
+    'IBMPlexSansArabic-Regular':  IBMPlexSansArabic_400Regular,
+    'IBMPlexSansArabic-Medium':   IBMPlexSansArabic_500Medium,
+    'IBMPlexSansArabic-SemiBold': IBMPlexSansArabic_600SemiBold,
+    'IBMPlexSansArabic-Bold':     IBMPlexSansArabic_700Bold,
+    // Barlow -- body face.
     Barlow_400Regular,
     Barlow_500Medium,
     Barlow_600SemiBold,
     Barlow_700Bold,
-    // JetBrains Mono numerics.
+    // JetBrains Mono -- inline numerics.
     JetBrainsMono_500Medium,
   });
 
