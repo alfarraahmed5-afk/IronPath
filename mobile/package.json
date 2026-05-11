@@ -21,6 +21,7 @@
     "@expo-google-fonts/barlow": "^0.2.3",
     "@expo-google-fonts/barlow-condensed": "^0.2.3",
     "@expo-google-fonts/jetbrains-mono": "^0.2.3",
+    "@expo/fingerprint": "^0.16.7",
     "@react-native-menu/menu": "^1.2.3",
     "@shopify/react-native-skia": "2.4.18",
     "@supabase/supabase-js": "^2.0.0",
@@ -75,13 +76,13 @@
     "typescript": "^5.0.0"
   },
   "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "1.27.0",
-    "lightningcss-linux-x64-musl": "1.27.0",
+    "lightningcss-darwin-arm64": "1.27.0",
+    "lightningcss-darwin-x64": "1.27.0",
     "lightningcss-linux-arm64-gnu": "1.27.0",
     "lightningcss-linux-arm64-musl": "1.27.0",
-    "lightningcss-darwin-x64": "1.27.0",
-    "lightningcss-darwin-arm64": "1.27.0",
-    "lightningcss-win32-x64-msvc": "1.27.0",
-    "lightningcss-win32-arm64-msvc": "1.27.0"
+    "lightningcss-linux-x64-gnu": "1.27.0",
+    "lightningcss-linux-x64-musl": "1.27.0",
+    "lightningcss-win32-arm64-msvc": "1.27.0",
+    "lightningcss-win32-x64-msvc": "1.27.0"
   }
 }
